@@ -1,10 +1,5 @@
-import {
-  FutureNet,
-  MainNet,
-  NetworkConfig,
-  TestNet,
-} from "stellar-plus/lib/stellar-plus/network/index.js";
 import { StellarNetwork } from "@fifo/spp-sdk";
+import { FutureNet, MainNet, type NetworkConfig, TestNet } from "@colibri/core";
 export function selectNetwork(envNetwork: string): {
   NETWORK_CONFIG: NetworkConfig;
   NETWORK: StellarNetwork;
