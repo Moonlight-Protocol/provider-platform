@@ -1,4 +1,4 @@
-import { load } from "https://deno.land/std@0.224.0/dotenv/mod.ts";
+import { load } from "dotenv";
 
 const env = await load(); // Reads from .env file
 
@@ -7,7 +7,6 @@ export default function (key: string): string {
 
   if (value === undefined) {
     const denoVal = Deno.env.get(key);
-  
 
     if (denoVal === undefined) {
       throw new Error(`${key} is not loaded`);
@@ -16,4 +15,3 @@ export default function (key: string): string {
   }
   return value;
 }
-
