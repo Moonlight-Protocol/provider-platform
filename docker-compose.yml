@@ -3,9 +3,9 @@ services:
   db:
     image: postgres:latest
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: devpass
-      POSTGRES_DB: executor
+      POSTGRES_USER: "${POSTGRES_USER:-admin}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-devpass}"
+      POSTGRES_DB: "${POSTGRES_DB:-provider_platform_db}"
     ports:
       - "5432:5432"
     volumes:
