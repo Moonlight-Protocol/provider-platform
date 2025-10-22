@@ -1,5 +1,5 @@
-import { MetadataHelper, ProcessEngine } from "@fifo/convee";
-import { STELLAR_SERVICE_ACCOUNT } from "../service/service-account.ts";
+import { ProcessEngine } from "@fifo/convee";
+import { PROVIDER_ACCOUNT } from "../service/service-account.ts";
 import getBase64Nonce from "../../../utils/rand/getBase64Nonce.ts";
 import {
   Account,
@@ -47,9 +47,8 @@ export const CREATE_CHALLENGE_PROCESS = ProcessEngine.create(
       throw new Error("Missing account in query parameters");
     }
     try {
-      const { tx, nonce, minTime, maxTime } = getChallengeTransaction(
-        clientAccount,
-      );
+      const { tx, nonce, minTime, maxTime } =
+        getChallengeTransaction(clientAccount);
 
       const xdr = tx.toXDR();
       const txHash = tx.hash().toString("hex");
@@ -82,11 +81,11 @@ export const CREATE_CHALLENGE_PROCESS = ProcessEngine.create(
   },
   {
     name: "CreateChallengeProcessEngine",
-  },
+  }
 );
 
 const getChallengeTransaction = (
-  clientAccount: string,
+  clientAccount: string
 ): {
   tx: Transaction;
   nonce: string;
@@ -105,12 +104,9 @@ const getChallengeTransaction = (
     value: nonceBase64,
   });
 
-  const serviceAccount = new Account(
-    STELLAR_SERVICE_ACCOUNT.getPublicKey(),
-    "-1",
-  );
+  const providerAccount = new Account(PROVIDER_ACCOUNT.getPublicKey(), "-1");
 
-  const txBuilder = new TransactionBuilder(serviceAccount, {
+  const txBuilder = new TransactionBuilder(providerAccount, {
     timebounds: { minTime: minTime.toString(), maxTime: maxTime.toString() },
     networkPassphrase: NETWORK_CONFIG.networkPassphrase,
     fee: "0",
@@ -119,12 +115,9 @@ const getChallengeTransaction = (
   txBuilder.addOperation(op);
   const builtTx = txBuilder.build();
 
-  const serviceKeyPair = Keypair.fromSecret(
-    STELLAR_SERVICE_ACCOUNT.getSecretKey(),
-  );
-  builtTx.sign(serviceKeyPair);
+  const signedTx = PROVIDER_ACCOUNT.signTransaction(builtTx);
 
-  return { tx: builtTx, nonce: nonceBase64, minTime, maxTime };
+  return { tx: signedTx, nonce: nonceBase64, minTime, maxTime };
 };
 
 // export class CreateChallengeProcessEngine extends ProcessEngine<

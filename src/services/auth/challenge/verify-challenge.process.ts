@@ -1,7 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
-import { StellarPlus } from "stellar-plus";
-import { Transaction } from "stellar-sdk";
-import { STELLAR_SERVICE_ACCOUNT } from "../service/service-account.ts";
+import { Transaction, Keypair } from "stellar-sdk";
+import { PROVIDER_ACCOUNT } from "../service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "../../../config/env.ts";
 import { ContextWithParsedPayload } from "../../../api/utils/parse-request-payload.ts";
 import { PostAuthPayload } from "../../../api/v1/stellar/auth/post.schema.ts";
@@ -15,7 +14,7 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
     try {
       const tx = new Transaction(
         signedChallenge,
-        NETWORK_CONFIG.networkPassphrase,
+        NETWORK_CONFIG.networkPassphrase
       );
 
       if (tx.sequence !== "0") {
@@ -37,7 +36,7 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
 
       if (!firstOp.name.startsWith(`${SERVICE_DOMAIN} auth`)) {
         throw new Error(
-          "Invalid challenge: operation key does not match expected format",
+          "Invalid challenge: operation key does not match expected format"
         );
       }
 
@@ -61,21 +60,16 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
         throw new Error("Invalid challenge: missing client public key");
       }
 
-      const clientAccHandler = new StellarPlus.Account.Base({
-        networkConfig: NETWORK_CONFIG,
-        publicKey: clientPublicKey,
-      });
+      const clientKeypair = Keypair.fromPublicKey(clientPublicKey);
 
       let isSignedByServer = false;
       let isSignedByClient = false;
 
       for (const sig of tx.signatures) {
-        if (
-          STELLAR_SERVICE_ACCOUNT.verifySignature(tx.hash(), sig.signature())
-        ) {
+        if (PROVIDER_ACCOUNT.verifySignature(tx.hash(), sig.signature())) {
           isSignedByServer = true;
         }
-        if (clientAccHandler.verifySignature(tx.hash(), sig.signature())) {
+        if (clientKeypair.verifySignature(tx.hash(), sig.signature())) {
           isSignedByClient = true;
         }
       }
@@ -94,5 +88,5 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
   },
   {
     name: "VerifyChallengeProcessEngine",
-  },
+  }
 );
