@@ -14,6 +14,7 @@
   "imports": {
     "@colibri/core": "jsr:@colibri/core@^0.6.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.5.0",
+    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.3.0",
     "stellar-sdk": "npm:@stellar/stellar-sdk@14.2.0",
 
     "dotenv": "https://deno.land/std@0.224.0/dotenv/mod.ts",

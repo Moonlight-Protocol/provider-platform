@@ -2,12 +2,16 @@
   "version": "5",
   "specifiers": {
     "jsr:@colibri/core@0.6": "0.6.0",
+    "jsr:@colibri/core@~0.5.3": "0.5.3",
     "jsr:@fifo/convee@0.5": "0.5.2",
     "jsr:@fifo/convee@0.9": "0.9.0",
     "jsr:@fifo/executor@0.2.0": "0.2.0",
     "jsr:@fifo/spp-sdk@~0.1.9": "0.1.9",
+    "jsr:@moonlight/moonlight-sdk@0.3": "0.3.0",
     "jsr:@noble/curves@^1.7.1": "1.9.0",
+    "jsr:@noble/curves@^1.8.0": "1.9.0",
     "jsr:@noble/hashes@1.8.0": "1.8.0",
+    "jsr:@noble/hashes@^1.6.1": "1.8.0",
     "jsr:@noble/hashes@^1.7.1": "1.8.0",
     "jsr:@oak/commons@1": "1.0.1",
     "jsr:@oak/oak@17.1.4": "17.1.4",
@@ -28,6 +32,7 @@
     "jsr:@std/ulid@1": "1.0.0",
     "npm:@stellar/stellar-sdk@14": "14.2.0",
     "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
+    "npm:@stellar/stellar-sdk@^14.2.0": "14.2.0",
     "npm:@types/node@*": "24.2.0",
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@6.0.3": "6.0.3",
@@ -38,10 +43,19 @@
     "npm:zod@^3.24.0": "3.24.2"
   },
   "jsr": {
+    "@colibri/core@0.5.3": {
+      "integrity": "1c236c37e067d557fe03e027a4bba2a82e8ada4a917eb28450e64fbf2a3c2dd9",
+      "dependencies": [
+        "jsr:@colibri/core@~0.5.3",
+        "jsr:@fifo/convee@0.9",
+        "npm:@stellar/stellar-sdk@14",
+        "npm:buffer@^6.0.3"
+      ]
+    },
     "@colibri/core@0.6.0": {
       "integrity": "9cbe232cf9d910659b74f5f44b76e470b5249d7d390ea535d903342530884edf",
       "dependencies": [
-        "jsr:@colibri/core",
+        "jsr:@colibri/core@0.6",
         "jsr:@fifo/convee@0.9",
         "npm:@stellar/stellar-sdk@14",
         "npm:buffer@^6.0.3"
@@ -66,12 +80,23 @@
       "integrity": "17766ab2cbe6e6e48591494cedcefe0e86f9d2c6e2dc5ac0165f014d0d286d12",
       "dependencies": [
         "jsr:@fifo/executor",
-        "jsr:@noble/curves",
+        "jsr:@noble/curves@^1.7.1",
         "jsr:@noble/hashes@^1.7.1",
         "npm:asn1js",
         "npm:buffer@6.0.3",
         "npm:stellar-plus",
         "npm:zod@3.24.2"
+      ]
+    },
+    "@moonlight/moonlight-sdk@0.3.0": {
+      "integrity": "24b73f166c97efd5f0a57111606dc49e1a6f123e468913077cdf70e7c7c48609",
+      "dependencies": [
+        "jsr:@colibri/core@~0.5.3",
+        "jsr:@noble/curves@^1.8.0",
+        "jsr:@noble/hashes@^1.6.1",
+        "npm:@stellar/stellar-sdk@^14.2.0",
+        "npm:asn1js",
+        "npm:buffer@6.0.3"
       ]
     },
     "@noble/curves@1.9.0": {
@@ -3708,6 +3733,7 @@
       "jsr:@colibri/core@0.6",
       "jsr:@fifo/convee@0.5",
       "jsr:@fifo/spp-sdk@~0.1.9",
+      "jsr:@moonlight/moonlight-sdk@0.3",
       "jsr:@oak/oak@^17.1.4",
       "jsr:@olli/kvdex@^3.1.4",
       "npm:@stellar/stellar-sdk@14.2.0",
