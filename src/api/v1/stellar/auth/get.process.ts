@@ -1,4 +1,5 @@
 import { Status } from "@oak/oak";
+
 import { Pipeline } from "@fifo/convee";
 import { parseAndValidateQueryFactory } from "../../../utils/parse-request-query.ts";
 import { type GetAuthResPayload, getAuthSchema } from "./get.schema.ts";
@@ -17,7 +18,7 @@ import { db } from "../../../../db/config.ts";
 const appendSchema = appendSchemaToContextFactory(getAuthSchema);
 const parse = parseAndValidateQueryFactory<typeof getAuthSchema>();
 const setSuccessResponse = async (input: CreateChallengeOutput) => {
-  return {
+  return await {
     ctx: input.ctx,
     response: {
       status: Status.OK,
@@ -48,10 +49,12 @@ const getAuthPipeline = Pipeline.create(
 export const getAuthEndpoint = (ctx: Context) => {
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
+  getAuthPipeline.addPlugin(errorPlugin, getAuthPipeline.name);
+
   db.users
     .findMany(["GDS3SZFBA4KYFUNFG4VPBAOV6B4IF2FENNSWTBKXHH4ZRRK26TMYWQ3V"])
     .then((users) => {
       console.log(users);
     });
-  return getAuthPipeline.run(ctx, { singleUsePlugins: [errorPlugin] });
+  return getAuthPipeline.run(ctx);
 };

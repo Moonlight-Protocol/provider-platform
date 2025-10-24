@@ -1,27 +1,36 @@
-import { OPEX_SIGNER } from "../../config/env.ts";
+import {
+  CHANEL_CONTRACT_ID,
+  NETWORK,
+  OPEX_SIGNER,
+  OPEX_SK,
+} from "../../config/env.ts";
+import {
+  UtxoBasedStellarAccount,
+  StellarDerivator,
+  UTXOStatus,
+} from "@moonlight/moonlight-sdk";
 
-console.log("==>> TODO: Enable OPEX account for Moonlight UTXO management");
 console.log(".  > OPEX:", OPEX_SIGNER.publicKey());
 
-// export const OPEX = new SPPAccount<StellarNetworkDerivation>({
-//   networkConfig: NETWORK_CONFIG,
-//   secretKey: OPEX_HANDLER.getSecretKey(),
-//   derivatorFactory: StellarNetworkDerivatorFactory({
-//     network: NETWORK,
-//     smartContract: CHANEL_CONTRACT_ID,
-//   }),
-//   utxoBalances: (utxos: UTXOPublicKey[]) =>
-//     POOL.balances({
-//       utxos: utxos.map((u) => Buffer.from(u)),
-//       txInvocation: TX_INVOCATION,
-//     }),
-//   defaultSelectionDirective: SelectionDirective.OLDER_FIRST,
-// });
+export const OPEX = new UtxoBasedStellarAccount({
+  root: OPEX_SK,
+  derivator: new StellarDerivator().withNetworkAndContract(
+    NETWORK,
+    CHANEL_CONTRACT_ID
+  ),
+  options: {
+    batchSize: 100,
+  },
+});
 
-// await OPEX.deriveAndLoad(200);
-// console.log(
-//   "LOADED: ",
-//   OPEX.getUTXOs().map((u) => `${u.sequence} - ${u.status}: ${u.balance}`)
-// );
+await OPEX.deriveBatch({ startIndex: 1, count: 5 });
+await OPEX.batchLoad();
 
-// console.log("LOADED FREE: ", OPEX.getFreeSequences());
+console.log(
+  "LOADED:",
+  OPEX.getAllUTXOs().length
+  //   OPEX.getAllUTXOs().map((u) => `${u.index} - ${u.status}: ${u.balance}`)
+);
+console.log("Total Balance : ", OPEX.getTotalBalance());
+
+console.log("LOADED FREE: ", OPEX.getUTXOsByState(UTXOStatus.FREE).length);

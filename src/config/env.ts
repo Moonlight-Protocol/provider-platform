@@ -4,6 +4,7 @@ import { requireSecretKey } from "../utils/env/requireSecretKey.ts";
 import { requirePublicKey } from "../utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "../utils/env/requireBaseFee.ts";
+import { requireContractId } from "../utils/env/requireContractId.ts";
 
 // Every required variable is retrieved via requireEnv.
 
@@ -15,8 +16,8 @@ export const CHALLENGE_TTL = Number(requireEnv("CHALLENGE_TTL"));
 export const SESSION_TTL = Number(requireEnv("SESSION_TTL"));
 
 // Moonlight
-export const CHANEL_CONTRACT_ID = requireEnv("CHANEL_CONTRACT_ID");
-export const CHANNEL_AUTH_ID = requireEnv("CHANNEL_AUTH_ID");
+export const CHANEL_CONTRACT_ID = requireContractId("CHANEL_CONTRACT_ID");
+export const CHANNEL_AUTH_ID = requireContractId("CHANNEL_AUTH_ID");
 
 // ACCOUNTS
 export const OPEX_SK = requireSecretKey("OPEX_SECRET");

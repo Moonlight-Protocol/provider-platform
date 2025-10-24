@@ -44,5 +44,7 @@ const getTransactionsPipeline = Pipeline.create(
 export const getTransactionsEndpoint = (ctx: Context) => {
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
-  return getTransactionsPipeline.run(ctx, { singleUsePlugins: [errorPlugin] });
+  getTransactionsPipeline.addPlugin(errorPlugin, getTransactionsPipeline.name);
+
+  return getTransactionsPipeline.run(ctx);
 };

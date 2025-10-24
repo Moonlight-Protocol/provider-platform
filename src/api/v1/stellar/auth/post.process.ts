@@ -12,16 +12,13 @@ import { Pipeline, Transformer } from "@fifo/convee";
 import { VERIFY_CHALLENGE_PROCESS } from "../../../../services/auth/challenge/verify-challenge.process.ts";
 import { COMPARE_CHALLENGE_PROCESS } from "../../../../services/auth/challenge/compare-challenge.process.ts";
 import { UPDATE_CHALLENGE_SESSION } from "../../../../services/auth/challenge/update-challenge-session.process.ts";
-import {
-  UPDATE_CHALLENGE_DB,
-} from "../../../../services/auth/challenge/update-challenge-db.process.ts";
+import { UPDATE_CHALLENGE_DB } from "../../../../services/auth/challenge/update-challenge-db.process.ts";
 import { NETWORK_CONFIG } from "../../../../config/env.ts";
 import generateJwt from "../../../../services/auth/generate-jwt.ts";
 import { processErrorResponsePluginFactory } from "../../../utils/plugins/process-error-response.ts";
 import { appendSchemaToContextFactory } from "../../../utils/append-schema-to-context.ts";
 import { ContextWith } from "../../../types.ts";
 import { setApiResponse } from "../../../utils/set-api-response.ts";
-
 
 // Additional Transformer to provide a new JWT for the account
 const GET_JWT_FOR_USER = async (
@@ -42,7 +39,6 @@ const GET_JWT_FOR_USER = async (
     jwt,
   };
 };
-
 
 const appendSchema = appendSchemaToContextFactory(postAuthSchema);
 const parse = parseAndValidateRequestFactory<typeof postAuthSchema>();
@@ -79,5 +75,7 @@ const postAuthPipeline = Pipeline.create(
 export const postAuthEndpoint = (ctx: Context) => {
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
-  return postAuthPipeline.run(ctx, { singleUsePlugins: [errorPlugin] });
+  postAuthPipeline.addPlugin(errorPlugin, postAuthPipeline.name);
+
+  return postAuthPipeline.run(ctx);
 };

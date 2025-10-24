@@ -1,15 +1,16 @@
-import { StellarNetwork } from "@fifo/spp-sdk";
 import { FutureNet, MainNet, type NetworkConfig, TestNet } from "@colibri/core";
+import { StellarNetworkId } from "@moonlight/moonlight-sdk";
+
 export function selectNetwork(envNetwork: string): {
   NETWORK_CONFIG: NetworkConfig;
-  NETWORK: StellarNetwork;
+  NETWORK: StellarNetworkId;
   POOL_ASSET: { code: string; contractId: string };
 } {
   switch (envNetwork) {
     case "testnet":
       return {
         NETWORK_CONFIG: TestNet(),
-        NETWORK: StellarNetwork.Testnet,
+        NETWORK: StellarNetworkId.Testnet,
         POOL_ASSET: {
           code: "XLM",
           contractId:
@@ -19,13 +20,13 @@ export function selectNetwork(envNetwork: string): {
     case "mainnet":
       return {
         NETWORK_CONFIG: MainNet(),
-        NETWORK: StellarNetwork.Mainnet,
+        NETWORK: StellarNetworkId.Mainnet,
         POOL_ASSET: { code: "XLM", contractId: "Not Defined" },
       };
     case "futurenet":
       return {
         NETWORK_CONFIG: FutureNet(),
-        NETWORK: StellarNetwork.Futurenet,
+        NETWORK: StellarNetworkId.Futurenet,
         POOL_ASSET: { code: "XLM", contractId: "Not Defined" },
       };
     default:

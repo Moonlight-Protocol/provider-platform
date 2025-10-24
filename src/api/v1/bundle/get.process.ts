@@ -42,5 +42,7 @@ const getBundlePipeline = Pipeline.create(
 export const getBundleEndpoint = (ctx: Context) => {
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
-  return getBundlePipeline.run(ctx, { singleUsePlugins: [errorPlugin] });
+  getBundlePipeline.addPlugin(errorPlugin, getBundlePipeline.name);
+
+  return getBundlePipeline.run(ctx);
 };
