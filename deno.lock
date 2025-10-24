@@ -3,8 +3,8 @@
   "specifiers": {
     "jsr:@colibri/core@0.6": "0.6.0",
     "jsr:@colibri/core@~0.5.3": "0.5.3",
-    "jsr:@fifo/convee@0.5": "0.5.2",
-    "jsr:@fifo/convee@0.9": "0.9.0",
+    "jsr:@fifo/convee@0.9": "0.9.2",
+    "jsr:@fifo/convee@~0.9.2": "0.9.2",
     "jsr:@fifo/executor@0.2.0": "0.2.0",
     "jsr:@fifo/spp-sdk@~0.1.9": "0.1.9",
     "jsr:@moonlight/moonlight-sdk@0.3": "0.3.0",
@@ -33,7 +33,6 @@
     "npm:@stellar/stellar-sdk@14": "14.2.0",
     "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
     "npm:@stellar/stellar-sdk@^14.2.0": "14.2.0",
-    "npm:@types/node@*": "24.2.0",
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
@@ -61,11 +60,8 @@
         "npm:buffer@^6.0.3"
       ]
     },
-    "@fifo/convee@0.5.2": {
-      "integrity": "c7b0e336502533c1ad404a26c03e9915800af7b67e35bf33e0616d934e4bf9f8"
-    },
-    "@fifo/convee@0.9.0": {
-      "integrity": "d81284c32f4e0567c06793f6a6ceb4a3ffa8817ee5958b7abacdb6416c474c47"
+    "@fifo/convee@0.9.2": {
+      "integrity": "178066e406335a88f90558e89f9a01d7b57f9aa3e675cd2f6548534b8ff14286"
     },
     "@fifo/executor@0.2.0": {
       "integrity": "73242aa5f5d2a7c08474aff8f51afe4fa84fcb3838dd6c816f9fed27da482509",
@@ -3724,14 +3720,22 @@
     }
   },
   "remote": {
+    "https://deno.land/std@0.221.0/encoding/_util.ts": "beacef316c1255da9bc8e95afb1fa56ed69baef919c88dc06ae6cb7a6103d376",
+    "https://deno.land/std@0.221.0/encoding/base64.ts": "8ccae67a1227b875340a8582ff707f37b131df435b07080d3bb58e07f5f97807",
+    "https://deno.land/std@0.221.0/encoding/base64url.ts": "9cc46cf510436be63ac00ebf97a7de1993e603ca58e1853b344bf90d80ea9945",
     "https://deno.land/std@0.224.0/dotenv/mod.ts": "0180eaeedaaf88647318811cdaa418cc64dc51fb08354f91f5f480d0a1309f7d",
     "https://deno.land/std@0.224.0/dotenv/parse.ts": "09977ff88dfd1f24f9973a338f0f91bbdb9307eb5ff6085446e7c423e4c7ba0c",
-    "https://deno.land/std@0.224.0/dotenv/stringify.ts": "275da322c409170160440836342eaa7cf012a1d11a7e700d8ca4e7f2f8aa4615"
+    "https://deno.land/std@0.224.0/dotenv/stringify.ts": "275da322c409170160440836342eaa7cf012a1d11a7e700d8ca4e7f2f8aa4615",
+    "https://deno.land/x/djwt/algorithm.ts": "b1c6645f9dbd6e6c47c123a3b18c28b956f91c65ed17f5b6d5d968fc3750542b",
+    "https://deno.land/x/djwt/deps.ts": "a7954fe567f2097b4f6aca11d091b6df658e485a817ac4dee47257ed5c28fd6e",
+    "https://deno.land/x/djwt/mod.ts": "962d8f2c4d6a4db111f45d777b152356aec31ba7db0ca664601175a422629857",
+    "https://deno.land/x/djwt/signature.ts": "16238fbf558267c85dd6c0178045f006c8b914a7301db87149f3318326569272",
+    "https://deno.land/x/djwt/util.ts": "5cb264d2125c553678e11446bcfa0494025d120e3f59d0a3ab38f6800def697d"
   },
   "workspace": {
     "dependencies": [
       "jsr:@colibri/core@0.6",
-      "jsr:@fifo/convee@0.5",
+      "jsr:@fifo/convee@~0.9.2",
       "jsr:@fifo/spp-sdk@~0.1.9",
       "jsr:@moonlight/moonlight-sdk@0.3",
       "jsr:@oak/oak@^17.1.4",
