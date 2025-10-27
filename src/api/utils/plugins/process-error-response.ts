@@ -1,9 +1,8 @@
 import {
-  BeltPluginError,
   type ConveeError,
   Pipeline,
   Plugin,
-  Transformer,
+  type Transformer,
 } from "@fifo/convee";
 import { appendCtxResponseFactory } from "../append-ctx-response.ts";
 import { setApiResponse } from "../set-api-response.ts";
@@ -22,7 +21,12 @@ export const processErrorResponsePluginFactory = (ctx: Context) => {
       [ERROR_TO_API_RESPONSE, appendCtxResponseFactory(ctx), setApiResponse],
       { name: "APIErrorProcessingPipeline" }
     );
-    const result = await errorPipeline.run(error);
+    const result = await errorPipeline.run(error).catch((e) => {
+      throw new Error(
+        `Unexpected Error when processing error response: ${e.message}`
+      );
+    });
+
     return result;
   };
 

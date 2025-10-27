@@ -7,7 +7,7 @@ type Output = ErrorResponse;
 
 export const ERROR_TO_API_RESPONSE: Transformer<Input, Output> = async (
   error: Error,
-  _metadataHelper?: MetadataHelper,
+  _metadataHelper?: MetadataHelper
 ): Promise<Output> => {
   const status = Status.InternalServerError;
 

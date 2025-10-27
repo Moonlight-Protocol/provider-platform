@@ -32,14 +32,14 @@ const setSuccessResponse = async (
   };
 };
 
-const getBundlePipeline = Pipeline.create(
-  [appendSchema, parse, LOAD_BUNDLE, setSuccessResponse, setApiResponse],
-  {
-    name: "GetBundlePipeline",
-  }
-);
-
 export const getBundleEndpoint = (ctx: Context) => {
+  const getBundlePipeline = Pipeline.create(
+    [appendSchema, parse, LOAD_BUNDLE, setSuccessResponse, setApiResponse],
+    {
+      name: "GetBundlePipeline",
+    }
+  );
+
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
   getBundlePipeline.addPlugin(errorPlugin, getBundlePipeline.name);

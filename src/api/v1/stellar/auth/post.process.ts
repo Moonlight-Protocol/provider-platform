@@ -55,24 +55,23 @@ const setSuccessResponse = async (input: ContextWith<string, "jwt">) => {
   };
 };
 
-const postAuthPipeline = Pipeline.create(
-  [
-    appendSchema,
-    parse,
-    VERIFY_CHALLENGE_PROCESS,
-    COMPARE_CHALLENGE_PROCESS,
-    UPDATE_CHALLENGE_SESSION,
-    UPDATE_CHALLENGE_DB,
-    GET_JWT_FOR_USER,
-    setSuccessResponse,
-    setApiResponse,
-  ],
-  {
-    name: "PostAuthPipeline",
-  }
-);
-
 export const postAuthEndpoint = (ctx: Context) => {
+  const postAuthPipeline = Pipeline.create(
+    [
+      appendSchema,
+      parse,
+      VERIFY_CHALLENGE_PROCESS,
+      COMPARE_CHALLENGE_PROCESS,
+      UPDATE_CHALLENGE_SESSION,
+      UPDATE_CHALLENGE_DB,
+      GET_JWT_FOR_USER,
+      setSuccessResponse,
+      setApiResponse,
+    ],
+    {
+      name: "PostAuthPipeline",
+    }
+  );
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
   postAuthPipeline.addPlugin(errorPlugin, postAuthPipeline.name);

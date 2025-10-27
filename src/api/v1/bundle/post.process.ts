@@ -38,14 +38,20 @@ const setSuccessResponse = async (
   };
 };
 
-const postBundlePipeline = Pipeline.create(
-  [appendSchema, parse, PROCESS_NEW_BUNDLE, setSuccessResponse, setApiResponse],
-  {
-    name: "PostBundlePipeline",
-  }
-);
-
 export const postBundleEndpoint = (ctx: Context) => {
+  const postBundlePipeline = Pipeline.create(
+    [
+      appendSchema,
+      parse,
+      PROCESS_NEW_BUNDLE,
+      setSuccessResponse,
+      setApiResponse,
+    ],
+    {
+      name: "PostBundlePipeline",
+    }
+  );
+
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
   postBundlePipeline.addPlugin(errorPlugin, postBundlePipeline.name);

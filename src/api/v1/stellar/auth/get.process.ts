@@ -31,22 +31,22 @@ const setSuccessResponse = async (input: CreateChallengeOutput) => {
   };
 };
 
-const getAuthPipeline = Pipeline.create(
-  [
-    appendSchema,
-    parse,
-    CREATE_CHALLENGE_PROCESS,
-    CREATE_CHALLENGE_DB,
-    CREATE_CHALLENGE_MEMORY,
-    setSuccessResponse,
-    setApiResponse,
-  ],
-  {
-    name: "CreateChallengePipeline",
-  }
-);
-
 export const getAuthEndpoint = (ctx: Context) => {
+  const getAuthPipeline = Pipeline.create(
+    [
+      appendSchema,
+      parse,
+      CREATE_CHALLENGE_PROCESS,
+      CREATE_CHALLENGE_DB,
+      CREATE_CHALLENGE_MEMORY,
+      setSuccessResponse,
+      setApiResponse,
+    ],
+    {
+      name: "CreateChallengePipeline",
+    }
+  );
+
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
   getAuthPipeline.addPlugin(errorPlugin, getAuthPipeline.name);

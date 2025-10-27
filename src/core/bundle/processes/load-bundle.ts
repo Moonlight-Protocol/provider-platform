@@ -14,7 +14,7 @@ export const LOAD_BUNDLE = ProcessEngine.create(
 
     const loadedBundle = await db.bundles.findByPrimaryIndex("hash", hash);
     if (loadedBundle === null) {
-      throw new Error("Not Found");
+      throw new Error("Bundle Not Found");
     }
 
     if (loadedBundle.value.clientAccount !== sessionData.sub) {

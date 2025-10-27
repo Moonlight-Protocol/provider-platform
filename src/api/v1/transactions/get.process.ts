@@ -34,14 +34,13 @@ const setSuccessResponse = async (
   };
 };
 
-const getTransactionsPipeline = Pipeline.create(
-  [appendSchema, parse, LOAD_BUNDLES, setSuccessResponse, setApiResponse],
-  {
-    name: "GetTransactionsPipeline",
-  }
-);
-
 export const getTransactionsEndpoint = (ctx: Context) => {
+  const getTransactionsPipeline = Pipeline.create(
+    [appendSchema, parse, LOAD_BUNDLES, setSuccessResponse, setApiResponse],
+    {
+      name: "GetTransactionsPipeline",
+    }
+  );
   const errorPlugin = processErrorResponsePluginFactory(ctx);
 
   getTransactionsPipeline.addPlugin(errorPlugin, getTransactionsPipeline.name);

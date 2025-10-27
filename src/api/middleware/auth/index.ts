@@ -42,14 +42,13 @@ export async function jwtMiddleware(
 
     // Attach the verified payload to ctx.state for later use.
     ctx.state.session = payload;
-
-    await next();
   } catch (error) {
-    console.error("JWT verification failed:", error);
+    console.error("JWT verification failed with error:", error);
     ctx.response.status = 401;
     ctx.response.body = { error: "JWT verification failed" };
     return;
   }
+  await next();
 }
 
 export type JwtSessionData = JwtPayload;
