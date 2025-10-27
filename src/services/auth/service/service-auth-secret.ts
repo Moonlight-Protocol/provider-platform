@@ -1,3 +1,5 @@
+import { SERVICE_AUTH_SECRET } from "../../../config/env.ts";
+
 function generateSecret() {
   // Generate 32 random bytes
   const randomBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -6,7 +8,13 @@ function generateSecret() {
   return secret;
 }
 
-export const SERVICE_AUTH_SECRET = generateSecret();
+if (!SERVICE_AUTH_SECRET) {
+  console.warn(
+    "WARNING: SERVICE_AUTH_SECRET is not set. Generating a random secret. This is NOT recommended for production environments."
+  );
+}
+
+export const authSecret = SERVICE_AUTH_SECRET || generateSecret();
 
 async function importSecret(secret: string, isSignable?: boolean) {
   const keyData = new TextEncoder().encode(secret);
@@ -15,14 +23,12 @@ async function importSecret(secret: string, isSignable?: boolean) {
     keyData,
     { name: "HMAC", hash: "SHA-256" } as const,
     false,
-    ["verify" as const, ...(isSignable ? ["sign" as const] : [])],
+    ["verify" as const, ...(isSignable ? ["sign" as const] : [])]
   );
 }
 
-export const SERVICE_AUTH_SECRET_AS_CRYPTO_KEY = await importSecret(
-  SERVICE_AUTH_SECRET,
-);
+export const SERVICE_AUTH_SECRET_AS_CRYPTO_KEY = await importSecret(authSecret);
 export const SERVICE_AUTH_SECRET_AS_CRYPTO_KEY_SIGNABLE = await importSecret(
-  SERVICE_AUTH_SECRET,
-  true,
+  authSecret,
+  true
 );
