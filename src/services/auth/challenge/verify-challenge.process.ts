@@ -4,6 +4,7 @@ import { PROVIDER_ACCOUNT } from "../service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "../../../config/env.ts";
 import { ContextWithParsedPayload } from "../../../api/utils/parse-request-payload.ts";
 import { PostAuthPayload } from "../../../api/v1/stellar/auth/post.schema.ts";
+import type { Buffer } from "npm:buffer@^6.0.3";
 
 export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
 export type VerifyChallengeOutput = VerifyChallengeInput;
@@ -66,10 +67,15 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
       let isSignedByClient = false;
 
       for (const sig of tx.signatures) {
-        if (PROVIDER_ACCOUNT.verifySignature(tx.hash(), sig.signature())) {
+        if (
+          PROVIDER_ACCOUNT.verifySignature(
+            tx.hash() as unknown as Buffer, // Forcing type to Buffer as there seems to be an issue with the lib type inference
+            sig.signature() as unknown as Buffer // Forcing type to Buffer as there seems to be an issue with the lib type inference
+          )
+        ) {
           isSignedByServer = true;
         }
-        if (clientKeypair.verifySignature(tx.hash(), sig.signature())) {
+        if (clientKeypair.verify(tx.hash(), sig.signature())) {
           isSignedByClient = true;
         }
       }

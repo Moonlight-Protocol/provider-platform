@@ -18,7 +18,7 @@
     "stellar-sdk": "npm:@stellar/stellar-sdk@14.2.0",
 
     "dotenv": "https://deno.land/std@0.224.0/dotenv/mod.ts",
-    "buffer": "npm:buffer@6.0.3",
+    "buffer": "npm:buffer@^6.0.3",
     "asn1js": "npm:asn1js@3.0.5",
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
     "@olli/kvdex": "jsr:@olli/kvdex@^3.1.4",
