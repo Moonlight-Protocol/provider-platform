@@ -25,7 +25,7 @@ const OPEX_PK = requirePublicKey("OPEX_PUBLIC");
 export const PROVIDER_SK = requireSecretKey("PROVIDER_SK");
 
 // Config
-export const { NETWORK_CONFIG, NETWORK, POOL_ASSET } = selectNetwork(
+export const { NETWORK_CONFIG, NETWORK, CHANNEL_ASSET } = selectNetwork(
   requireEnv("NETWORK")
 );
 const NETWORK_FEE = requireBaseFee("NETWORK_FEE");

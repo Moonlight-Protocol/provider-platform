@@ -1,6 +1,6 @@
 import { TX_CONFIG } from "../../config/env.ts";
 import { RawBundle } from "../../models/bundle/bundle.schema.ts";
-import { POOL } from "../pool/index.ts";
+
 import { Buffer } from "buffer";
 
 export async function calculateChange(bundle: RawBundle): Promise<bigint> {

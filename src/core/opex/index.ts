@@ -8,7 +8,11 @@ import {
   UtxoBasedStellarAccount,
   StellarDerivator,
   UTXOStatus,
+  type UTXOPublicKey,
+  ChannelReadMethods,
 } from "@moonlight/moonlight-sdk";
+import { CHANNEL_CLIENT } from "../channel-client/index.ts";
+import { Buffer } from "node:buffer";
 
 console.log(".  > OPEX:", OPEX_SIGNER.publicKey());
 
@@ -18,8 +22,16 @@ export const OPEX = new UtxoBasedStellarAccount({
     NETWORK,
     CHANEL_CONTRACT_ID
   ),
+
   options: {
     batchSize: 100,
+    fetchBalances: (utxos: UTXOPublicKey[]) =>
+      CHANNEL_CLIENT.read({
+        method: ChannelReadMethods.utxo_balances,
+        methodArgs: {
+          utxos: utxos.map((u) => Buffer.from(u)),
+        },
+      }),
   },
 });
 

@@ -11,7 +11,6 @@ export const bundleModel = z.object({
   status: z.enum(["pending", "confirmed", "failed"]),
   feeCharged: z.string(),
   clientAccount: z.string(),
-  delegateUtxo: z.string(),
   txHash: z.string(),
 });
 
