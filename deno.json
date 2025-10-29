@@ -10,7 +10,6 @@
     "strict": true
   },
   "nodeModulesDir": "auto",
-  "exports": "./src/export/api.ts",
   "imports": {
     "@colibri/core": "jsr:@colibri/core@^0.6.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.9.2",

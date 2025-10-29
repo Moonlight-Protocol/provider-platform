@@ -1,21 +1,17 @@
 import { ProcessEngine } from "@fifo/convee";
-import { PostBundlePayload } from "../../../api/v1/bundle/post.schema.ts";
-import { ContextWithParsedPayload } from "../../../api/utils/parse-request-payload.ts";
-import { db } from "../../../db/config.ts";
+import type { PostBundlePayload } from "../../../http/v1/bundle/post.schema.ts";
+import type { ContextWithParsedPayload } from "../../../http/utils/parse-request-payload.ts";
+import { db } from "../../../infra/config/config.ts";
 
-import {
-  convertRawBundleToBuffer,
+import type {
   RawBundle,
 } from "../../../models/bundle/bundle.schema.ts";
-import { Bundle } from "../../../models/bundle/bundle.schema.ts";
-import { UTXO, UtxoStatus } from "../../../models/utxo/utxo.schema.ts";
-import { calculateChange } from "../calculate-change.ts";
-import { JwtSessionData } from "../../../api/middleware/auth/index.ts";
+import type { Bundle } from "../../../models/bundle/bundle.schema.ts";
+import { UtxoStatus } from "../../../models/utxo/utxo.schema.ts";
+import type { JwtSessionData } from "../../../http/middleware/auth/index.ts";
 
-import { OPEX } from "../../opex/index.ts";
 import { Buffer } from "buffer";
 import { sha256Hash } from "@fifo/spp-sdk";
-import { CHANNEL_CLIENT } from "../../channel-client/index.ts";
 
 export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
   async (input: ContextWithParsedPayload<PostBundlePayload>) => {
@@ -37,33 +33,6 @@ export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
     const txHash = bundle.hash;
     console.log("TX hash mocked as bundle hash: ", bundle.hash);
     console.log("change: ", 1n);
-
-    // const change = await calculateChange(rawBundle);
-
-    // const reserved = await OPEX.reserveUTXOs(1);
-
-    // if (!reserved) {
-    //   throw new Error("Insufficient OPEX UTXOs to process bundle");
-    // }
-
-    // const feeUTXO = reserved[0];
-
-    // const res = await CHANNEL_CLIENT.delegatedTransfer({
-    //   bundles: [convertRawBundleToBuffer(rawBundle)],
-    //   delegate_utxo: Buffer.from(delegateUtxo.keypair.publicKey),
-    //   txInvocation: TX_INVOCATION,
-    //   options: {
-    //     includeHashOutput: true,
-    //   },
-    // }).catch((error) => {
-    //   throw new Error("Error transferring bundle");
-    // });
-
-    // const txHash = (res as any).hash as string;
-    // OPEX.updateAndReleaseUtxos(selected).then(() => {
-    //   console.log("Updated OPEX UTXO");
-    //   console.log("Balance: ", OPEX.getUnspentBalance());
-    // });
 
     const cr = await db.bundles.add({
       createdAt: new Date(),
@@ -93,9 +62,6 @@ export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
 );
 
 const formatBundle = async (rawBundle: RawBundle): Promise<Bundle> => {
-  //   const bundlBufferPreHash = POOL.buildBundlePayload(
-  //     convertRawBundleToBuffer(rawBundle)
-  //   );
 
   const bundlBufferPreHash = Buffer.from(JSON.stringify(rawBundle)); // MOCK
 

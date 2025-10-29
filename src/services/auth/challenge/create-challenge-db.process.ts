@@ -1,6 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import { CreateChallengeOutput } from "./create-challenge.process.ts";
-import { db, kv } from "../../../db/config.ts";
+import { db } from "../../../infra/config/config.ts";
 import { User } from "../../../models/user/user.model.ts";
 
 export const CREATE_CHALLENGE_DB = ProcessEngine.create(

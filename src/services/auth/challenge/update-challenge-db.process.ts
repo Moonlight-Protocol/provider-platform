@@ -1,9 +1,9 @@
-import { MetadataHelper, ProcessEngine } from "@fifo/convee";
+import { ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
-import { NETWORK_CONFIG, SESSION_TTL } from "../../../config/env.ts";
-import { ContextWithParsedPayload } from "../../../api/utils/parse-request-payload.ts";
-import { PostAuthPayload } from "../../../api/v1/stellar/auth/post.schema.ts";
-import { db } from "../../../db/config.ts";
+import { NETWORK_CONFIG } from "../../../config/env.ts";
+import type { ContextWithParsedPayload } from "../../../http/utils/parse-request-payload.ts";
+import type { PostAuthPayload } from "../../../http/v1/stellar/auth/post.schema.ts";
+import { db } from "../../../infra/config/config.ts";
 
 export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
 export type VerifyChallengeOutput = VerifyChallengeInput;

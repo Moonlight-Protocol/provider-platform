@@ -6,11 +6,6 @@ import {
 } from "../../config/env.ts";
 import { PrivacyChannel } from "@moonlight/moonlight-sdk";
 
-// export const POOL = new PermissionlessPool({
-//   networkConfig: NETWORK_CONFIG,
-//   assetContractId: POOL_ASSET.contractId,
-// });
-
 export const CHANNEL_CLIENT = new PrivacyChannel(
   NETWORK_CONFIG,
   CHANEL_CONTRACT_ID,

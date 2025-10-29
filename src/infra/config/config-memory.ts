@@ -1,5 +1,5 @@
 import { kvdex } from "@olli/kvdex";
-import { sessionCollection } from "../models/auth/session/session.model.ts";
+import { sessionCollection } from "../../models/auth/session/session.model.ts";
 
 // const memoryKv = await Deno.openKv(":memory:");
 const memoryKv = await Deno.openKv("./.data/memory-kvdb.db");

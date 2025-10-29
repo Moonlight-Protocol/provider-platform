@@ -12,9 +12,9 @@ import {
   NETWORK_CONFIG,
   SERVICE_DOMAIN,
 } from "../../../config/env.ts";
-import type { ContextWithParsedQuery } from "../../../api/utils/parse-request-query.ts";
-import type { GetAuthPayload } from "../../../api/v1/stellar/auth/get.schema.ts";
-import { extractRequestMetadata } from "../../../api/utils/extract-request-metadata.ts";
+import type { ContextWithParsedQuery } from "../../../http/utils/parse-request-query.ts";
+import type { GetAuthPayload } from "../../../http/v1/stellar/auth/get.schema.ts";
+import { extractRequestMetadata } from "../../../http/utils/extract-request-metadata.ts";
 import type { Context } from "@oak/oak";
 import { isTransaction } from "@colibri/core";
 

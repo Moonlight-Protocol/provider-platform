@@ -1,6 +1,6 @@
 import { SESSION_TTL } from "../../../config/env.ts";
-import { memDb } from "../../../db/config-memory.ts";
-import { Session } from "../../../models/auth/session/session.model.ts";
+import { memDb } from "../../../infra/config/config-memory.ts";
+import type { Session } from "../../../models/auth/session/session.model.ts";
 
 class InMemorySessionManager {
   public async addSession(

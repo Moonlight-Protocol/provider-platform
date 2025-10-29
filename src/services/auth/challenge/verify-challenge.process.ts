@@ -2,8 +2,8 @@ import { ProcessEngine } from "@fifo/convee";
 import { Transaction, Keypair } from "stellar-sdk";
 import { PROVIDER_ACCOUNT } from "../service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "../../../config/env.ts";
-import { ContextWithParsedPayload } from "../../../api/utils/parse-request-payload.ts";
-import { PostAuthPayload } from "../../../api/v1/stellar/auth/post.schema.ts";
+import type { ContextWithParsedPayload } from "../../../http/utils/parse-request-payload.ts";
+import type { PostAuthPayload } from "../../../http/v1/stellar/auth/post.schema.ts";
 import type { Buffer } from "npm:buffer@^6.0.3";
 
 export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;

@@ -1,9 +1,9 @@
 import { ProcessEngine } from "@fifo/convee";
-import { db } from "../../../db/config.ts";
+import { db } from "../../../infra/config/config.ts";
 
-import type { JwtSessionData } from "../../../api/middleware/auth/index.ts";
-import type { ContextWithParsedQuery } from "../../../api/utils/parse-request-query.ts";
-import type { GetTransactionsPayload } from "../../../api/v1/transactions/get.schema.ts";
+import type { JwtSessionData } from "../../../http/middleware/auth/index.ts";
+import type { ContextWithParsedQuery } from "../../../http/utils/parse-request-query.ts";
+import type { GetTransactionsPayload } from "../../../http/v1/transactions/get.schema.ts";
 import type { BundleModel } from "../../../models/bundle/bundle.model.ts";
 
 export const LOAD_BUNDLES = ProcessEngine.create(
@@ -26,10 +26,6 @@ export const LOAD_BUNDLES = ProcessEngine.create(
     );
 
     const loadedBundles = dbQueryResult === null ? [] : dbQueryResult.result;
-
-    // if (result === null) {
-    //   throw new Error("Not Found");
-    // }
 
     loadedBundles.forEach((bundle) => {
       if (bundle.value.clientAccount !== sessionData.sub) {

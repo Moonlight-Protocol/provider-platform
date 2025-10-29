@@ -13,7 +13,7 @@ import type { Context } from "@oak/oak";
 import { appendSchemaToContextFactory } from "../../../utils/append-schema-to-context.ts";
 import { processErrorResponsePluginFactory } from "../../../utils/plugins/process-error-response.ts";
 import { setApiResponse } from "../../../utils/set-api-response.ts";
-import { db } from "../../../../db/config.ts";
+import { db } from "../../../../infra/config/config.ts";
 
 const appendSchema = appendSchemaToContextFactory(getAuthSchema);
 const parse = parseAndValidateQueryFactory<typeof getAuthSchema>();

@@ -1,9 +1,9 @@
 import { ProcessEngine } from "@fifo/convee";
-import { GetBundlePayload } from "../../../api/v1/bundle/get.schema.ts";
-import { db } from "../../../db/config.ts";
+import type { GetBundlePayload } from "../../../http/v1/bundle/get.schema.ts";
+import { db } from "../../../infra/config/config.ts";
 
-import { JwtSessionData } from "../../../api/middleware/auth/index.ts";
-import { ContextWithParsedQuery } from "../../../api/utils/parse-request-query.ts";
+import type { JwtSessionData } from "../../../http/middleware/auth/index.ts";
+import type { ContextWithParsedQuery } from "../../../http/utils/parse-request-query.ts";
 
 export const LOAD_BUNDLE = ProcessEngine.create(
   async (input: ContextWithParsedQuery<GetBundlePayload>) => {

@@ -20,7 +20,6 @@
     "jsr:@std/assert@1": "1.0.15",
     "jsr:@std/bytes@1": "1.0.6",
     "jsr:@std/bytes@^1.0.4": "1.0.6",
-    "jsr:@std/cli@1.0.12": "1.0.12",
     "jsr:@std/collections@^1.0.9": "1.1.3",
     "jsr:@std/crypto@1": "1.0.5",
     "jsr:@std/encoding@1": "1.0.10",
@@ -33,14 +32,12 @@
     "npm:@stellar/stellar-sdk@14": "14.2.0",
     "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
     "npm:@stellar/stellar-sdk@^14.2.0": "14.2.0",
-    "npm:@types/node@*": "24.2.0",
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:stellar-plus@0.14.4": "0.14.4",
-    "npm:zod@3.24.2": "3.24.2",
-    "npm:zod@^3.24.0": "3.24.2"
+    "npm:zod@3.24.2": "3.24.2"
   },
   "jsr": {
     "@colibri/core@0.5.3": {
@@ -70,7 +67,7 @@
         "jsr:@oak/oak@17.1.4",
         "jsr:@olli/kvdex",
         "npm:buffer@6.0.3",
-        "npm:zod@3.24.2"
+        "npm:zod"
       ]
     },
     "@fifo/spp-sdk@0.1.9": {
@@ -82,7 +79,7 @@
         "npm:asn1js",
         "npm:buffer@6.0.3",
         "npm:stellar-plus",
-        "npm:zod@3.24.2"
+        "npm:zod"
       ]
     },
     "@moonlight/moonlight-sdk@0.3.0": {
@@ -144,10 +141,8 @@
       "integrity": "007b1dca50a20f7d036d186fb24875ce2eb19d9c0b3a32878edc1d0e8181aa9a",
       "dependencies": [
         "jsr:@std/bytes@^1.0.4",
-        "jsr:@std/cli",
         "jsr:@std/collections",
-        "jsr:@std/ulid",
-        "npm:zod@^3.24.0"
+        "jsr:@std/ulid"
       ]
     },
     "@std/assert@1.0.15": {
@@ -155,9 +150,6 @@
     },
     "@std/bytes@1.0.6": {
       "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
-    },
-    "@std/cli@1.0.12": {
-      "integrity": "e5cfb7814d189da174ecd7a34fbbd63f3513e24a1b307feb2fcd5da47a070d90"
     },
     "@std/collections@1.1.3": {
       "integrity": "bf8b0818886df6a32b64c7d3b037a425111f28278d69fd0995aeb62777c986b0"
@@ -591,8 +583,8 @@
     "@types/node@12.20.55": {
       "integrity": "sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ=="
     },
-    "@types/node@18.19.129": {
-      "integrity": "sha512-hrmi5jWt2w60ayox3iIXwpMEnfUvOLJCRtrOPbHtH15nTjvO7uhnelvrdAs0dO0/zl5DZ3ZbahiaXEVb54ca/A==",
+    "@types/node@18.19.130": {
+      "integrity": "sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==",
       "dependencies": [
         "undici-types@5.26.5"
       ]
@@ -627,7 +619,7 @@
     "@types/ssh2@1.15.5": {
       "integrity": "sha512-N1ASjp/nXH3ovBHddRJpli4ozpk6UdDYIX4RJWFa9L1YKnzdhTlVmiGHm4DZnj/jLbqZpes4aeR30EFGQtvhQQ==",
       "dependencies": [
-        "@types/node@18.19.129"
+        "@types/node@18.19.130"
       ]
     },
     "accepts@1.3.8": {
@@ -1369,7 +1361,7 @@
       "dependencies": [
         "@types/cookie",
         "@types/cors",
-        "@types/node@18.19.129",
+        "@types/node@18.19.130",
         "accepts",
         "base64id",
         "cookie@0.4.2",
@@ -3720,6 +3712,9 @@
       "integrity": "sha512-lY7CDW43ECgW9u1TcT3IoXHflywfVqDYze4waEz812jR/bZ8FHDsl7pFQoSZTz5N+2NqRXs8GBwnAwo3ZNxqhQ=="
     }
   },
+  "redirects": {
+    "https://deno.land/x/djwt/mod.ts": "https://deno.land/x/djwt@v3.0.2/mod.ts"
+  },
   "remote": {
     "https://deno.land/std@0.221.0/encoding/_util.ts": "beacef316c1255da9bc8e95afb1fa56ed69baef919c88dc06ae6cb7a6103d376",
     "https://deno.land/std@0.221.0/encoding/base64.ts": "8ccae67a1227b875340a8582ff707f37b131df435b07080d3bb58e07f5f97807",
@@ -3727,11 +3722,11 @@
     "https://deno.land/std@0.224.0/dotenv/mod.ts": "0180eaeedaaf88647318811cdaa418cc64dc51fb08354f91f5f480d0a1309f7d",
     "https://deno.land/std@0.224.0/dotenv/parse.ts": "09977ff88dfd1f24f9973a338f0f91bbdb9307eb5ff6085446e7c423e4c7ba0c",
     "https://deno.land/std@0.224.0/dotenv/stringify.ts": "275da322c409170160440836342eaa7cf012a1d11a7e700d8ca4e7f2f8aa4615",
-    "https://deno.land/x/djwt/algorithm.ts": "b1c6645f9dbd6e6c47c123a3b18c28b956f91c65ed17f5b6d5d968fc3750542b",
-    "https://deno.land/x/djwt/deps.ts": "a7954fe567f2097b4f6aca11d091b6df658e485a817ac4dee47257ed5c28fd6e",
-    "https://deno.land/x/djwt/mod.ts": "962d8f2c4d6a4db111f45d777b152356aec31ba7db0ca664601175a422629857",
-    "https://deno.land/x/djwt/signature.ts": "16238fbf558267c85dd6c0178045f006c8b914a7301db87149f3318326569272",
-    "https://deno.land/x/djwt/util.ts": "5cb264d2125c553678e11446bcfa0494025d120e3f59d0a3ab38f6800def697d"
+    "https://deno.land/x/djwt@v3.0.2/algorithm.ts": "b1c6645f9dbd6e6c47c123a3b18c28b956f91c65ed17f5b6d5d968fc3750542b",
+    "https://deno.land/x/djwt@v3.0.2/deps.ts": "a7954fe567f2097b4f6aca11d091b6df658e485a817ac4dee47257ed5c28fd6e",
+    "https://deno.land/x/djwt@v3.0.2/mod.ts": "962d8f2c4d6a4db111f45d777b152356aec31ba7db0ca664601175a422629857",
+    "https://deno.land/x/djwt@v3.0.2/signature.ts": "16238fbf558267c85dd6c0178045f006c8b914a7301db87149f3318326569272",
+    "https://deno.land/x/djwt@v3.0.2/util.ts": "5cb264d2125c553678e11446bcfa0494025d120e3f59d0a3ab38f6800def697d"
   },
   "workspace": {
     "dependencies": [
