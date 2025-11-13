@@ -1,5 +1,5 @@
 import { z } from "npm:zod@3.24.2";
-import { baseSuccessResponseSchema } from "../../../default-schemas.ts";
+import { baseSuccessResponseSchema } from "@/http/default-schemas.ts";
 export const postAuthSchema = z.object({
   signedChallenge: z.string(),
 });

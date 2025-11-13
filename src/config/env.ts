@@ -1,12 +1,14 @@
-import { selectNetwork } from "./network.ts";
-import requireEnv from "../utils/env/requireEnv.ts";
-import { requireSecretKey } from "../utils/env/requireSecretKey.ts";
-import { requirePublicKey } from "../utils/env/requirePublicKey.ts";
+import { selectNetwork } from "@/config/network.ts";
+import requireEnv from "@/utils/env/requireEnv.ts";
+import { requireSecretKey } from "@/utils/env/requireSecretKey.ts";
+import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
-import { requireBaseFee } from "../utils/env/requireBaseFee.ts";
-import { requireContractId } from "../utils/env/requireContractId.ts";
+import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
+import { requireContractId } from "@/utils/env/requireContractId.ts";
 
 // Every required variable is retrieved via requireEnv.
+
+export const DATABASE_URL = requireEnv("DATABASE_URL");
 
 export const PORT = requireEnv("PORT");
 export const MODE = requireEnv("MODE");

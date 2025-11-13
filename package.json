@@ -1,0 +1,17 @@
+{
+  "name": "@moonlight-protocol/provider-platform",
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.6",
+    "dotenv": "^16.4.5",
+    "typescript": "^5.0.0"
+  }
+}
+

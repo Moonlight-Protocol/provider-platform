@@ -1,60 +1,60 @@
 import { ProcessEngine } from "@fifo/convee";
-import type { PostBundlePayload } from "../../../http/v1/bundle/post.schema.ts";
 import type { ContextWithParsedPayload } from "../../../http/utils/parse-request-payload.ts";
-import { db } from "../../../infra/config/config.ts";
 
 import type {
   RawBundle,
 } from "../../../models/bundle/bundle.schema.ts";
-import type { Bundle } from "../../../models/bundle/bundle.schema.ts";
-import { UtxoStatus } from "../../../models/utxo/utxo.schema.ts";
-import type { JwtSessionData } from "../../../http/middleware/auth/index.ts";
+import type { Bundle } from "@/models/bundle/bundle.schema.ts";
+import { UtxoStatus } from "@/models/utxo/utxo.schema.ts";
+import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 
 import { Buffer } from "buffer";
 import { sha256Hash } from "@fifo/spp-sdk";
+import type { PostBundlePayload } from "@/http/v1/bundle/post.schema.ts";
 
 export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
   async (input: ContextWithParsedPayload<PostBundlePayload>) => {
-    const rawBundle = input.payload.bundle;
-    const ctx = input.ctx;
-    const sessionData = ctx.state.session as JwtSessionData;
-    const bundle = await formatBundle(rawBundle);
+    // const rawBundle = input.payload.bundle;
+    // const ctx = input.ctx;
+    // const sessionData = ctx.state.session as JwtSessionData;
+    // const bundle = await formatBundle(rawBundle);
 
-    const loadedBundle = await db.bundles.findByPrimaryIndex(
-      "hash",
-      bundle.hash
-    );
-    console.log("Loaded Bundle: ", loadedBundle);
-    if (loadedBundle !== null) {
-      throw new Error("Invalid Bundle: Bundle already exists");
-    }
+    // const loadedBundle = await memDb.bundles.findByPrimaryIndex(
+    //   "hash",
+    //   bundle.hash
+    // );
+    // console.log("Loaded Bundle: ", loadedBundle);
+    // if (loadedBundle !== null) {
+    //   throw new Error("Invalid Bundle: Bundle already exists");
+    // }
 
-    console.log("MOCK TRANSACT!");
-    const txHash = bundle.hash;
-    console.log("TX hash mocked as bundle hash: ", bundle.hash);
-    console.log("change: ", 1n);
+    // console.log("MOCK TRANSACT!");
+    // const txHash = bundle.hash;
+    // console.log("TX hash mocked as bundle hash: ", bundle.hash);
+    // console.log("change: ", 1n);
 
-    const cr = await db.bundles.add({
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      hash: bundle.hash,
-      status: "confirmed",
-      feeCharged: 1n.toString(),
-      clientAccount: sessionData.sub,
-      txHash: txHash,
-    });
+    // const cr = await db.bundles.add({
+    //   createdAt: new Date(),
+    //   updatedAt: new Date(),
+    //   hash: bundle.hash,
+    //   status: "confirmed",
+    //   feeCharged: 1n.toString(),
+    //   clientAccount: sessionData.sub,
+    //   txHash: txHash,
+    // });
 
-    if (!cr.ok) {
-      throw new Error("Error storing bundle");
-    }
+    // if (!cr.ok) {
+    //   throw new Error("Error storing bundle");
+    // }
 
-    console.log("Bundle created: ", bundle.hash);
-    console.log(
-      "Bundle obj: ",
-      (await db.bundles.findByPrimaryIndex("hash", bundle.hash))?.value
-    );
+    // console.log("Bundle created: ", bundle.hash);
+    // console.log(
+    //   "Bundle obj: ",
+    //   (await db.bundles.findByPrimaryIndex("hash", bundle.hash))?.value
+    // );
 
-    return { ctx, transactionHash: txHash, bundleHash: bundle.hash };
+    // return { ctx, transactionHash: txHash, bundleHash: bundle.hash };
+    return await input;
   },
   {
     name: "ProcessNewBundleProcessEngine",

@@ -1,7 +1,5 @@
 import {
   type ContractId,
-  FutureNet,
-  MainNet,
   type NetworkConfig,
   TestNet,
 } from "@colibri/core";

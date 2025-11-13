@@ -1,5 +1,5 @@
 import { Router } from "@oak/oak";
-import authRouter from "./auth/routes.ts";
+import authRouter from "@/http/v1/stellar/auth/routes.ts";
 
 const stellarRouter = new Router();
 

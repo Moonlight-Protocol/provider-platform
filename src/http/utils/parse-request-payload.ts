@@ -16,6 +16,7 @@ export type ContextWithSchema<T extends ZodSchema> = {
 export type ContextWithParsedPayload<SchemaType> = {
   ctx: Context;
   payload: SchemaType;
+  jwt?: string;
 };
 
 // Factory that returns a Transformer

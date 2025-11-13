@@ -1,7 +1,7 @@
 import { Router } from "@oak/oak";
-import bundleRouter from "./bundle/routes.ts";
+import bundleRouter from "@/http/v1/bundle/routes.ts";
 
-import stellarRouter from "./stellar/routes.ts";
+import stellarRouter from "@/http/v1/stellar/routes.ts";
 import transactionsRouter from "./transactions/routes.ts";
 
 const apiVi = new Router();

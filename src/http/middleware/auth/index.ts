@@ -1,13 +1,12 @@
-import { Context } from "@oak/oak";
+import type { Context } from "@oak/oak";
 import { verify } from "https://deno.land/x/djwt/mod.ts";
-import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY } from "../../../services/auth/service/service-auth-secret.ts";
-import { JwtPayload } from "../../../services/auth/generate-jwt.ts";
+import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY } from "@/core/service/auth/service/service-auth-secret.ts";
+import type { JwtPayload } from "@/core/service/auth/generate-jwt.ts";
 
 export async function jwtMiddleware(
   ctx: Context,
   next: () => Promise<unknown>
 ) {
-  console.log("jwtMiddleware");
   const authorization = ctx.request.headers.get("authorization");
   if (!authorization) {
     ctx.response.status = 401;

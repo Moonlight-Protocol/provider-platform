@@ -1,22 +1,16 @@
-import { appendSchemaToContextFactory } from "../../utils/append-schema-to-context.ts";
+import { appendSchemaToContextFactory } from "@/http/utils/append-schema-to-context.ts";
 import { Pipeline } from "@fifo/convee";
+import { parseAndValidateQueryFactory } from "@/http/utils/parse-request-query.ts";
 import {
-  ContextWithParsedQuery,
-  parseAndValidateQueryFactory,
-} from "../../utils/parse-request-query.ts";
-import {
-  GetTransactionsPayload,
-  GetTransactionsResPayload,
-  getTransactionsResSchema,
+  type GetTransactionsResPayload,
   getTransactionsSchema,
-} from "./get.schema.ts";
-import { processErrorResponsePluginFactory } from "../../utils/plugins/process-error-response.ts";
-import { BundleModel } from "../../../models/bundle/bundle.model.ts";
-import { ContextWith } from "../../types.ts";
-import { Context, Status } from "@oak/oak";
-import { LOAD_BUNDLES } from "../../../core/bundle/processes/load-bundles.ts";
-import { z } from "zod";
-import { setApiResponse } from "../../utils/set-api-response.ts";
+} from "@/http/v1/transactions/get.schema.ts";
+import { processErrorResponsePluginFactory } from "@/http/utils/plugins/process-error-response.ts";
+import type { BundleModel } from "@/models/bundle/bundle.model.ts";
+import type { ContextWith } from "@/http/types.ts";
+import { type Context, Status } from "@oak/oak";
+import { LOAD_BUNDLES } from "@/core/bundle/processes/load-bundles.ts";
+import { setApiResponse } from "@/http/utils/set-api-response.ts";
 
 const appendSchema = appendSchemaToContextFactory(getTransactionsSchema);
 const parse = parseAndValidateQueryFactory<typeof getTransactionsSchema>();
@@ -24,7 +18,7 @@ const parse = parseAndValidateQueryFactory<typeof getTransactionsSchema>();
 const setSuccessResponse = async (
   input: ContextWith<BundleModel[], "bundles">
 ) => {
-  return {
+  return await {
     ctx: input.ctx,
     response: {
       status: Status.OK,
@@ -36,7 +30,13 @@ const setSuccessResponse = async (
 
 export const getTransactionsEndpoint = (ctx: Context) => {
   const getTransactionsPipeline = Pipeline.create(
-    [appendSchema, parse, LOAD_BUNDLES, setSuccessResponse, setApiResponse],
+    [
+      appendSchema,
+      parse,
+      LOAD_BUNDLES,
+      setSuccessResponse,
+      setApiResponse,
+    ],
     {
       name: "GetTransactionsPipeline",
     }
