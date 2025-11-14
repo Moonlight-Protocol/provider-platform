@@ -28,8 +28,8 @@ erDiagram
     sessions {
         text id PK
         enum status "ACTIVE, INACTIVE"
-        text jwt_token
-        text user_id FK
+        text jwt_token "nullable"
+        text account_id FK
         timestamp created_at
         timestamp updated_at
         text created_by
@@ -38,9 +38,11 @@ erDiagram
     }
     challenges {
         text id PK
-        text user_id FK
+        text account_id FK
         enum status "VERIFIED, UNVERIFIED"
         timestamp ttl
+        text tx_hash "unique"
+        text tx_xdr
         timestamp created_at
         timestamp updated_at
         text created_by
@@ -91,82 +93,13 @@ erDiagram
     }
 
     users ||--o{ accounts : "has"
-    users ||--o{ sessions : "has"
-    users ||--o{ challenges : "has"
+    accounts ||--o{ sessions : "has"
+    accounts ||--o{ challenges : "has"
     accounts ||--o{ utxos : "has"
     operations_bundles ||--o{ bundles_transactions : "has"
     transactions ||--o{ bundles_transactions : "has"
     operations_bundles ||--o{ utxos : "creates"
     operations_bundles ||--o{ utxos : "spends"
-```
-
-## ASCII Relationship Diagram
-
-```
-┌─────────────┐
-│    users    │
-│─────────────│
-│ id (PK)     │
-│ status      │
-│ ...         │
-└──────┬──────┘
-       │
-       │ 1:N
-       │
-       ├─────────────────┐
-       │                 │
-       │                 │
-┌──────▼──────┐   ┌──────▼──────┐   ┌─────────────┐
-│  accounts   │   │  sessions   │   │ challenges  │
-│─────────────│   │─────────────│   │─────────────│
-│ id (PK)     │   │ id (PK)     │   │ id (PK)     │
-│ type        │   │ status      │   │ status      │
-│ user_id (FK)│   │ jwt_token   │   │ user_id (FK)│
-│ ...         │   │ user_id (FK)│   │ ttl         │
-└──────┬──────┘   └──────────────┘   └─────────────┘
-       │
-       │ 1:N
-       │
-┌──────▼──────┐
-│   utxos     │
-│─────────────│
-│ id (PK)     │
-│ account_id  │
-│ (FK)        │
-│ created_at_ │
-│ bundle_id   │
-│ (FK)        │
-│ spent_at_   │
-│ bundle_id   │
-│ (FK)        │
-│ ...         │
-└──────┬──────┘
-       │
-       │ N:1 (via created_at_bundle_id)
-       │ N:1 (via spent_at_bundle_id)
-       │
-┌──────▼──────────────┐
-│ operations_bundles  │
-│─────────────────────│
-│ id (PK)             │
-│ status              │
-│ ttl                 │
-│ ...                 │
-└──────┬──────────────┘
-       │
-       │ N:M (via bundles_transactions)
-       │
-       │
-┌──────▼──────────────┐         ┌──────────────┐
-│ bundles_transactions│         │ transactions │
-│─────────────────────│         │──────────────│
-│ bundle_id (PK,FK)   │◄────────┤ id (PK)      │
-│ transaction_id      │    N:M  │ status       │
-│ (PK,FK)             │         │ timeout      │
-│ ...                 │         │ ledger_      │
-└─────────────────────┘         │ sequence     │
-                                │ ...          │
-                                └──────────────┘
 ```
 
 ## Entity Descriptions
@@ -191,8 +124,6 @@ Represents system users in the platform.
 
 **Relationships:**
 - Has many `accounts` (1:N)
-- Has many `sessions` (1:N)
-- Has many `challenges` (1:N)
 
 ### Accounts
 
@@ -205,33 +136,37 @@ Represents user accounts that can hold UTXOs.
 
 **Relationships:**
 - Belongs to `user` (N:1)
+- Has many `sessions` (1:N)
+- Has many `challenges` (1:N)
 - Has many `utxos` (1:N)
 
 ### Sessions
 
-Represents user authentication sessions.
+Represents account authentication sessions.
 
 **Fields:**
 - `id` (text, PK): Unique session identifier
 - `status` (enum): Session status - ACTIVE or INACTIVE
-- `jwt_token` (text): JWT token for the session
-- `user_id` (text, FK): Reference to the user who owns this session
+- `jwt_token` (text, nullable): JWT token for the session
+- `account_id` (text, FK): Reference to the account that owns this session
 
 **Relationships:**
-- Belongs to `user` (N:1)
+- Belongs to `account` (N:1)
 
 ### Challenges
 
-Represents authentication challenges for users.
+Represents authentication challenges for accounts.
 
 **Fields:**
 - `id` (text, PK): Unique challenge identifier
-- `user_id` (text, FK): Reference to the user who owns this challenge
+- `account_id` (text, FK): Reference to the account that owns this challenge
 - `status` (enum): Challenge status - VERIFIED or UNVERIFIED
 - `ttl` (timestamp with time zone): Time-to-live expiration timestamp
+- `tx_hash` (text, unique): Transaction hash associated with the challenge
+- `tx_xdr` (text): Transaction XDR (base64-encoded transaction data)
 
 **Relationships:**
-- Belongs to `user` (N:1)
+- Belongs to `account` (N:1)
 
 ### Operations Bundles
 
@@ -295,13 +230,13 @@ Junction table representing the many-to-many relationship between operations bun
 
 A user can have multiple accounts. Each account is associated with a single user through the `user_id` foreign key. This allows users to manage multiple accounts for different purposes (e.g., OPEX accounts for operations, USER accounts for regular use).
 
-### User → Sessions (1:N)
+### Account → Sessions (1:N)
 
-A user can have multiple active sessions simultaneously. Each session is tied to a specific user and contains a JWT token for authentication. Sessions can be active or inactive, allowing for session management and revocation.
+An account can have multiple active sessions simultaneously. Each session is tied to a specific account and contains a JWT token for authentication. Sessions can be active or inactive, allowing for session management and revocation.
 
-### User → Challenges (1:N)
+### Account → Challenges (1:N)
 
-A user can have multiple authentication challenges. Challenges are used for verifying user identity and have a time-to-live (TTL) for security purposes. Each challenge can be in a verified or unverified state.
+An account can have multiple authentication challenges. Challenges are used for verifying account identity and have a time-to-live (TTL) for security purposes. Each challenge can be in a verified or unverified state. Challenges include transaction hash (`tx_hash`) and transaction XDR (`tx_xdr`) for blockchain verification.
 
 ### Account → UTXOs (1:N)
 
@@ -359,8 +294,8 @@ All entities use `text` type for primary keys, providing flexibility in key gene
 
 Foreign key relationships enforce referential integrity:
 - `accounts.user_id` → `users.id`
-- `sessions.user_id` → `users.id`
-- `challenges.user_id` → `users.id`
+- `sessions.account_id` → `accounts.id`
+- `challenges.account_id` → `accounts.id`
 - `utxos.account_id` → `accounts.id`
 - `utxos.created_at_bundle_id` → `operations_bundles.id`
 - `utxos.spent_at_bundle_id` → `operations_bundles.id`
