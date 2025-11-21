@@ -1,5 +1,5 @@
 import { LocalSigner } from "@colibri/core";
-import { NETWORK_CONFIG, PROVIDER_SK } from "@/config/env.ts";
+import { PROVIDER_SK } from "@/config/env.ts";
 
 // export const STELLAR_SERVICE_ACCOUNT =
 //   new StellarPlus.Account.DefaultAccountHandler({

@@ -1,7 +1,5 @@
-import { Context } from "@oak/oak";
-import { Transformer } from "@fifo/convee";
-import { MetadataHelper } from "@fifo/convee";
-import { ApiResponse } from "../default-schemas.ts";
+import type { Context } from "@oak/oak";
+import type { ApiResponse } from "../default-schemas.ts";
 import { Status } from "@oak/oak";
 
 type Input = {

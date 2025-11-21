@@ -8,88 +8,88 @@ This document describes the database schema for the Provider Platform, including
 erDiagram
     users {
         text id PK
-        enum status "UNVERIFIED, APPROVED, PENDING, BLOCKED"
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        enum status "UNVERIFIED, APPROVED, PENDING, BLOCKED" "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     accounts {
         text id PK
-        enum type "OPEX, USER"
-        text user_id FK
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        enum type "OPEX, USER" "not null"
+        text user_id FK "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     sessions {
         text id PK
-        enum status "ACTIVE, INACTIVE"
+        enum status "ACTIVE, INACTIVE" "not null"
         text jwt_token "nullable"
-        text account_id FK
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        text account_id FK "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     challenges {
         text id PK
-        text account_id FK
-        enum status "VERIFIED, UNVERIFIED"
-        timestamp ttl
-        text tx_hash "unique"
-        text tx_xdr
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        text account_id FK "not null"
+        enum status "VERIFIED, UNVERIFIED" "not null"
+        timestamp ttl "not null"
+        text tx_hash "unique, not null"
+        text tx_xdr "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     operations_bundles {
         text id PK
-        enum status "PENDING, COMPLETED, EXPIRED"
-        timestamp ttl
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        enum status "PENDING, COMPLETED, EXPIRED" "not null"
+        timestamp ttl "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     transactions {
         text id PK
-        enum status "UNVERIFIED, VERIFIED"
-        timestamp timeout
-        text ledger_sequence
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        enum status "UNVERIFIED, VERIFIED" "not null"
+        timestamp timeout "not null"
+        text ledger_sequence "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     utxos {
         text id PK
-        text account_id FK
-        text spent_by_account_id
-        text created_at_bundle_id FK
-        text spent_at_bundle_id FK
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        text account_id FK "not null"
+        text spent_by_account_id "nullable"
+        text created_at_bundle_id FK "nullable"
+        text spent_at_bundle_id FK "nullable"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
     bundles_transactions {
-        text bundle_id PK,FK
-        text transaction_id PK,FK
-        timestamp created_at
-        timestamp updated_at
-        text created_by
-        text updated_by
-        timestamp deleted_at
+        text bundle_id PK,FK "not null"
+        text transaction_id PK,FK "not null"
+        timestamp created_at "not null, default now"
+        timestamp updated_at "not null, default now"
+        text created_by "nullable"
+        text updated_by "nullable"
+        timestamp deleted_at "nullable"
     }
 
     users ||--o{ accounts : "has"
@@ -108,8 +108,8 @@ erDiagram
 
 All entities inherit the following base fields for auditing and soft delete:
 
-- `created_at` (timestamp with time zone): Automatically set when record is created
-- `updated_at` (timestamp with time zone): Automatically updated when record is modified
+- `created_at` (timestamp with time zone, NOT NULL, DEFAULT NOW): Automatically set when record is created
+- `updated_at` (timestamp with time zone, NOT NULL, DEFAULT NOW): Automatically updated when record is modified
 - `created_by` (text, nullable): User/system that created the record
 - `updated_by` (text, nullable): User/system that last updated the record
 - `deleted_at` (timestamp with time zone, nullable): Timestamp when record was soft deleted (NULL if active)
@@ -120,7 +120,7 @@ Represents system users in the platform.
 
 **Fields:**
 - `id` (text, PK): Unique user identifier
-- `status` (enum): User status - UNVERIFIED, APPROVED, PENDING, or BLOCKED
+- `status` (enum, NOT NULL): User status - UNVERIFIED, APPROVED, PENDING, or BLOCKED
 
 **Relationships:**
 - Has many `accounts` (1:N)
@@ -131,8 +131,8 @@ Represents user accounts that can hold UTXOs.
 
 **Fields:**
 - `id` (text, PK): Unique account identifier
-- `type` (enum): Account type - OPEX or USER
-- `user_id` (text, FK): Reference to the user who owns this account
+- `type` (enum, NOT NULL): Account type - OPEX or USER
+- `user_id` (text, FK, NOT NULL): Reference to the user who owns this account
 
 **Relationships:**
 - Belongs to `user` (N:1)
@@ -146,9 +146,9 @@ Represents account authentication sessions.
 
 **Fields:**
 - `id` (text, PK): Unique session identifier
-- `status` (enum): Session status - ACTIVE or INACTIVE
+- `status` (enum, NOT NULL): Session status - ACTIVE or INACTIVE
 - `jwt_token` (text, nullable): JWT token for the session
-- `account_id` (text, FK): Reference to the account that owns this session
+- `account_id` (text, FK, NOT NULL): Reference to the account that owns this session
 
 **Relationships:**
 - Belongs to `account` (N:1)
@@ -159,11 +159,11 @@ Represents authentication challenges for accounts.
 
 **Fields:**
 - `id` (text, PK): Unique challenge identifier
-- `account_id` (text, FK): Reference to the account that owns this challenge
-- `status` (enum): Challenge status - VERIFIED or UNVERIFIED
-- `ttl` (timestamp with time zone): Time-to-live expiration timestamp
-- `tx_hash` (text, unique): Transaction hash associated with the challenge
-- `tx_xdr` (text): Transaction XDR (base64-encoded transaction data)
+- `account_id` (text, FK, NOT NULL): Reference to the account that owns this challenge
+- `status` (enum, NOT NULL): Challenge status - VERIFIED or UNVERIFIED
+- `ttl` (timestamp with time zone, NOT NULL): Time-to-live expiration timestamp
+- `tx_hash` (text, UNIQUE, NOT NULL): Transaction hash associated with the challenge
+- `tx_xdr` (text, NOT NULL): Transaction XDR (base64-encoded transaction data)
 
 **Relationships:**
 - Belongs to `account` (N:1)
@@ -174,8 +174,8 @@ Represents bundles of operations that can contain multiple transactions.
 
 **Fields:**
 - `id` (text, PK): Unique bundle identifier
-- `status` (enum): Bundle status - PENDING, COMPLETED, or EXPIRED
-- `ttl` (timestamp with time zone): Time-to-live expiration timestamp
+- `status` (enum, NOT NULL): Bundle status - PENDING, COMPLETED, or EXPIRED
+- `ttl` (timestamp with time zone, NOT NULL): Time-to-live expiration timestamp
 
 **Relationships:**
 - Has many `bundle_transactions` (1:N) - Junction table linking to transactions
@@ -188,9 +188,9 @@ Represents individual blockchain transactions.
 
 **Fields:**
 - `id` (text, PK): Unique transaction identifier
-- `status` (enum): Transaction status - UNVERIFIED or VERIFIED
-- `timeout` (timestamp with time zone): Transaction timeout timestamp
-- `ledger_sequence` (text): Ledger sequence number
+- `status` (enum, NOT NULL): Transaction status - UNVERIFIED or VERIFIED
+- `timeout` (timestamp with time zone, NOT NULL): Transaction timeout timestamp
+- `ledger_sequence` (text, NOT NULL): Ledger sequence number
 
 **Relationships:**
 - Has many `bundle_transactions` (1:N) - Junction table linking to bundles
@@ -202,7 +202,7 @@ Represents Unspent Transaction Outputs (UTXOs) that can be spent.
 
 **Fields:**
 - `id` (text, PK): Unique UTXO identifier
-- `account_id` (text, FK): Reference to the account that owns this UTXO
+- `account_id` (text, FK, NOT NULL): Reference to the account that owns this UTXO
 - `spent_by_account_id` (text, nullable): Account ID that spent this UTXO (if spent)
 - `created_at_bundle_id` (text, FK, nullable): Reference to the bundle that created this UTXO
 - `spent_at_bundle_id` (text, FK, nullable): Reference to the bundle that spent this UTXO
@@ -217,8 +217,8 @@ Represents Unspent Transaction Outputs (UTXOs) that can be spent.
 Junction table representing the many-to-many relationship between operations bundles and transactions.
 
 **Fields:**
-- `bundle_id` (text, PK, FK): Reference to operations bundle
-- `transaction_id` (text, PK, FK): Reference to transaction
+- `bundle_id` (text, PK, FK, NOT NULL): Reference to operations bundle
+- `transaction_id` (text, PK, FK, NOT NULL): Reference to transaction
 
 **Relationships:**
 - Belongs to `operations_bundle` (N:1)
@@ -289,6 +289,10 @@ Queries should filter out soft-deleted records by checking `WHERE deleted_at IS 
 ### Primary Keys
 
 All entities use `text` type for primary keys, providing flexibility in key generation strategies. The `bundles_transactions` table uses a composite primary key consisting of both `bundle_id` and `transaction_id`.
+
+### Unique Constraints
+
+- `challenges.tx_hash`: Unique constraint ensures that each transaction hash can only be associated with one challenge, preventing duplicate challenge transactions.
 
 ### Foreign Keys
 

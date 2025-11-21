@@ -29,7 +29,7 @@ export const CREATE_CHALLENGE_DB = ProcessEngine.create(
         user = await userRepository.create({
           id: crypto.randomUUID(),
           status: UserStatus.UNVERIFIED
-        } as NewUser)
+        } as NewUser);
 
         account = await accountRepository.create({
           id: challengeData.clientAccount,

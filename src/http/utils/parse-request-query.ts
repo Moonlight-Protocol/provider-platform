@@ -1,11 +1,11 @@
-import { Context } from "@oak/oak";
+import type { Context } from "@oak/oak";
 import {
-  infer as ZodInfer,
+  type infer as ZodInfer,
   ZodObject,
-  ZodSchema,
+  type ZodSchema,
 } from "zod";
-import { safeStringify } from "../../utils/parse/safeStringfy.ts";
-import { MetadataHelper, Transformer } from "@fifo/convee";
+import { safeStringify } from "../../utils/parse/safeStringify.ts";
+import type { MetadataHelper } from "@fifo/convee";
 
 // Context + Schema input type
 export type ContextWithSchema<T extends ZodSchema> = {

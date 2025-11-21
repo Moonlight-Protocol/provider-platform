@@ -30,6 +30,7 @@
     "jsr:@std/media-types@1": "1.1.0",
     "jsr:@std/path@1": "1.1.2",
     "jsr:@std/ulid@1": "1.0.0",
+    "npm:@drizzle-team/brocli@0.11": "0.11.0",
     "npm:@stellar/stellar-sdk@14": "14.2.0",
     "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
     "npm:@stellar/stellar-sdk@^14.2.0": "14.2.0",
@@ -38,16 +39,15 @@
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
-    "npm:dotenv@^16.4.5": "16.6.1",
     "npm:drizzle-kit@*": "0.31.6_esbuild@0.25.12",
     "npm:drizzle-kit@~0.31.6": "0.31.6_esbuild@0.25.12",
-    "npm:drizzle-orm@*": "0.44.7_@types+pg@8.15.6_pg@8.16.3",
-    "npm:drizzle-orm@~0.44.7": "0.44.7_@types+pg@8.15.6_pg@8.16.3",
+    "npm:drizzle-orm@*": "0.44.7_@types+pg@8.15.6_pg@8.16.3_postgres@3.4.7",
+    "npm:drizzle-orm@~0.44.7": "0.44.7_@types+pg@8.15.6_pg@8.16.3_postgres@3.4.7",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:pg@*": "8.16.3",
     "npm:pg@^8.16.3": "8.16.3",
+    "npm:postgres@^3.4.7": "3.4.7",
     "npm:stellar-plus@0.14.4": "0.14.4",
-    "npm:typescript@5": "5.9.3",
     "npm:zod@3.24.2": "3.24.2",
     "npm:zod@^3.24.0": "3.24.2"
   },
@@ -202,6 +202,9 @@
   "npm": {
     "@drizzle-team/brocli@0.10.2": {
       "integrity": "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="
+    },
+    "@drizzle-team/brocli@0.11.0": {
+      "integrity": "sha512-hD3pekGiPg0WPCCGAZmusBBJsDqGUR66Y452YgQsZOnkdQ7ViEPKuyP4huUGEZQefp8g34RRodXYmJ2TbCH+tg=="
     },
     "@esbuild-kit/core-utils@3.3.2": {
       "integrity": "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==",
@@ -1570,13 +1573,10 @@
         "domhandler"
       ]
     },
-    "dotenv@16.6.1": {
-      "integrity": "sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow=="
-    },
     "drizzle-kit@0.31.6_esbuild@0.25.12": {
       "integrity": "sha512-/B4e/4pwnx25QwD5xXgdpo1S+077a2VZdosXbItE/oNmUgQwZydGDz9qJYmnQl/b+5IX0rLfwRhrPnroGtrg8Q==",
       "dependencies": [
-        "@drizzle-team/brocli",
+        "@drizzle-team/brocli@0.10.2",
         "@esbuild-kit/esm-loader",
         "esbuild@0.25.12",
         "esbuild-register"
@@ -1592,6 +1592,19 @@
       "optionalPeers": [
         "@types/pg",
         "pg"
+      ]
+    },
+    "drizzle-orm@0.44.7_@types+pg@8.15.6_pg@8.16.3_postgres@3.4.7": {
+      "integrity": "sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==",
+      "dependencies": [
+        "@types/pg",
+        "pg",
+        "postgres"
+      ],
+      "optionalPeers": [
+        "@types/pg",
+        "pg",
+        "postgres"
       ]
     },
     "dunder-proto@1.0.1": {
@@ -3022,6 +3035,9 @@
         "xtend"
       ]
     },
+    "postgres@3.4.7": {
+      "integrity": "sha512-Jtc2612XINuBjIl/QTWsV5UvE8UHuNblcO3vVADSrKsrc6RqGX6lOW1cEo3CM2v0XG4Nat8nI+YM7/f26VxXLw=="
+    },
     "prepend-http@2.0.0": {
       "integrity": "sha512-ravE6m9Atw9Z/jjttRUZ+clIXogdghyZAuWJ3qEzjT+jI/dL1ifAqhZeC5VHzQp1MSt1+jxKkFNemj/iO7tVUA=="
     },
@@ -3709,10 +3725,6 @@
     "typescript-optional@2.0.1": {
       "integrity": "sha512-xuwmqsCjE4OeeMKxbNX3jjNcISGzYh5Q9R1rM5OyxEVNIr94CB5llCkfKW+1nZTKbbUV0axN3QAUuX2fus/DhQ=="
     },
-    "typescript@5.9.3": {
-      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
-      "bin": true
-    },
     "ultron@1.1.1": {
       "integrity": "sha512-UIEXBNeYmKptWH6z8ZnqTeS8fV74zG0/eRU9VGkpzz+LIJNs8W/zM/L+7ctCkRrgbNnnR0xxw4bKOr0cW0N0Og=="
     },
@@ -4204,6 +4216,7 @@
       "jsr:@moonlight/moonlight-sdk@0.3",
       "jsr:@oak/oak@^17.1.4",
       "jsr:@olli/kvdex@^3.1.4",
+      "npm:@drizzle-team/brocli@0.11",
       "npm:@stellar/stellar-sdk@14.2.0",
       "npm:@types/pg@^8.15.6",
       "npm:asn1js@3.0.5",
@@ -4211,14 +4224,8 @@
       "npm:drizzle-kit@~0.31.6",
       "npm:drizzle-orm@~0.44.7",
       "npm:pg@^8.16.3",
+      "npm:postgres@^3.4.7",
       "npm:zod@3.24.2"
-    ],
-    "packageJson": {
-      "dependencies": [
-        "npm:dotenv@^16.4.5",
-        "npm:drizzle-kit@~0.31.6",
-        "npm:typescript@5"
-      ]
-    }
+    ]
   }
 }

@@ -48,6 +48,10 @@ export const UPDATE_CHALLENGE_SESSION = ProcessEngine.create(
       sessionManager.updateSession(data);
     }
 
+    if (!tx.operations || tx.operations.length === 0) {
+      throw new Error("Transaction has no operations");
+    }
+    
     const txOperation = tx.operations[0] as Operation.ManageData;
     const txClientAccount = txOperation.source;
 

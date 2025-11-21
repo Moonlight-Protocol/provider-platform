@@ -2,7 +2,7 @@ import { ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
 import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type{ PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
+import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { ChallengeStatus } from "@/persistence/drizzle/entity/challenge.entity.ts";
