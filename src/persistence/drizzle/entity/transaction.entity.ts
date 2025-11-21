@@ -1,0 +1,33 @@
+import { pgTable, text, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
+import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
+import { utxo } from "@/persistence/drizzle/entity/utxo.entity.ts";
+
+export enum TransactionStatus {
+  UNVERIFIED = "UNVERIFIED",
+  VERIFIED = "VERIFIED",
+}
+
+export const transactionStatusEnum = pgEnum("transaction_status", [
+  TransactionStatus.UNVERIFIED,
+  TransactionStatus.VERIFIED,
+]);
+
+export const transaction = pgTable("transactions", {
+  id: text("id").primaryKey(),
+  status: transactionStatusEnum("status").notNull(),
+  timeout: timestamp("timeout", { withTimezone: true }).notNull(),
+  ledgerSequence: text("ledger_sequence").notNull(),
+  ...createBaseColumns(),
+});
+
+// Relations
+export const transactionRelations = relations(transaction, ({ many }) => ({
+  bundleTransactions: many(bundleTransaction),
+  utxos: many(utxo),
+}));
+
+export type Transaction = typeof transaction.$inferSelect;
+export type NewTransaction = typeof transaction.$inferInsert;
+
