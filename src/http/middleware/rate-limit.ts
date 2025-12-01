@@ -1,4 +1,5 @@
 import type { Middleware } from "@oak/oak";
+import { LOG } from "@/config/logger.ts";
 export function createRateLimitMiddleware(
   limit: number,
   windowMs: number
@@ -18,12 +19,12 @@ export function createRateLimitMiddleware(
       entry.count++;
       rateLimitMap.set(clientIP, entry);
 
-      console.log(
+      LOG.debug(
         `[RateLimit] IP: ${clientIP} - Count: ${entry.count} in current window...`
       );
 
       if (entry.count > limit) {
-        console.log(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
+        LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
         ctx.response.status = 429;
         ctx.response.body = {
           message:
@@ -47,12 +48,12 @@ export function createRateLimitMiddleware(
       entry.count++;
       rateLimitMap.set(clientIP, entry);
 
-      console.log(
+      LOG.debug(
         `[RateLimit] IP: ${clientIP} - Count: ${entry.count} in current window...`
       );
 
       if (entry.count > limit) {
-        console.log(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
+        LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
         ctx.response.status = 429;
         ctx.response.body = {
           message:

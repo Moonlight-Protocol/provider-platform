@@ -1,5 +1,5 @@
 import { type ContractId, StrKey } from "@colibri/core";
-import requireEnv from "./requireEnv.ts";
+import { requireEnv } from "@/utils/env/loadEnv.ts";
 
 export const requireContractId = (keyName: string): ContractId => {
   const key = requireEnv(keyName);
