@@ -1,15 +1,12 @@
 import { ProcessEngine } from "@fifo/convee";
 import type { ContextWithParsedPayload } from "../../../http/utils/parse-request-payload.ts";
 
-import type {
-  RawBundle,
-} from "../../../models/bundle/bundle.schema.ts";
+import type { RawBundle } from "../../../models/bundle/bundle.schema.ts";
 import type { Bundle } from "@/models/bundle/bundle.schema.ts";
 import { UtxoStatus } from "@/models/utxo/utxo.schema.ts";
-import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 
 import { Buffer } from "buffer";
-import { sha256Hash } from "@fifo/spp-sdk";
+import { sha256Hash } from "@/utils/crypto/sha256.ts";
 import type { PostBundlePayload } from "@/http/v1/bundle/post.schema.ts";
 
 export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
@@ -62,7 +59,6 @@ export const PROCESS_NEW_BUNDLE = ProcessEngine.create(
 );
 
 const formatBundle = async (rawBundle: RawBundle): Promise<Bundle> => {
-
   const bundlBufferPreHash = Buffer.from(JSON.stringify(rawBundle)); // MOCK
 
   const bundleHash = await sha256Hash(bundlBufferPreHash);
