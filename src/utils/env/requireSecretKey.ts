@@ -1,5 +1,5 @@
 import { type Ed25519SecretKey, StrKey } from "@colibri/core";
-import requireEnv from "./requireEnv.ts";
+import { requireEnv } from "@/utils/env/loadEnv.ts";
 
 export const requireSecretKey = (keyName: string): Ed25519SecretKey => {
   const key = requireEnv(keyName);
