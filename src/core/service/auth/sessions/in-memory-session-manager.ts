@@ -1,6 +1,7 @@
 import { SESSION_TTL } from "@/config/env.ts";
 import { memDb } from "@/persistence/kv/config.ts";
 import type { Session } from "@/models/auth/session/session.model.ts";
+import { LOG } from "@/config/logger.ts";
 
 class InMemorySessionManager {
   public async addSession(
@@ -9,8 +10,8 @@ class InMemorySessionManager {
     requestId: string,
     expiresAt: Date
   ): Promise<void> {
-    console.log(`Adding session to store: ${txHash}`);
-    console.log(`Entries: ${await memDb.countAll()}`);
+    LOG.debug(`Adding session to store: ${txHash}`);
+    LOG.debug(`Entries: ${await memDb.countAll()}`);
 
     const cr = await memDb.sessions.add({
       txHash,
@@ -21,8 +22,8 @@ class InMemorySessionManager {
     });
 
     if (cr.ok) {
-      console.log("session added to store");
-      console.log(`Entries: ${await memDb.countAll()}`);
+      LOG.info("session", { txHash }, "added to store");
+      LOG.debug("Entries:", await memDb.countAll());
     }
   }
 
@@ -46,15 +47,15 @@ class InMemorySessionManager {
   public async cleanupExpired(): Promise<void> {
     const now = Date.now();
 
-    console.log(`Cleaning expired sessions`);
-    console.log(`Entries B4: ${await memDb.countAll()}`);
+    LOG.debug(`Cleaning expired sessions`);
+    LOG.debug("Entries B4:", await memDb.countAll());
 
     const cursor = await memDb.sessions.deleteMany({
       filter: (doc) => doc.value.expiresAt.getTime() < now,
     });
 
-    console.log(`Cursor ${cursor}`);
-    console.log(`Entries AFTER: ${await memDb.countAll()}`);
+    LOG.debug("Cursor", cursor);
+    LOG.debug("Entries AFTER:", await memDb.countAll());
   }
 }
 

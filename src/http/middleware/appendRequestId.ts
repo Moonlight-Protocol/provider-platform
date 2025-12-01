@@ -1,4 +1,5 @@
 import type { Context } from "@oak/oak";
+import { LOG } from "@/config/logger.ts";
 
 export async function appendRequestIdMiddleware(
   ctx: Context,
@@ -6,6 +7,6 @@ export async function appendRequestIdMiddleware(
 ) {
   const requestId = crypto.randomUUID();
   ctx.state.requestId = requestId;
-  console.log(`Incoming request with ID: ${requestId}`);
+  LOG.info("Incoming request with ID:", { requestId });
   await next();
 }
