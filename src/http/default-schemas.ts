@@ -1,4 +1,4 @@
-import { z } from "npm:zod@3.24.2";
+import { z } from "zod";
 import { Status } from "@oak/oak";
 
 export const baseSuccessResponseSchema = z.object({
@@ -6,9 +6,13 @@ export const baseSuccessResponseSchema = z.object({
   message: z.string().optional(),
 });
 
-export const successResponseSchema = baseSuccessResponseSchema.extend({
-  data: z.any().optional(),
-});
+export const successResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
+  baseSuccessResponseSchema.extend({
+    data: dataSchema.optional(),
+  });
+
+// Default schema for unions and general use
+export const defaultSuccessResponseSchema = successResponseSchema(z.any());
 
 export const errorResponseSchema = z.object({
   status: z.union([
@@ -26,10 +30,11 @@ export const errorResponseSchema = z.object({
 });
 
 export const responseSchema = z.union([
-  successResponseSchema,
+  defaultSuccessResponseSchema,
   errorResponseSchema,
 ]);
 
+export type BaseSuccessResponse = z.infer<typeof baseSuccessResponseSchema>;
 export type ApiResponse = z.infer<typeof responseSchema>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
-export type SuccessResponse = z.infer<typeof successResponseSchema>;
+export type SuccessResponse<T = unknown> = BaseSuccessResponse & { data?: T };

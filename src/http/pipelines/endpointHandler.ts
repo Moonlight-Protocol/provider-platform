@@ -1,25 +1,29 @@
 import { Pipeline } from "@fifo/convee";
 import type { ZodSchema, z } from "zod";
-import { appendSchemaToContextFactory } from "@/http/utils/append-schema-to-context.ts";
-import { parseAndValidateQueryFactory } from "@/http/utils/parse-request-query.ts";
 import type { ContextWithParsedQuery } from "@/http/utils/parse-request-query.ts";
+import { P_ParseRequestQuery } from "../processes/parse-request-query.ts";
+import { P_SetSuccessResponse } from "../processes/set-successfull-response.ts";
+import type { Context } from "@oak/oak";
 
-export const PIPE_GetEndpoint = <S extends ZodSchema>({
+export const PIPE_GetEndpoint = <Req extends ZodSchema, Res extends ZodSchema>({
   name = "GET_EndpointPipeline",
   handlerFn,
   requestSchema,
+  responseSchema,
 }: {
   name: string;
   handlerFn: (
     input: ContextWithParsedQuery<z.infer<typeof requestSchema>>
-  ) => Promise<HandlerOutput<ResData>>;
-  requestSchema: S;
+  ) => Promise<Context>;
+  requestSchema: Req;
+  responseSchema: Res;
 }) => {
-  const appendRequestSchema = appendSchemaToContextFactory(requestSchema);
-  const parseRequestData = parseAndValidateQueryFactory<typeof requestSchema>();
-
   return Pipeline.create(
-    [appendRequestSchema, parseRequestData, handlerFn],
+    [
+      P_ParseRequestQuery(requestSchema),
+      handlerFn,
+      P_SetSuccessResponse(responseSchema),
+    ],
     //   P_ParseRequest<ReqData>(), handlerFn, P_SetSuccessResponse<ResData>()],
     { name }
   );
