@@ -8,6 +8,7 @@ import { appendCtxResponseFactory } from "../append-ctx-response.ts";
 import { setApiResponse } from "../set-api-response.ts";
 import type { Context } from "@oak/oak";
 import { ERROR_TO_API_RESPONSE } from "../error-to-api-response.ts";
+import { LOG } from "@/config/logger.ts";
 
 export const processErrorResponsePluginFactory = (ctx: Context) => {
   const processError: Transformer<
@@ -16,7 +17,7 @@ export const processErrorResponsePluginFactory = (ctx: Context) => {
   > = async (
     error: ConveeError<Error>
   ): Promise<ConveeError<Error> | Context> => {
-    console.log("Plugin captured an error: ", error.message);
+    LOG.error("Plugin captured an error: ", error.message);
     const errorPipeline = Pipeline.create(
       [ERROR_TO_API_RESPONSE, appendCtxResponseFactory(ctx), setApiResponse],
       { name: "APIErrorProcessingPipeline" }

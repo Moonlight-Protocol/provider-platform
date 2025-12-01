@@ -1,10 +1,11 @@
 import { selectNetwork } from "@/config/network.ts";
-import requireEnv from "@/utils/env/requireEnv.ts";
+import { requireEnv } from "@/utils/env/loadEnv.ts";
 import { requireSecretKey } from "@/utils/env/requireSecretKey.ts";
 import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
 import { requireContractId } from "@/utils/env/requireContractId.ts";
+import { LOG } from "@/config/logger.ts";
 
 // Every required variable is retrieved via requireEnv.
 
@@ -43,4 +44,4 @@ export const TX_CONFIG: TransactionConfig = {
   signers: [OPEX_SIGNER],
 };
 
-console.log(`Loaded ENV variables: PORT=${PORT}, MODE=${MODE}`);
+LOG.debug("Loaded ENV variables: ", { PORT: Number(PORT), MODE: MODE });

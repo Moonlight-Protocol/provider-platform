@@ -3,7 +3,7 @@ import {
   NETWORK,
   OPEX_SIGNER,
   OPEX_SK,
-} from "../../config/env.ts";
+} from "@/config/env.ts";
 import {
   UtxoBasedStellarAccount,
   StellarDerivator,
@@ -11,10 +11,11 @@ import {
   type UTXOPublicKey,
   ChannelReadMethods,
 } from "@moonlight/moonlight-sdk";
-import { CHANNEL_CLIENT } from "../channel-client/index.ts";
+import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { Buffer } from "node:buffer";
+import { LOG } from "@/config/logger.ts";
 
-console.log(".  > OPEX:", OPEX_SIGNER.publicKey());
+LOG.debug(".  > OPEX:", OPEX_SIGNER.publicKey());
 
 export const OPEX = new UtxoBasedStellarAccount({
   root: OPEX_SK,
@@ -38,11 +39,11 @@ export const OPEX = new UtxoBasedStellarAccount({
 await OPEX.deriveBatch({ startIndex: 1, count: 5 });
 await OPEX.batchLoad();
 
-console.log(
+LOG.debug(
   "LOADED:",
   OPEX.getAllUTXOs().length
   //   OPEX.getAllUTXOs().map((u) => `${u.index} - ${u.status}: ${u.balance}`)
 );
-console.log("Total Balance : ", OPEX.getTotalBalance());
+LOG.debug("Total Balance : ", OPEX.getTotalBalance());
 
-console.log("LOADED FREE: ", OPEX.getUTXOsByState(UTXOStatus.FREE).length);
+LOG.debug("LOADED FREE: ", OPEX.getUTXOsByState(UTXOStatus.FREE).length);

@@ -5,6 +5,7 @@ import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payloa
 import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import { LOG } from "@/config/logger.ts";
 
 export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
 export type VerifyChallengeOutput = VerifyChallengeInput;
@@ -37,7 +38,8 @@ export const COMPARE_CHALLENGE_PROCESS = ProcessEngine.create(
       NETWORK_CONFIG.networkPassphrase
     );
 
-    const localChallengeOperation = localChallengeTx.operations[0] as Operation.ManageData;
+    const localChallengeOperation = localChallengeTx
+      .operations[0] as Operation.ManageData;
     const localChallengeClientAccount = localChallengeOperation.source;
     const localChallengeNonce = localChallengeOperation.value?.toString();
 
@@ -60,8 +62,8 @@ export const COMPARE_CHALLENGE_PROCESS = ProcessEngine.create(
     }
 
     if (localChallenge.ttl < expiresAt) {
-      console.log(`Local challenge expires at: ${localChallenge.ttl}`);
-      console.log(`Incoming challenge expires at: ${expiresAt}`);
+      LOG.debug(`Local challenge expires at:`, localChallenge.ttl);
+      LOG.debug(`Incoming challenge expires at:`, expiresAt);
       throw new Error(
         "Expiration time mismatch between stored and signed challenge"
       );

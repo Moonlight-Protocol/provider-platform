@@ -10,6 +10,7 @@ import { SessionRepository } from "@/persistence/drizzle/repository/session.repo
 import { SessionStatus } from "@/persistence/drizzle/entity/session.entity.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { Operation } from "stellar-sdk";
+import { LOG } from "@/config/logger.ts";
 
 export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
 export type VerifyChallengeOutput = VerifyChallengeInput;
@@ -31,7 +32,7 @@ export const UPDATE_CHALLENGE_SESSION = ProcessEngine.create(
 
     const key = tx.hash().toString("hex");
 
-    console.log("Updating session with key", key);
+    LOG.debug("Updating session with key", key);
 
     const ttl = SESSION_TTL * 1000;
 
@@ -44,14 +45,14 @@ export const UPDATE_CHALLENGE_SESSION = ProcessEngine.create(
         status: "ACTIVE",
         expiresAt: new Date(Date.now() + ttl),
       } as Session;
-  
+
       sessionManager.updateSession(data);
     }
 
     if (!tx.operations || tx.operations.length === 0) {
       throw new Error("Transaction has no operations");
     }
-    
+
     const txOperation = tx.operations[0] as Operation.ManageData;
     const txClientAccount = txOperation.source;
 
