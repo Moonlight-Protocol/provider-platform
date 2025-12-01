@@ -18,9 +18,14 @@ export class Logger {
 
   private format(...args: unknown[]): string {
     return args
-      .map((arg) =>
-        typeof arg === "string" ? arg : chalk.cyan(JSON.stringify(arg))
-      )
+      .map((arg) => {
+        if (typeof arg === "string") return arg;
+        try {
+          return chalk.cyan(JSON.stringify(arg));
+        } catch (error) {
+          return chalk.cyan(`[Unstringifiable: ${(error as Error).message}]`);
+        }
+      })
       .join(" ");
   }
 
