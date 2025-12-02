@@ -1,5 +1,4 @@
 import { ProcessEngine } from "@fifo/convee";
-import type { Context } from "@oak/oak";
 import { isTransaction } from "@colibri/core";
 import { PROVIDER_ACCOUNT } from "@/core/service/auth/service/service-account.ts";
 import getBase64Nonce from "@/utils/rand/getBase64Nonce.ts";
@@ -9,34 +8,12 @@ import {
   type Transaction,
   TransactionBuilder,
 } from "stellar-sdk";
-import {
-  CHALLENGE_TTL,
-  NETWORK_CONFIG,
-  SERVICE_DOMAIN,
-} from "@/config/env.ts";
-import type { ContextWithParsedQuery } from "@/http/utils/parse-request-query.ts";
-import type { GetAuthPayload } from "@/http/v1/stellar/auth/get.schema.ts";
+import { CHALLENGE_TTL, NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import { extractRequestMetadata } from "@/http/utils/extract-request-metadata.ts";
+import type { GetChallengeInput, ChallengeData } from "./types.ts";
 
-export type CreateChallengeOutput = {
-  ctx: Context;
-  challengeData: {
-    txHash: string;
-    clientAccount: string;
-    xdr: string;
-    nonce: string;
-    dateCreated: Date;
-    requestId: string;
-    clientIp: string;
-    userAgent: string;
-    expiresAt: Date;
-  };
-};
-
-export type CreateChallengeInput = ContextWithParsedQuery<GetAuthPayload>;
-
-export const CREATE_CHALLENGE_PROCESS = ProcessEngine.create(
-  async (input: CreateChallengeInput) => {
+export const P_CreateChallenge = ProcessEngine.create(
+  async (input: GetChallengeInput): Promise<ChallengeData> => {
     const { ctx, query } = input;
     const clientAccount = query.account;
     if (!clientAccount) {
@@ -54,7 +31,7 @@ export const CREATE_CHALLENGE_PROCESS = ProcessEngine.create(
 
       const { clientIp, userAgent, requestId } = extractRequestMetadata(ctx);
 
-      const output: CreateChallengeOutput = {
+      const output: ChallengeData = {
         ctx,
         challengeData: {
           txHash: txHash,

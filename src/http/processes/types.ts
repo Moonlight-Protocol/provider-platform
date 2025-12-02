@@ -1,6 +1,5 @@
 import type { Context } from "@oak/oak";
-
-import type { BaseSuccessResponse } from "../default-schemas.ts";
+import type { BaseSuccessResponse } from "@/http/default-schemas.ts";
 
 export type SuccessResponseInput<D> = BaseSuccessResponse & {
   ctx: Context;
@@ -10,4 +9,9 @@ export type SuccessResponseInput<D> = BaseSuccessResponse & {
 export type ContextWithParsedQuery<SchemaType> = {
   ctx: Context;
   query: SchemaType;
+};
+
+export type ContextWithParsedBody<SchemaType> = {
+  ctx: Context;
+  body: SchemaType;
 };

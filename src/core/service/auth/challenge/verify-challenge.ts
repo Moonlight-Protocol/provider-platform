@@ -2,18 +2,13 @@ import { ProcessEngine } from "@fifo/convee";
 import { Transaction, Keypair } from "stellar-sdk";
 import { PROVIDER_ACCOUNT } from "@/core/service/auth/service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
-import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type { Buffer } from "npm:buffer@^6.0.3";
-import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
+import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
+import { LOG } from "@/config/logger.ts";
 
-export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
-export type VerifyChallengeOutput = VerifyChallengeInput;
-
-export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
-  async (input: VerifyChallengeInput): Promise<VerifyChallengeOutput> => {
-    const { signedChallenge } = input.payload;
+export const P_VerifyChallenge = ProcessEngine.create(
+  (input: PostChallengeInput): PostChallengeInput => {
+    const { signedChallenge } = input.body;
     try {
-      
       const tx = new Transaction(
         signedChallenge,
         NETWORK_CONFIG.networkPassphrase
@@ -70,8 +65,10 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
       for (const sig of tx.signatures) {
         if (
           PROVIDER_ACCOUNT.verifySignature(
-            tx.hash() as unknown as Buffer, // Forcing type to Buffer as there seems to be an issue with the lib type inference
-            sig.signature() as unknown as Buffer // Forcing type to Buffer as there seems to be an issue with the lib type inference
+            // deno-lint-ignore no-explicit-any
+            tx.hash() as any, // Forcing type to Buffer as there seems to be an issue with the lib type inference
+            // deno-lint-ignore no-explicit-any
+            sig.signature() as any // Forcing type to Buffer as there seems to be an issue with the lib type inference
           )
         ) {
           isSignedByServer = true;
@@ -86,10 +83,10 @@ export const VERIFY_CHALLENGE_PROCESS = ProcessEngine.create(
       if (!isSignedByClient) {
         throw new Error("Invalid challenge: not signed by the client");
       }
-      
+
       return input;
     } catch (error) {
-      console.error(error);
+      LOG.error("Challenge verification error:", (error as Error).message);
       throw new Error("Challenge verification failed");
     }
   },

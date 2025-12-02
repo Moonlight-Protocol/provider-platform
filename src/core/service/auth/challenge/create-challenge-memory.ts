@@ -1,10 +1,9 @@
 import { ProcessEngine } from "@fifo/convee";
-import type { CreateChallengeOutput } from "@/core/service/auth/challenge/create-challenge.process.ts";
 import { sessionManager } from "@/core/service/auth/sessions/in-memory-session-manager.ts";
+import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
 
-
-export const CREATE_CHALLENGE_MEMORY = ProcessEngine.create(
-  async (input: CreateChallengeOutput) => {
+export const P_CreateChallengeMemory = ProcessEngine.create(
+  async (input: ChallengeData) => {
     const { challengeData } = input;
     try {
       if (await sessionManager.getSession(challengeData.txHash)) {

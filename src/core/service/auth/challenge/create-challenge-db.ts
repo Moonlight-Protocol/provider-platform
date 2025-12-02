@@ -1,5 +1,4 @@
 import { ProcessEngine } from "@fifo/convee";
-import type { CreateChallengeOutput } from "@/core/service/auth/challenge/create-challenge.process.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { UserRepository } from "@/persistence/drizzle/repository/user.repository.ts";
@@ -11,13 +10,14 @@ import {
   type NewUser,
   type NewAccount,
 } from "@/persistence/drizzle/entity/index.ts";
+import type { ChallengeData } from "./types.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 const userRepository = new UserRepository(drizzleClient);
 const accountRepository = new AccountRepository(drizzleClient);
 
-export const CREATE_CHALLENGE_DB = ProcessEngine.create(
-  async (input: CreateChallengeOutput) => {
+export const P_CreateChallengeDB = ProcessEngine.create(
+  async (input: ChallengeData) => {
     const { challengeData } = input;
     try {
       let account = await accountRepository.findById(
@@ -28,7 +28,7 @@ export const CREATE_CHALLENGE_DB = ProcessEngine.create(
       if (!account) {
         user = await userRepository.create({
           id: crypto.randomUUID(),
-          status: UserStatus.UNVERIFIED
+          status: UserStatus.UNVERIFIED,
         } as NewUser);
 
         account = await accountRepository.create({

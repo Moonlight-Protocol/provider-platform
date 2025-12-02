@@ -1,24 +1,20 @@
 import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
 import { type Operation, Transaction, TransactionBuilder } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
-import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { LOG } from "@/config/logger.ts";
-
-export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
-export type VerifyChallengeOutput = VerifyChallengeInput;
+import type { PostChallengeInput } from "./types.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
-export const COMPARE_CHALLENGE_PROCESS = ProcessEngine.create(
+export const P_CompareChallenge = ProcessEngine.create(
   async (
-    input: VerifyChallengeInput,
+    input: PostChallengeInput,
     _metadataHelper?: MetadataHelper
-  ): Promise<VerifyChallengeOutput> => {
+  ): Promise<PostChallengeInput> => {
     // Assume the input was already validated by an earlier process.
-    const { signedChallenge } = input.payload;
+    const { signedChallenge } = input.body;
     const tx = new Transaction(
       signedChallenge,
       NETWORK_CONFIG.networkPassphrase

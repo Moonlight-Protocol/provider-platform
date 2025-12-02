@@ -1,5 +1,4 @@
-// utils/extractRequestMetadata.ts
-import { Context } from "@oak/oak";
+import type { Context } from "@oak/oak";
 
 /**
  * Extracts metadata from the context.
@@ -13,7 +12,7 @@ export function extractRequestMetadata(ctx: Context) {
 
   try {
     clientIP = ctx.request.ip;
-  } catch (error) {
+  } catch (_error) {
     // Fallback when ctx.request.ip fails
     clientIP =
       ctx.request.headers.get("x-forwarded-for") ||
@@ -27,7 +26,7 @@ export function extractRequestMetadata(ctx: Context) {
     }
   }
 
-  let requestId = (ctx.state as any).requestId;
+  let requestId = ctx.state.requestId;
   if (!requestId) {
     requestId = crypto.randomUUID();
     ctx.state.requestId = requestId;

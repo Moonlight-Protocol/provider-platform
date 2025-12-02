@@ -1,22 +1,20 @@
 import { ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
-import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { ChallengeStatus } from "@/persistence/drizzle/entity/challenge.entity.ts";
-import type { ContextWith } from "@/http/types.ts";
+import type {
+  ContextWithJWT,
+  PostChallengeWithJWT,
+} from "@/core/service/auth/challenge/types.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
-export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
-export type VerifyChallengeOutput = ContextWith<string, "jwt">;
-
-export const UPDATE_CHALLENGE_DB = ProcessEngine.create(
-  async (input: VerifyChallengeInput): Promise<VerifyChallengeOutput> => {
+export const P_UpdateChallengeDB = ProcessEngine.create(
+  async (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
     // Assume the input was already validated by an earlier process.
-    const { signedChallenge } = input.payload;
+    const { signedChallenge } = input.body;
     const tx = new Transaction(
       signedChallenge,
       NETWORK_CONFIG.networkPassphrase
@@ -31,7 +29,7 @@ export const UPDATE_CHALLENGE_DB = ProcessEngine.create(
     challenge.status = ChallengeStatus.VERIFIED;
 
     await challengeRepository.update(challenge.id, {
-      ...challenge
+      ...challenge,
     });
 
     return {
@@ -43,4 +41,3 @@ export const UPDATE_CHALLENGE_DB = ProcessEngine.create(
     name: "UpdateChallengeDB",
   }
 );
-

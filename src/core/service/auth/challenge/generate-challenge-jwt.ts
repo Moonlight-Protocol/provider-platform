@@ -1,20 +1,19 @@
 import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
-import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
-import generateJwt from "../generate-jwt.ts";
+import type {
+  PostChallengeInput,
+  PostChallengeWithJWT,
+} from "@/core/service/auth/challenge/types.ts";
+import generateJwt from "@/core/service/auth/generate-jwt.ts";
 
-export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
-export type VerifyChallengeOutput = VerifyChallengeInput;
-
-export const GENERATE_CHALLENGE_JWT_PROCESS = ProcessEngine.create(
+export const P_GenerateChallengeJWT = ProcessEngine.create(
   async (
-    input: VerifyChallengeInput,
+    input: PostChallengeInput,
     _metadataHelper?: MetadataHelper
-  ): Promise<VerifyChallengeOutput> => {
+  ): Promise<PostChallengeWithJWT> => {
     // Assume the input was already validated by an earlier process.
-    const { signedChallenge } = input.payload;
+    const { signedChallenge } = input.body;
     const tx = new Transaction(
       signedChallenge,
       NETWORK_CONFIG.networkPassphrase
@@ -31,9 +30,9 @@ export const GENERATE_CHALLENGE_JWT_PROCESS = ProcessEngine.create(
 
     return {
       ctx: input.ctx,
-      payload: input.payload,
+      body: input.body,
       jwt,
-    } as VerifyChallengeOutput;
+    };
   },
   {
     name: "GenerateChallengeJWT",

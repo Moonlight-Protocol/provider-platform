@@ -1,8 +1,6 @@
 import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
 import { NETWORK_CONFIG, SESSION_TTL } from "@/config/env.ts";
-import type { ContextWithParsedPayload } from "@/http/utils/parse-request-payload.ts";
-import type { PostAuthPayload } from "@/http/v1/stellar/auth/post.schema.ts";
 import { sessionManager } from "@/core/service/auth/sessions/in-memory-session-manager.ts";
 import type { Session } from "@/models/auth/session/session.model.ts";
 import { AccountRepository } from "@/persistence/drizzle/repository/account.repository.ts";
@@ -11,20 +9,18 @@ import { SessionStatus } from "@/persistence/drizzle/entity/session.entity.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { Operation } from "stellar-sdk";
 import { LOG } from "@/config/logger.ts";
-
-export type VerifyChallengeInput = ContextWithParsedPayload<PostAuthPayload>;
-export type VerifyChallengeOutput = VerifyChallengeInput;
+import type { PostChallengeWithJWT } from "@/core/service/auth/challenge/types.ts";
 
 const accountRepository = new AccountRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
 
-export const UPDATE_CHALLENGE_SESSION = ProcessEngine.create(
+export const P_UpdateChallengeSession = ProcessEngine.create(
   async (
-    input: VerifyChallengeInput,
+    input: PostChallengeWithJWT,
     _metadataHelper?: MetadataHelper
-  ): Promise<VerifyChallengeOutput> => {
+  ): Promise<PostChallengeWithJWT> => {
     // Assume the input was already validated by an earlier process.
-    const { signedChallenge } = input.payload;
+    const { signedChallenge } = input.body;
     const tx = new Transaction(
       signedChallenge,
       NETWORK_CONFIG.networkPassphrase

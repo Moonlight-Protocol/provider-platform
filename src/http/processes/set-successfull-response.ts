@@ -1,15 +1,15 @@
 import { ProcessEngine } from "@fifo/convee";
 import { type Context, Status } from "@oak/oak";
 import type { infer as ZodInfer, ZodSchema } from "zod";
-import type { SuccessResponseInput } from "./types.ts";
-import { LOG } from "../../config/logger.ts";
+import type { SuccessResponseInput } from "@/http//processes/types.ts";
+import { LOG } from "@/config/logger.ts";
 
 const PROCESS_NAME = "setSuccessResponse" as const;
 
 const P_SetSuccessResponse = <S extends ZodSchema>(schema: S) => {
-  const setSuccessResponseProcess = async (
+  const setSuccessResponseProcess = (
     input: SuccessResponseInput<ZodInfer<S>>
-  ): Promise<Context> => {
+  ): Context => {
     const { ctx, data, status, message } = input;
 
     LOG.trace("Setting success response");
@@ -26,8 +26,8 @@ const P_SetSuccessResponse = <S extends ZodSchema>(schema: S) => {
         data: validatedData,
       } as SuccessResponseInput<ZodInfer<S>>;
 
-      LOG.debug(`Response body set with status ${ctx.response.status}`);
-      return await ctx;
+      LOG.debug("Response body set with status:", ctx.response.status);
+      return ctx;
     } catch (error) {
       throw new Error(`Failed to set success response: ${error} `);
     }
