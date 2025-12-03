@@ -1,8 +1,8 @@
 import { Buffer } from "buffer";
-import { z } from "npm:zod@3.24.2";
-import { uint8ArraySchema } from "../../utils/schema/uint8Array.ts";
-import { bigintSchema } from "../../utils/schema/bigint.ts";
-import { utxoSchema } from "../utxo/utxo.schema.ts";
+import { z } from "zod";
+import { uint8ArraySchema } from "@/utils/schema/uint8Array.ts";
+import { bigintSchema } from "@/utils/schema/bigint.ts";
+import { utxoSchema } from "@/models/utxo/utxo.schema.ts";
 
 export const rawBundleSchema = z.object({
   create: z.array(z.tuple([uint8ArraySchema, bigintSchema]).readonly()),

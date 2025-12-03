@@ -1,4 +1,4 @@
-import { z } from "npm:zod@3.24.2";
+import { z } from "zod";
 
 export const dateSchema = z.preprocess((arg) => {
   if (typeof arg === "string" || arg instanceof Date) {

@@ -1,5 +1,7 @@
-import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
 import { Transaction } from "stellar-sdk";
+import type { Operation } from "stellar-sdk";
+import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
+import { LOG } from "@/config/logger.ts";
 import { NETWORK_CONFIG, SESSION_TTL } from "@/config/env.ts";
 import { sessionManager } from "@/core/service/auth/sessions/in-memory-session-manager.ts";
 import type { Session } from "@/models/auth/session/session.model.ts";
@@ -7,8 +9,6 @@ import { AccountRepository } from "@/persistence/drizzle/repository/account.repo
 import { SessionRepository } from "@/persistence/drizzle/repository/session.repository.ts";
 import { SessionStatus } from "@/persistence/drizzle/entity/session.entity.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import type { Operation } from "stellar-sdk";
-import { LOG } from "@/config/logger.ts";
 import type { PostChallengeWithJWT } from "@/core/service/auth/challenge/types.ts";
 
 const accountRepository = new AccountRepository(drizzleClient);
