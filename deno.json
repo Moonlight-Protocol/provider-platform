@@ -36,8 +36,7 @@
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
     "@olli/kvdex": "jsr:@olli/kvdex@^3.1.4",
     "zod": "npm:zod@3.24.2",
-    "chalk": "npm:chalk@^5.3.0",
-    "@fifo/spp-sdk": "jsr:@fifo/spp-sdk@^0.1.9"
+    "chalk": "npm:chalk@^5.3.0"
   },
   "deploy": {
     "project": "159af174-b645-4039-be9c-493de4886f26",
