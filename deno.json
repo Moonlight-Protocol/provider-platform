@@ -24,6 +24,7 @@
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
     "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.3.0",
     "@types/pg": "npm:@types/pg@^8.15.6",
+    "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
     "drizzle-kit": "npm:drizzle-kit@^0.31.6",
     "drizzle-orm": "npm:drizzle-orm@^0.44.7",
     "pg": "npm:pg@^8.16.3",
