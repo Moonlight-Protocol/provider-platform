@@ -1,7 +1,7 @@
 import { ProcessEngine } from "@fifo/convee";
 import { type Context, Status } from "@oak/oak";
 import type { infer as ZodInfer, ZodSchema } from "zod";
-import type { SuccessResponseInput } from "@/http//processes/types.ts";
+import type { SuccessResponseInput } from "@/http/processes/types.ts";
 import { LOG } from "@/config/logger.ts";
 
 const PROCESS_NAME = "setSuccessResponse" as const;
