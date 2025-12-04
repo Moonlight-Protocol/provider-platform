@@ -23,7 +23,7 @@ const assembleResponse = (
   return {
     ctx: input.ctx,
     status: Status.OK,
-    message: "Auth challenge successfully created",
+    message: "Auth challenge verified successfully",
     data: {
       jwt: input.jwt,
     },
