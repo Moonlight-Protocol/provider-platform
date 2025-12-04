@@ -9,7 +9,7 @@ const PROCESS_NAME = "ParseRequestBody" as const;
 
 /**
  *
- * Factory Process that parses and validates URL query parameters
+ * Factory Process that parses and validates the request body
  *
  * @param schema - Zod schema to validate the request body against
  * @returns A Process that takes a Context and returns a ContextWithParsedBody
