@@ -38,7 +38,7 @@ export class INVALID_AUTHORIZATION_HEADER extends PlatformError {
         status: 401,
         message: "Invalid authorization header",
         details:
-          "The HTTP request included an invalid authorization header. It must formatted as 'Bearer <token>'.",
+          "The HTTP request included an invalid authorization header. It must be formatted as 'Bearer <token>'.",
       },
     });
   }
