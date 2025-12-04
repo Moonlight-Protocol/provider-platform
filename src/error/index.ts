@@ -4,7 +4,7 @@ import type {
   ApiError,
   PlatformErrorShape,
 } from "@/error/types.ts";
-import { isDefined } from "../utils/type-guards/is-defined.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
 
 export enum GENERAL_ERROR_CODES {
   UNEXPECTED = "GEN_000",

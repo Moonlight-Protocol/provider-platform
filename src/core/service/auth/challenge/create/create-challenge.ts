@@ -10,7 +10,10 @@ import {
 } from "stellar-sdk";
 import { CHALLENGE_TTL, NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import { extractRequestMetadata } from "@/http/utils/extract-request-metadata.ts";
-import type { GetChallengeInput, ChallengeData } from "../types.ts";
+import type {
+  GetChallengeInput,
+  ChallengeData,
+} from "@/core/service/auth/challenge/types.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import * as E from "@/core/service/auth/challenge/create/error.ts";

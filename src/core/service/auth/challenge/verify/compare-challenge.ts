@@ -3,7 +3,7 @@ import { Transaction, TransactionBuilder } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import type { PostChallengeInput } from "../types.ts";
+import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
 import * as E from "@/core/service/auth/challenge/verify/error.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
