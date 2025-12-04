@@ -7,7 +7,7 @@ import {
 } from "@fifo/convee";
 import type { Context } from "@oak/oak";
 import { LOG } from "@/config/logger.ts";
-import * as E from "@/http/plugins//error.ts";
+import * as E from "@/http/plugins/error.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
