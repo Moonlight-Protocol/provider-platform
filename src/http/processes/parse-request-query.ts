@@ -1,13 +1,7 @@
 import { ProcessEngine } from "@fifo/convee";
 import type { Context } from "@oak/oak";
-import {
-  ZodError,
-  type infer as ZodInfer,
-  ZodObject,
-  type ZodSchema,
-} from "zod";
+import { ZodError, type infer as ZodInfer, type ZodSchema } from "zod";
 import { LOG } from "@/config/logger.ts";
-import { safeStringify } from "@/utils/parse/safeStringify.ts";
 import type { ContextWithParsedQuery } from "@/http/processes/types.ts";
 import * as E from "@/http/processes/error.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
