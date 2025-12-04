@@ -33,7 +33,7 @@ const P_ParseRequestQuery = <S extends ZodSchema>(schema: S) => {
   const parseRequestProcess = (
     ctx: Context
   ): ContextWithParsedQuery<ZodInfer<S>> => {
-    LOG.trace("Parsing request body");
+    LOG.trace("Parsing request query");
 
     try {
       const queryPayload = Object.fromEntries(
