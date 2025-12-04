@@ -87,7 +87,14 @@ export class PlatformError<M = undefined | unknown> extends Error {
   }
 
   getAPIError(): ApiError {
-    if (this.hasAPIError()) return this.api;
+    if (this.hasAPIError())
+      return {
+        code: this.code,
+        status: this.api.status,
+        message: this.api.message,
+        details: this.api.details,
+      };
+
     return {
       code: this.code,
       status: 500,
