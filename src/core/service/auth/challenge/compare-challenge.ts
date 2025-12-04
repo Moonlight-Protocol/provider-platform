@@ -1,10 +1,14 @@
 import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
-import { type Operation, Transaction, TransactionBuilder } from "stellar-sdk";
+import { Transaction, TransactionBuilder } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { LOG } from "@/config/logger.ts";
 import type { PostChallengeInput } from "./types.ts";
+import * as E from "@/core/service/auth/challenge/error.ts";
+import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
+import { extractOperationFromChallengeTx } from "./extract-nonce-from-tx.ts";
+import { isTransaction } from "@colibri/core";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
@@ -19,51 +23,56 @@ export const P_CompareChallenge = ProcessEngine.create(
       signedChallenge,
       NETWORK_CONFIG.networkPassphrase
     );
+    assertOrThrow(isTransaction(tx), new E.CHALLENGE_IS_NOT_TRANSACTION(tx));
 
     const txHash = tx.hash().toString("hex");
 
     // Look up the stored challenge record using the tx hash.
     const localChallenge = await challengeRepository.findOneByTxHash(txHash);
 
-    if (!localChallenge) {
-      throw new Error("Local challenge record not found");
-    }
+    assertOrThrow(isDefined(localChallenge), new E.CHALLENGE_NOT_FOUND(txHash));
 
     const localChallengeTx = TransactionBuilder.fromXDR(
       localChallenge.txXDR,
       NETWORK_CONFIG.networkPassphrase
     );
 
-    const localChallengeOperation = localChallengeTx
-      .operations[0] as Operation.ManageData;
-    const localChallengeClientAccount = localChallengeOperation.source;
-    const localChallengeNonce = localChallengeOperation.value?.toString();
+    assertOrThrow(
+      isTransaction(localChallengeTx),
+      new E.CHALLENGE_IS_NOT_TRANSACTION(localChallengeTx)
+    );
 
-    const firstOp = tx.operations[0] as Operation.ManageData;
-    const incomingNonce = firstOp.value?.toString();
-    const incomingClientAccount = firstOp.source;
+    const {
+      clientAccount: localChallengeClientAccount,
+      nonce: localChallengeNonce,
+    } = extractOperationFromChallengeTx(localChallengeTx);
+
+    const { nonce: incomingNonce, clientAccount: incomingClientAccount } =
+      extractOperationFromChallengeTx(tx);
+
     const maxTime = tx.timeBounds?.maxTime
       ? parseInt(tx.timeBounds.maxTime)
       : 0;
+
     const expiresAt = new Date(maxTime * 1000);
 
-    if (localChallengeNonce !== incomingNonce) {
-      throw new Error("Nonce mismatch between stored and signed challenge");
-    }
+    assertOrThrow(
+      localChallengeNonce === incomingNonce,
+      new E.NONCE_MISMATCH(localChallengeNonce, incomingNonce)
+    );
 
-    if (localChallengeClientAccount !== incomingClientAccount) {
-      throw new Error(
-        "Client account mismatch between stored and signed challenge"
-      );
-    }
+    assertOrThrow(
+      localChallengeClientAccount === incomingClientAccount,
+      new E.CLIENT_ACCOUNT_MISMATCH(
+        localChallengeClientAccount,
+        incomingClientAccount
+      )
+    );
 
-    if (localChallenge.ttl < expiresAt) {
-      LOG.debug(`Local challenge expires at:`, localChallenge.ttl);
-      LOG.debug(`Incoming challenge expires at:`, expiresAt);
-      throw new Error(
-        "Expiration time mismatch between stored and signed challenge"
-      );
-    }
+    assertOrThrow(
+      localChallenge.ttl === expiresAt,
+      new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, expiresAt)
+    );
 
     return input;
   },
