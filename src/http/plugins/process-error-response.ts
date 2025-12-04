@@ -10,6 +10,9 @@ import type { Context } from "@oak/oak";
 import { LOG } from "@/config/logger.ts";
 import { P_SetErrorResponse } from "@/http/processes/set-api-response.ts";
 import { P_ErrorToApiResponse } from "@/http/processes/error-to-api-response.ts";
+import * as E from "@/http/plugins//error.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+import { PIPE_APIError } from "../pipelines/error-pipeline.ts";
 
 export const PLG_ProcessErrorResponse = () => {
   const processInput: Modifier<Context> = (
@@ -28,21 +31,17 @@ export const PLG_ProcessErrorResponse = () => {
     error: ConveeError<Error>,
     metadataHelper?: MetadataHelper
   ): Promise<ConveeError<Error> | Context> => {
-    LOG.debug("Plugin captured an error: ", error.message);
+    LOG.error("Plugin captured an error: ", error.message);
 
     const ctx = metadataHelper!.get("input-context") as Context;
 
-    const errorPipeline = Pipeline.create(
-      [P_ErrorToApiResponse(), P_SetErrorResponse(ctx)],
-      { name: "APIErrorProcessingPipeline" }
-    );
-    const result = await errorPipeline.run(error).catch((e) => {
-      const errorMessage = `Failed to process error response: ${e.message}`;
-      LOG.fatal(errorMessage);
-      throw new Error(errorMessage);
-    });
+    const errorPipeline = PIPE_APIError(ctx);
 
-    return result;
+    try {
+      return await errorPipeline.run(error);
+    } catch (e) {
+      logAndThrow(new E.PROCESSING_ERROR_RESPONSE_FAILED(e));
+    }
   };
 
   return Plugin.create({
