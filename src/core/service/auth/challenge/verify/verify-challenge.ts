@@ -53,11 +53,11 @@ export const P_VerifyChallenge = ProcessEngine.create(
 
       assertOrThrow(
         currentTime >= minTime,
-        new E.CHALLENGE_TOO_EARLY(minTime, currentTime)
+        new E.CHALLENGE_TOO_EARLY(currentTime, minTime)
       );
       assertOrThrow(
         currentTime <= maxTime,
-        new E.CHALLENGE_EXPIRED(maxTime, currentTime)
+        new E.CHALLENGE_EXPIRED(currentTime, maxTime)
       );
 
       const clientPublicKey = firstOp.source;
