@@ -1,5 +1,5 @@
 type ParsedValue =
-  | bigint
+  | Uint8Array
   | string
   | number
   | boolean
@@ -8,23 +8,15 @@ type ParsedValue =
   | ParsedValue[]
   | { [key: string]: ParsedValue };
 
-export const parseBigInt = (obj: unknown): ParsedValue => {
-  if (typeof obj === "string" && /^\d+$/.test(obj)) {
-    return BigInt(obj);
+export const parseUint8Array = (data: unknown): ParsedValue => {
+  if (Array.isArray(data)) {
+    return data.map(parseUint8Array);
+  } else if (
+    data &&
+    typeof data === "object" &&
+    Object.keys(data).every((k) => !isNaN(Number(k)))
+  ) {
+    return new Uint8Array(Object.values(data as Record<string, number>));
   }
-
-  if (Array.isArray(obj)) {
-    return obj.map(parseBigInt);
-  }
-
-  if (obj !== null && typeof obj === "object") {
-    return Object.fromEntries(
-      Object.entries(obj).map(([k, v]): [string, ParsedValue] => [
-        k,
-        parseBigInt(v),
-      ])
-    );
-  }
-
-  return obj as ParsedValue;
+  return data as ParsedValue;
 };
