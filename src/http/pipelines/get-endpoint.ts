@@ -6,7 +6,7 @@ import { PLG_ProcessErrorResponse } from "@/http/plugins/process-error-response.
 import type {
   GetEndpointInput,
   GetEndpointOutput,
-} from "@/http//pipelines/types.ts";
+} from "@/http/pipelines/types.ts";
 
 export const PIPE_GetEndpoint = <
   Req extends ZodSchema,
