@@ -10,7 +10,9 @@ import {
   type NewUser,
   type NewAccount,
 } from "@/persistence/drizzle/entity/index.ts";
-import type { ChallengeData } from "./types.ts";
+import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+import * as E from "@/core/service/auth/challenge/store/error.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 const userRepository = new UserRepository(drizzleClient);
@@ -49,8 +51,7 @@ export const P_CreateChallengeDB = ProcessEngine.create(
 
       return await input;
     } catch (error) {
-      console.error(error);
-      throw new Error("Error storing challenge in DB");
+      logAndThrow(new E.FAILED_TO_STORE_CHALLENGE_IN_DATABASE(error));
     }
   },
   {

@@ -3,8 +3,8 @@ import { Transaction, TransactionBuilder } from "stellar-sdk";
 import { NETWORK_CONFIG } from "@/config/env.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import type { PostChallengeInput } from "./types.ts";
-import * as E from "@/core/service/auth/challenge/error.ts";
+import type { PostChallengeInput } from "../types.ts";
+import * as E from "@/core/service/auth/challenge/verify/error.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { extractOperationFromChallengeTx } from "./extract-nonce-from-tx.ts";
@@ -25,6 +25,7 @@ export const P_CompareChallenge = ProcessEngine.create(
     );
     assertOrThrow(isTransaction(tx), new E.CHALLENGE_IS_NOT_TRANSACTION(tx));
 
+    const incomingTtl = extractChallengeTtl(tx);
     const txHash = tx.hash().toString("hex");
 
     // Look up the stored challenge record using the tx hash.
@@ -50,12 +51,6 @@ export const P_CompareChallenge = ProcessEngine.create(
     const { nonce: incomingNonce, clientAccount: incomingClientAccount } =
       extractOperationFromChallengeTx(tx);
 
-    const maxTime = tx.timeBounds?.maxTime
-      ? parseInt(tx.timeBounds.maxTime)
-      : 0;
-
-    const expiresAt = new Date(maxTime * 1000);
-
     assertOrThrow(
       localChallengeNonce === incomingNonce,
       new E.NONCE_MISMATCH(localChallengeNonce, incomingNonce)
@@ -70,8 +65,8 @@ export const P_CompareChallenge = ProcessEngine.create(
     );
 
     assertOrThrow(
-      localChallenge.ttl === expiresAt,
-      new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, expiresAt)
+      localChallenge.ttl === incomingTtl,
+      new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, incomingTtl)
     );
 
     return input;
@@ -80,3 +75,8 @@ export const P_CompareChallenge = ProcessEngine.create(
     name: "CompareChallengeProcessEngine",
   }
 );
+
+const extractChallengeTtl = (tx: Transaction): Date => {
+  const maxTime = tx.timeBounds?.maxTime ? parseInt(tx.timeBounds.maxTime) : 0;
+  return new Date(maxTime * 1000);
+};

@@ -1,6 +1,6 @@
 import type { Transaction, OperationType } from "stellar-sdk";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
-import * as E from "@/core/service/auth/challenge/error.ts";
+import * as E from "@/core/service/auth/challenge/verify/error.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 
 export function extractOperationFromChallengeTx(tx: Transaction): {

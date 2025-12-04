@@ -21,6 +21,7 @@ export const errorStatusSchema = z.union([
   z.literal(Status.NotFound),
   z.literal(Status.InternalServerError),
   z.literal(Status.TooManyRequests),
+  z.literal(Status.Conflict),
 ]);
 
 export const errorResponseSchema = z.object({
