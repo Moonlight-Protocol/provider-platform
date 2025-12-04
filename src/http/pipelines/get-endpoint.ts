@@ -1,7 +1,7 @@
 import { Pipeline, type PipelineStep, type PipelineSteps } from "@fifo/convee";
 import type { ZodSchema } from "zod";
 import { P_ParseRequestQuery } from "@/http/processes/parse-request-query.ts";
-import { P_SetSuccessResponse } from "@/http/processes/set-successfull-response.ts";
+import { P_SetSuccessResponse } from "@/http/processes/set-successful-response.ts";
 import { PLG_ProcessErrorResponse } from "@/http/plugins/process-error-response.ts";
 import type {
   GetEndpointInput,

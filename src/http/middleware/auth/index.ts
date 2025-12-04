@@ -28,7 +28,7 @@ export async function jwtMiddleware(
     const payload = await verify(token, secretKey);
 
     // Optionally, you can decode the token to inspect all fields
-    // (verify already returns the payload if successful)
+    // (verify already returns the payload if )
     // const payload = decode(token);
 
     // Check expiration manually if needed
