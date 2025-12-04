@@ -7,6 +7,7 @@ import { P_CreateChallenge } from "@/core/service/auth/challenge/create-challeng
 import { PIPE_GetEndpoint } from "@/http/pipelines/get-endpoint.ts";
 import type { GetEndpointOutput } from "@/http/pipelines/types.ts";
 import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
+import { LOG } from "@/config/logger.ts";
 
 export const requestSchema = z.object({
   account: z.string().regex(regex.ed25519PublicKey),
@@ -20,10 +21,14 @@ export const responseSchema = z.object({
 const assembleResponse = (
   input: ChallengeData
 ): GetEndpointOutput<typeof responseSchema> => {
+  const message = "Auth challenge successfully created";
+
+  LOG.info(message);
+
   return {
     ctx: input.ctx,
     status: Status.OK,
-    message: "Auth challenge successfully created",
+    message,
     data: {
       hash: input.challengeData.txHash,
       challenge: input.challengeData.xdr,

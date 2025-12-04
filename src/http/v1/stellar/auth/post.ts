@@ -8,6 +8,7 @@ import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
 import { P_CompareChallenge } from "@/core/service/auth/challenge/compare-challenge.ts";
 import type { ContextWithJWT } from "@/core/service/auth/challenge/types.ts";
+import { LOG } from "@/config/logger.ts";
 
 export const requestSchema = z.object({
   signedChallenge: z.string(),
@@ -20,10 +21,14 @@ export const responseSchema = z.object({
 const assembleResponse = (
   input: ContextWithJWT
 ): PostEndpointOutput<typeof responseSchema> => {
+  const message = "Auth challenge verified successfully";
+
+  LOG.info(message);
+
   return {
     ctx: input.ctx,
     status: Status.OK,
-    message: "Auth challenge verified successfully",
+    message,
     data: {
       jwt: input.jwt,
     },
