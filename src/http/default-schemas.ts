@@ -20,6 +20,7 @@ export const errorStatusSchema = z.union([
   z.literal(Status.Forbidden),
   z.literal(Status.NotFound),
   z.literal(Status.InternalServerError),
+  z.literal(Status.TooManyRequests),
 ]);
 
 export const errorResponseSchema = z.object({

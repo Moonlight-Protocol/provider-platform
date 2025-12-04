@@ -2,9 +2,9 @@ import type { Context } from "@oak/oak";
 import { verify } from "@zaubrik/djwt";
 import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY } from "@/core/service/auth/service/service-auth-secret.ts";
 import type { JwtPayload } from "@/core/service/auth/generate-jwt.ts";
-import { isDefined } from "../../../utils/type-guards/is-defined.ts";
-import * as E from "./error.ts";
-import { PIPE_APIError } from "../../pipelines/error-pipeline.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
+import * as E from "@/http//middleware/auth/error.ts";
+import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
 export async function jwtMiddleware(
   ctx: Context,
