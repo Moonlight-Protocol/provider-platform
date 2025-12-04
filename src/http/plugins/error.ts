@@ -17,7 +17,7 @@ export class PROCESSING_ERROR_RESPONSE_FAILED extends PlatformError {
         status: 500,
         message: "Failed to process error response",
         details:
-          "An unnexpected failure occurred while processing a captured error response.",
+          "An unexpected failure occurred while processing a captured error response.",
       },
     });
   }
