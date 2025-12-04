@@ -32,7 +32,7 @@ const assembleResponse = (
 
 export const postAuthHandler = (ctx: Context) => {
   const handler = PIPE_PostEndpoint({
-    name: "GetAuthEndpointPipeline",
+    name: "PostAuthEndpointPipeline",
     requestSchema: requestSchema,
     responseSchema: responseSchema,
     steps: [
