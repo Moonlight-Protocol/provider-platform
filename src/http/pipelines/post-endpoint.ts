@@ -5,7 +5,7 @@ import { P_SetSuccessResponse } from "@/http/processes/set-successful-response.t
 import type {
   PostEndpointInput,
   PostEndpointOutput,
-} from "@/http//pipelines/types.ts";
+} from "@/http/pipelines/types.ts";
 import { PLG_ProcessErrorResponse } from "@/http/plugins/process-error-response.ts";
 
 export const PIPE_PostEndpoint = <
