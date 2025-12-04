@@ -65,7 +65,7 @@ export const P_CompareChallenge = ProcessEngine.create(
     );
 
     assertOrThrow(
-      localChallenge.ttl === incomingTtl,
+      localChallenge.ttl.toDateString() === incomingTtl.toDateString(),
       new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, incomingTtl)
     );
 
