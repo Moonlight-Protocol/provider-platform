@@ -11,7 +11,7 @@ export enum GENERAL_ERROR_CODES {
   UNKNOWN = "GEN_001",
 }
 
-export class PlatformError<M = undefined> extends Error {
+export class PlatformError<M = undefined | unknown> extends Error {
   readonly code: string;
   readonly source: string;
   readonly details?: string;
