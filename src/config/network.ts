@@ -1,9 +1,7 @@
-import {
-  type ContractId,
-  type NetworkConfig,
-  TestNet,
-} from "@colibri/core";
+import { type ContractId, type NetworkConfig, TestNet } from "@colibri/core";
 import { StellarNetworkId } from "@moonlight/moonlight-sdk";
+import * as E from "@/config/error.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 
 export function selectNetwork(envNetwork: string): {
   NETWORK_CONFIG: NetworkConfig;
@@ -34,6 +32,6 @@ export function selectNetwork(envNetwork: string): {
     //   CHANNEL_ASSET: { code: "XLM", contractId: "Not Defined" },
     // };
     default:
-      throw new Error("Invalid network configured: " + envNetwork);
+      logAndThrow(new E.INVALID_NETWORK());
   }
 }
