@@ -1,6 +1,6 @@
-import { z } from "npm:zod@3.24.2";
-import { collection } from "jsr:@olli/kvdex@^3.1.4";
-import { dateSchema } from "../../utils/schema/date.ts";
+import { z } from "zod";
+import { collection } from "@olli/kvdex";
+import { dateSchema } from "@/utils/schema/date.ts";
 
 export type BundleModel = z.infer<typeof bundleModel>;
 

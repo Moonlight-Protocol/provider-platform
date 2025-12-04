@@ -1,3 +1,6 @@
+// deno-lint-ignore-file no-explicit-any
+// TODO: Remove no-explicit-any after fixing Drizzle types
+// unknown should be used instead of any where possible
 import { eq, and, isNull } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import {
@@ -81,4 +84,3 @@ export class BundleTransactionRepository extends BaseRepository<
       );
   }
 }
-

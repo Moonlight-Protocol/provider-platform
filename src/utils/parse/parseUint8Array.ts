@@ -1,4 +1,14 @@
-export const parseUint8Array = (data: any): any => {
+type ParsedValue =
+  | Uint8Array
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | ParsedValue[]
+  | { [key: string]: ParsedValue };
+
+export const parseUint8Array = (data: unknown): ParsedValue => {
   if (Array.isArray(data)) {
     return data.map(parseUint8Array);
   } else if (
@@ -6,7 +16,7 @@ export const parseUint8Array = (data: any): any => {
     typeof data === "object" &&
     Object.keys(data).every((k) => !isNaN(Number(k)))
   ) {
-    return new Uint8Array(Object.values(data)); // Convert object back to Uint8Array ✅
+    return new Uint8Array(Object.values(data as Record<string, number>));
   }
-  return data;
+  return data as ParsedValue;
 };

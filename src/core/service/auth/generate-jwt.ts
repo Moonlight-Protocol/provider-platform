@@ -1,6 +1,6 @@
-import { create, getNumericDate } from "https://deno.land/x/djwt/mod.ts";
+import { create, getNumericDate } from "@zaubrik/djwt";
 import { SERVICE_DOMAIN, SESSION_TTL } from "@/config/env.ts";
-import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY_SIGNABLE } from "./service/service-auth-secret.ts";
+import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY_SIGNABLE } from "@/core/service/auth/service/service-auth-secret.ts";
 
 export type JwtPayload = {
   iss: string;
@@ -23,6 +23,6 @@ export default async function (clientAccount: string, challengeHash: string) {
 
   const secretKey = SERVICE_AUTH_SECRET_AS_CRYPTO_KEY_SIGNABLE;
   const jwt = await create(header, payload, secretKey);
-  
+
   return jwt;
 }

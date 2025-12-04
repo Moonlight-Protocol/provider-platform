@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { collection } from "@olli/kvdex";
-import { gAccountPublicKey } from "../../utils/regex/gAccountPublicKey.ts";
+import { regex } from "@colibri/core";
 export type UTXOModel = z.infer<typeof utxoModel>;
 
 export const utxoModel = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
-  publicKey: z.string().regex(gAccountPublicKey),
+  publicKey: z.string().regex(regex.ed25519PublicKey),
   amount: z.number(),
   status: z.enum(["unspent", "spent"]),
   bundleCreateHash: z.string().optional(),

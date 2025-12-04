@@ -1,4 +1,4 @@
-import { z } from "npm:zod@3.24.2";
+import { z } from "zod";
 
 export const uint8ArraySchema = z.preprocess((data) => {
   if (Array.isArray(data)) {

@@ -1,4 +1,4 @@
-import uint8ArrayToBase64 from "../conversion/uint8ArrayToBase64.ts";
+import uint8ArrayToBase64 from "@/utils/conversion/uint8ArrayToBase64.ts";
 
 export default function getBase64Nonce(bytes: number): string {
   const nonceArray = new Uint8Array(bytes);

@@ -32,7 +32,7 @@ export function createRateLimitMiddleware(
         };
         return;
       }
-    } catch (error) {
+    } catch (_error) {
       // Fallback when IP detection fails
       const clientIP =
         ctx.request.headers.get("x-forwarded-for") ||

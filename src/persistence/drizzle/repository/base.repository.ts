@@ -1,4 +1,7 @@
-import { eq, and, isNull, SQL } from "drizzle-orm";
+// deno-lint-ignore-file no-explicit-any
+//TODO: Remove no-explicit-any after fixing Drizzle types
+// unknown should be used instead of any where possible
+import { eq, and, isNull, type SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 
@@ -19,7 +22,10 @@ export abstract class BaseRepository<
    * Inserts a new record
    */
   async create(data: TInsert): Promise<TSelect> {
-    const result = await this.db.insert(this.table).values(data as any).returning();
+    const result = await this.db
+      .insert(this.table)
+      .values(data as any)
+      .returning();
     return result[0] as TSelect;
   }
 
@@ -83,4 +89,3 @@ export abstract class BaseRepository<
       .where(eq((this.table as any).id, id) as SQL<unknown>);
   }
 }
-
