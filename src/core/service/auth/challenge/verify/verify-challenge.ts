@@ -1,9 +1,13 @@
 import { ProcessEngine } from "@fifo/convee";
-import { Transaction, Keypair } from "stellar-sdk";
+import { Transaction, Keypair, type OperationType } from "stellar-sdk";
 import { PROVIDER_ACCOUNT } from "@/core/service/auth/service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
-import { LOG } from "@/config/logger.ts";
+import * as E from "@/core/service/auth/challenge/verify/error.ts";
+import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
+import { StrKey } from "@colibri/core";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 
 export const P_VerifyChallenge = ProcessEngine.create(
   (input: PostChallengeInput): PostChallengeInput => {
@@ -14,28 +18,30 @@ export const P_VerifyChallenge = ProcessEngine.create(
         NETWORK_CONFIG.networkPassphrase
       );
 
-      if (tx.sequence !== "0") {
-        throw new Error("Invalid challenge: sequence number is not 0");
-      }
+      assertOrThrow(
+        tx.sequence === "0",
+        new E.INVALID_SEQUENCE_NUMBER(tx.sequence)
+      );
 
-      if (!tx.timeBounds) {
-        throw new Error("Invalid challenge: missing time bounds");
-      }
+      assertOrThrow(isDefined(tx.timeBounds), new E.MISSING_TIME_BOUNDS());
 
-      if (!tx.operations || tx.operations.length === 0) {
-        throw new Error("Invalid challenge: no operations present");
-      }
+      assertOrThrow(
+        isDefined(tx.operations && tx.operations.length > 0),
+        new E.MISSING_OPERATIONS(tx)
+      );
 
       const firstOp = tx.operations[0];
-      if (firstOp.type !== "manageData") {
-        throw new Error("Invalid challenge: first operation is not manageData");
-      }
 
-      if (!firstOp.name.startsWith(`${SERVICE_DOMAIN} auth`)) {
-        throw new Error(
-          "Invalid challenge: operation key does not match expected format"
-        );
-      }
+      const expectedOperationType = "manageData" as OperationType.ManageData;
+      assertOrThrow(
+        firstOp.type === expectedOperationType,
+        new E.WRONG_OPERATION_TYPE(expectedOperationType, firstOp.type)
+      );
+
+      assertOrThrow(
+        firstOp.name.startsWith(`${SERVICE_DOMAIN} auth`),
+        new E.OPERATION_KEY_MISMATCH(`${SERVICE_DOMAIN} auth`, firstOp.name)
+      );
 
       const currentTime = Math.floor(Date.now() / 1000);
       const minTime = tx.timeBounds.minTime
@@ -45,17 +51,22 @@ export const P_VerifyChallenge = ProcessEngine.create(
         ? parseInt(tx.timeBounds.maxTime)
         : 0;
 
-      if (currentTime < minTime) {
-        throw new Error("Challenge is not yet valid");
-      }
-      if (currentTime > maxTime) {
-        throw new Error("Challenge has expired");
-      }
+      assertOrThrow(
+        currentTime >= minTime,
+        new E.CHALLENGE_TOO_EARLY(currentTime, minTime)
+      );
+      assertOrThrow(
+        currentTime <= maxTime,
+        new E.CHALLENGE_EXPIRED(currentTime, maxTime)
+      );
 
       const clientPublicKey = firstOp.source;
-      if (!clientPublicKey || clientPublicKey.length === 0) {
-        throw new Error("Invalid challenge: missing client public key");
-      }
+
+      assertOrThrow(
+        isDefined(clientPublicKey) &&
+          StrKey.isEd25519PublicKey(clientPublicKey),
+        new E.MISSING_CLIENT_ACCOUNT()
+      );
 
       const clientKeypair = Keypair.fromPublicKey(clientPublicKey);
 
@@ -77,17 +88,13 @@ export const P_VerifyChallenge = ProcessEngine.create(
           isSignedByClient = true;
         }
       }
-      if (!isSignedByServer) {
-        throw new Error("Invalid challenge: not signed by the server");
-      }
-      if (!isSignedByClient) {
-        throw new Error("Invalid challenge: not signed by the client");
-      }
+
+      assertOrThrow(isSignedByServer, new E.MISSING_SERVER_SIGNATURE());
+      assertOrThrow(isSignedByClient, new E.MISSING_CLIENT_SIGNATURE());
 
       return input;
     } catch (error) {
-      LOG.error("Challenge verification error:", (error as Error).message);
-      throw new Error("Challenge verification failed");
+      logAndThrow(new E.CHALLENGE_VERIFICATION_FAILED(error));
     }
   },
   {

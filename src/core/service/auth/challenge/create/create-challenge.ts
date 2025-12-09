@@ -10,15 +10,22 @@ import {
 } from "stellar-sdk";
 import { CHALLENGE_TTL, NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import { extractRequestMetadata } from "@/http/utils/extract-request-metadata.ts";
-import type { GetChallengeInput, ChallengeData } from "./types.ts";
+import type {
+  GetChallengeInput,
+  ChallengeData,
+} from "@/core/service/auth/challenge/types.ts";
+import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
+import * as E from "@/core/service/auth/challenge/create/error.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 
 export const P_CreateChallenge = ProcessEngine.create(
   async (input: GetChallengeInput): Promise<ChallengeData> => {
     const { ctx, query } = input;
     const clientAccount = query.account;
-    if (!clientAccount) {
-      throw new Error("Missing account in query parameters");
-    }
+
+    assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
+
     try {
       const { tx, nonce, minTime, maxTime } =
         getChallengeTransaction(clientAccount);
@@ -48,8 +55,7 @@ export const P_CreateChallenge = ProcessEngine.create(
 
       return await output;
     } catch (error) {
-      console.error("Error creating challenge: ", error);
-      throw new Error("Error creating challenge");
+      logAndThrow(new E.FAILED_TO_CREATE_CHALLENGE(error));
     }
   },
   {
@@ -94,9 +100,10 @@ const getChallengeTransaction = (
     NETWORK_CONFIG.networkPassphrase
   );
 
-  if (!isTransaction(signedTxObj)) {
-    throw new Error("Signed transaction is not a valid Transaction object");
-  }
+  assertOrThrow(
+    isTransaction(signedTxObj),
+    new E.INVALID_SIGNED_TRANSACTION_OBJ(signedTxObj)
+  );
 
   return { tx: signedTxObj, nonce: nonceBase64, minTime, maxTime };
 };

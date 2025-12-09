@@ -10,6 +10,9 @@ import { SessionRepository } from "@/persistence/drizzle/repository/session.repo
 import { SessionStatus } from "@/persistence/drizzle/entity/session.entity.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { PostChallengeWithJWT } from "@/core/service/auth/challenge/types.ts";
+import * as E from "@/core/service/auth/challenge/store/error.ts";
+import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
 
 const accountRepository = new AccountRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -45,21 +48,20 @@ export const P_UpdateChallengeSession = ProcessEngine.create(
       sessionManager.updateSession(data);
     }
 
-    if (!tx.operations || tx.operations.length === 0) {
-      throw new Error("Transaction has no operations");
-    }
+    assertOrThrow(
+      isDefined(tx.operations) && tx.operations.length > 0,
+      new E.CHALLENGE_HAS_NO_OPERATIONS(key)
+    );
 
     const txOperation = tx.operations[0] as Operation.ManageData;
     const txClientAccount = txOperation.source;
-
-    if (!txClientAccount) {
-      throw new Error("Transaction client account is required");
-    }
+    assertOrThrow(isDefined(txClientAccount), new E.MISSING_CLIENT_ACCOUNT());
 
     const account = await accountRepository.findById(txClientAccount);
-    if (!account) {
-      throw new Error("User account not found in database");
-    }
+    assertOrThrow(
+      isDefined(account),
+      new E.USER_NOT_FOUND_IN_DATABASE(txClientAccount)
+    );
 
     // Add session to database
     await sessionRepository.create({

@@ -2,23 +2,22 @@ import type { Context } from "@oak/oak";
 import { verify } from "@zaubrik/djwt";
 import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY } from "@/core/service/auth/service/service-auth-secret.ts";
 import type { JwtPayload } from "@/core/service/auth/generate-jwt.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
+import * as E from "@/http/middleware/auth/error.ts";
+import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
 export async function jwtMiddleware(
   ctx: Context,
   next: () => Promise<unknown>
 ) {
   const authorization = ctx.request.headers.get("authorization");
-  if (!authorization) {
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Missing authorization header" };
-    return;
+  if (!isDefined(authorization)) {
+    return await PIPE_APIError(ctx).run(new E.MISSING_AUTHORIZATION_HEADER());
   }
 
   const parts = authorization.split(" ");
   if (parts.length !== 2 || parts[0] !== "Bearer") {
-    ctx.response.status = 401;
-    ctx.response.body = { error: "Invalid authorization header format" };
-    return;
+    return await PIPE_APIError(ctx).run(new E.INVALID_AUTHORIZATION_HEADER());
   }
   const token = parts[1];
 
@@ -34,18 +33,13 @@ export async function jwtMiddleware(
     // Check expiration manually if needed
     const now = Math.floor(Date.now() / 1000);
     if (typeof payload.exp === "number" && now > payload.exp) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "JWT has expired" };
-      return;
+      return await PIPE_APIError(ctx).run(new E.EXPIRED_TOKEN());
     }
 
     // Attach the verified payload to ctx.state for later use.
     ctx.state.session = payload;
   } catch (error) {
-    console.error("JWT verification failed with error:", error);
-    ctx.response.status = 401;
-    ctx.response.body = { error: "JWT verification failed" };
-    return;
+    return await PIPE_APIError(ctx).run(new E.JWT_VERIFICATION_FAILED(error));
   }
   await next();
 }

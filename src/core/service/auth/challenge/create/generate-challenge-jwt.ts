@@ -6,6 +6,9 @@ import type {
   PostChallengeWithJWT,
 } from "@/core/service/auth/challenge/types.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
+import * as E from "@/core/service/auth/challenge/create/error.ts";
+import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
+import { isDefined } from "@/utils/type-guards/is-defined.ts";
 
 export const P_GenerateChallengeJWT = ProcessEngine.create(
   async (
@@ -22,9 +25,7 @@ export const P_GenerateChallengeJWT = ProcessEngine.create(
     const key = tx.hash().toString("hex");
 
     const clientAccount = tx.operations[0].source;
-    if (!clientAccount) {
-      throw new Error("Missing account in challenge operation");
-    }
+    assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
 
     const jwt = await generateJwt(clientAccount, key);
 

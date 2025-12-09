@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { regex } from "@colibri/core";
 import { Status, type Context } from "@oak/oak";
-import { P_CreateChallengeDB } from "@/core/service/auth/challenge/create-challenge-db.ts";
-import { P_CreateChallengeMemory } from "@/core/service/auth/challenge/create-challenge-memory.ts";
-import { P_CreateChallenge } from "@/core/service/auth/challenge/create-challenge.ts";
+import { P_CreateChallengeDB } from "@/core/service/auth/challenge/store/create-challenge-db.ts";
+import { P_CreateChallengeMemory } from "@/core/service/auth/challenge/store/create-challenge-memory.ts";
+import { P_CreateChallenge } from "@/core/service/auth/challenge/create/create-challenge.ts";
 import { PIPE_GetEndpoint } from "@/http/pipelines/get-endpoint.ts";
 import type { GetEndpointOutput } from "@/http/pipelines/types.ts";
 import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";

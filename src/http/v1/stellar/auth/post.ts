@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { type Context, Status } from "@oak/oak";
-import { P_VerifyChallenge } from "@/core/service/auth/challenge/verify-challenge.ts";
-import { P_UpdateChallengeSession } from "@/core/service/auth/challenge/update-challenge-session.ts";
-import { P_UpdateChallengeDB } from "@/core/service/auth/challenge/update-challenge-db.ts";
-import { P_GenerateChallengeJWT } from "@/core/service/auth/challenge/generate-challenge-jwt.ts";
+import { P_VerifyChallenge } from "@/core/service/auth/challenge/verify/verify-challenge.ts";
+import { P_UpdateChallengeSession } from "@/core/service/auth/challenge/store/update-challenge-session.ts";
+import { P_UpdateChallengeDB } from "@/core/service/auth/challenge/store/update-challenge-db.ts";
+import { P_GenerateChallengeJWT } from "@/core/service/auth/challenge/create/generate-challenge-jwt.ts";
 import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
-import { P_CompareChallenge } from "@/core/service/auth/challenge/compare-challenge.ts";
+import { P_CompareChallenge } from "@/core/service/auth/challenge/verify/compare-challenge.ts";
 import type { ContextWithJWT } from "@/core/service/auth/challenge/types.ts";
 import { LOG } from "@/config/logger.ts";
 
