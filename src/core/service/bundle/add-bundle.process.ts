@@ -9,11 +9,10 @@ import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { TX_CONFIG, NETWORK_RPC_SERVER, OPEX_SK } from "@/config/env.ts";
 import {
-ChannelInvokeMethods,
+  ChannelInvokeMethods,
   MoonlightOperation,
   MoonlightTransactionBuilder,
   type OperationTypes,
-  sha256Hash,
   UtxoBasedStellarAccount,
   UTXOStatus,
 } from "@moonlight/moonlight-sdk";
@@ -21,220 +20,313 @@ import { LOG } from "@/config/logger.ts";
 import type { requestSchema } from "@/http/v1/bundle/post.ts";
 import type { PostEndpointInput } from "@/http/pipelines/types.ts";
 import type { SIM_ERRORS } from "@colibri/core";
+import {
+  classifyOperations,
+  calculateOperationAmounts,
+  calculateFee,
+  generateBundleId,
+  calculateBundleTtl,
+} from "./bundle.service.ts";
+import * as E from "./bundle.errors.ts";
+import type { ClassifiedOperations } from "./bundle.types.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 
+// Configuration constants
+const BUNDLE_CONFIG = {
+  TTL_HOURS: 24,
+  OPEX_UTXO_BATCH_SIZE: 200,
+  REQUIRED_OPEX_UTXOS: 1,
+  TRANSACTION_EXPIRATION_OFFSET: 1000,
+} as const;
+
+// Repositories
 const sessionRepository = new SessionRepository(drizzleClient);
 const utxoRepository = new UtxoRepository(drizzleClient);
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
 
+// ========== HELPER FUNCTIONS ==========
+
+/**
+ * Validates the user session
+ */
+async function validateSession(sessionId: string) {
+  const userSession = await sessionRepository.findById(sessionId);
+  if (!userSession) {
+    logAndThrow(new E.INVALID_SESSION(sessionId));
+  }
+  return userSession;
+}
+
+/**
+ * Validates that exists and the bundle is expired with the same ID, otherwise throws an error
+ */
+async function assertAndThrowBundle(bundleId: string): Promise<boolean> {
+  const existingBundle = await operationsBundleRepository.findById(bundleId);
+
+  if (!existingBundle)
+    return false;
+
+  if (existingBundle.status !== BundleStatus.EXPIRED)
+    logAndThrow(new E.BUNDLE_ALREADY_EXISTS(bundleId));
+  
+  return true;
+}
+
+/**
+ * Parses MLXDR operations
+ */
+async function parseOperations(operationsMLXDR: string[]): Promise<Array<OperationTypes.CreateOperation | OperationTypes.SpendOperation | OperationTypes.DepositOperation | OperationTypes.WithdrawOperation>> {
+  const operations = await Promise.all(
+    operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr))
+  );
+  
+  if (operations.length === 0) {
+    logAndThrow(new E.NO_OPERATIONS_PROVIDED());
+  }
+  
+  return operations;
+}
+
+/**
+ * Validates spend operations
+ */
+function validateSpendOperations(operations: OperationTypes.SpendOperation[]): void {
+  for (let i = 0; i < operations.length; i++) {
+    const operation = operations[i];
+    if (!operation.isSignedByUTXO()) {
+      logAndThrow(new E.SPEND_OPERATION_NOT_SIGNED(i));
+    }
+  }
+}
+
+/**
+ * Ensures OPEX account has enough free UTXOs available
+ */
+async function ensureOpexUtxosAvailable(
+  opexHandler: UtxoBasedStellarAccount,
+  requiredCount: number
+): Promise<void> {
+  while (opexHandler.getUTXOsByState(UTXOStatus.FREE).length < requiredCount + 1) {
+    LOG.trace("Deriving UTXOs batch for OPEX account");
+    await opexHandler.deriveBatch({});
+    LOG.trace("Loading UTXOs batch for OPEX account");
+    await opexHandler.batchLoad();
+    
+    LOG.trace(`Derived UTXOS: ${opexHandler.getAllUTXOs().length}`);
+    LOG.trace(`Free UTXOS: ${opexHandler.getUTXOsByState(UTXOStatus.FREE).length}`);
+    LOG.trace(`SPENT: ${opexHandler.getUTXOsByState(UTXOStatus.SPENT).length}`);
+    LOG.trace(`UNSPENT: ${opexHandler.getUTXOsByState(UTXOStatus.UNSPENT).length}`);
+    LOG.trace(`UNLOADED: ${opexHandler.getUTXOsByState(UTXOStatus.UNLOADED).length}`);
+  }
+}
+
+/**
+ * Persists UTXOs in the database from create operations
+ */
+async function persistCreateOperations(
+  operations: OperationTypes.CreateOperation[],
+  bundleId: string,
+  accountId: string
+): Promise<void> {
+  for (const operation of operations) {
+    await utxoRepository.create({
+      id: Buffer.from(operation.getUtxo()).toString("base64"),
+      accountId,
+      amount: operation.getAmount(),
+      createdAt: new Date(),
+      createdBy: accountId,
+      createdAtBundleId: bundleId,
+    });
+  }
+}
+
+/**
+ * Updates UTXOs in the database from spend operations
+ */
+async function persistSpendOperations(
+  operations: OperationTypes.SpendOperation[],
+  bundleId: string,
+  accountId: string
+): Promise<void> {
+  for (const operation of operations) {
+    const utxoId = operation.getUtxo().toString();
+    const utxo = await utxoRepository.findById(utxoId);
+    
+    if (!utxo) {
+      logAndThrow(new E.UTXO_NOT_FOUND(utxoId));
+    }
+    
+    await utxoRepository.update(utxo.id, {
+      amount: utxo.amount - operation.getAmount(),
+      updatedAt: new Date(),
+      updatedBy: accountId,
+      spentAtBundleId: bundleId,
+      spentByAccountId: accountId,
+    });
+  }
+}
+
+/**
+ * Adds operations to the transaction builder
+ */
+function addOperationsToTransaction(
+  txBuilder: MoonlightTransactionBuilder,
+  classified: ClassifiedOperations
+): void {
+  classified.deposit.forEach((op) => {
+    txBuilder.addOperation(op);
+  });
+  
+  classified.create.forEach((op) => {
+    txBuilder.addOperation(op);
+  });
+  
+  classified.spend.forEach((op) => {
+    txBuilder.addOperation(op);
+  });
+}
+
+/**
+ * Gets transaction expiration from latest ledger
+ */
+async function getTransactionExpiration(): Promise<number> {
+  const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger();
+  return latestLedger.sequence + BUNDLE_CONFIG.TRANSACTION_EXPIRATION_OFFSET;
+}
+
+/**
+ * Submits transaction to channel contract
+ */
+async function submitTransaction(
+  txBuilder: MoonlightTransactionBuilder,
+  expiration: number
+): Promise<string> {
+  await txBuilder.signWithProvider(TX_CONFIG.signers[1], expiration);
+  
+  try {
+    const { hash } = await CHANNEL_CLIENT.invokeRaw({
+      operationArgs: {
+        function: ChannelInvokeMethods.transact,
+        args: [txBuilder.buildXDR()],
+        auth: [...txBuilder.getSignedAuthEntries()],
+      },
+      config: TX_CONFIG,
+    });
+    
+    return hash.toString();
+  } catch (error) {
+    LOG.error("Simulation failed: ", (error as SIM_ERRORS.SIMULATION_FAILED).meta.data.input.transaction.toXDR());
+    logAndThrow(new E.INVALID_OPERATIONS("Simulation failed"));
+  }
+}
+
+// ========== MAIN PROCESS ==========
+
 export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
-    const operationsMLXDR = input.body.operationsMLXDR;
-    const ctx = input.ctx;
-    const sessionData = ctx.state.session as JwtSessionData;
+    const { operationsMLXDR } = input.body;
+    const sessionData = input.ctx.state.session as JwtSessionData;
 
-    const userSession = await sessionRepository.findById(sessionData.sessionId);
-    if (!userSession) {
-      throw new Error("Invalid Session: Account not found in session");
+    // 1. Session validation
+    const userSession = await validateSession(sessionData.sessionId);
+
+    // 2. Bundle ID generation and validation
+    const bundleId = await generateBundleId(operationsMLXDR);
+    const isBundleExpired = await assertAndThrowBundle(bundleId);
+
+    // 3. Parse and classify operations
+    const operations = await parseOperations(operationsMLXDR);
+    const classified = classifyOperations(operations);
+    validateSpendOperations(classified.spend);
+      
+    // 4. Bundle update or creation
+    let bundleEntity: OperationsBundle;
+    if (isBundleExpired) {
+      bundleEntity = await operationsBundleRepository.update(bundleId, {
+        status: BundleStatus.PENDING,
+        updatedAt: new Date(),
+        updatedBy: userSession.accountId,
+      });
+    } else {
+      bundleEntity = await operationsBundleRepository.create({
+        id: bundleId,
+        status: BundleStatus.PENDING,
+        ttl: calculateBundleTtl(),
+        createdBy: userSession.accountId,
+        createdAt: new Date(),
+      });
     }
+    
 
-    const operationsBundleId = await sha256Hash(Buffer.from(JSON.stringify(operationsMLXDR)));
-
-    const operationsBundle = await operationsBundleRepository.findById(operationsBundleId);
-    if (operationsBundle && operationsBundle.status === BundleStatus.PENDING) {
-      throw new Error("Invalid Operations Bundle: A PENDING Operations Bundle already exists");
-    }
-
-    const userOperations = await Promise.all(
-      operationsMLXDR.map(async (xdr: string) => 
-        await MoonlightOperation.fromMLXDR(xdr))
-    );
-    if (userOperations.length === 0) {
-      throw new Error("Invalid Operations: No operations provided");
-    }
-
-    const createOperations = userOperations.filter((operation) => operation.isCreate());
-    const spendOperations = userOperations.filter((operation) => operation.isSpend());
-    const depositOperations = userOperations.filter((operation) => operation.isDeposit());
-    const withdrawOperations = userOperations.filter((operation) => operation.isWithdraw());
-
-
-    const newOperationsBundle = await operationsBundleRepository.create({
-      id: operationsBundleId,
-      status: BundleStatus.PENDING,
-      ttl: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      createdBy: userSession.accountId,
-      createdAt: new Date(),
-    });
-
-    const totalCreateAmount = createOperations.length > 0
-      ? createOperations.reduce(
-          (acc: bigint, operation: OperationTypes.CreateOperation) => {
-            return acc + operation.getAmount();
-          },
-          BigInt(0)
-        )
-      : BigInt(0);
-    const totalSpendAmount = spendOperations.length > 0
-      ? spendOperations.reduce(
-          (acc: bigint, operation: OperationTypes.SpendOperation) => {
-            return acc + operation.getAmount();
-          },
-          BigInt(0)
-        )
-      : BigInt(0);
-    const totalDepositAmount = depositOperations.length > 0
-      ? depositOperations.reduce(
-          (acc: bigint, operation: OperationTypes.DepositOperation) => {
-            return acc + operation.getAmount();
-          },
-          BigInt(0)
-        )
-      : BigInt(0);
-
-    const totalWithdrawAmount = withdrawOperations.length > 0
-      ? withdrawOperations.reduce(
-          (acc: bigint, operation: OperationTypes.WithdrawOperation) => {
-            return acc + operation.getAmount();
-          },
-          BigInt(0)
-        )
-      : BigInt(0);
-
-    const totalInflows = totalDepositAmount;
-    const totalOutflows = totalCreateAmount + totalWithdrawAmount;
-    let fee = totalInflows - totalOutflows;
-    if (totalInflows <= BigInt(0)) {
-      fee = totalSpendAmount - totalOutflows
-    }
-
+    // 5. Fee calculation
+    const amounts = calculateOperationAmounts(classified);
+    const feeCalculation = calculateFee(amounts);
+    
     LOG.debug("Fee calculation breakdown", {
-      totalDepositAmount: totalDepositAmount.toString(),
-      totalCreateAmount: totalCreateAmount.toString(),
-      totalWithdrawAmount: totalWithdrawAmount.toString(),
-      totalSpendAmount: totalSpendAmount.toString(),
-      totalInflows: totalInflows.toString(),
-      totalOutflows: totalOutflows.toString(),
-      fee: fee.toString(),
+      totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
+      totalCreateAmount: feeCalculation.breakdown.totalCreateAmount.toString(),
+      totalWithdrawAmount: feeCalculation.breakdown.totalWithdrawAmount.toString(),
+      totalSpendAmount: feeCalculation.breakdown.totalSpendAmount.toString(),
+      totalInflows: feeCalculation.totalInflows.toString(),
+      totalOutflows: feeCalculation.totalOutflows.toString(),
+      fee: feeCalculation.fee.toString(),
     });
 
-    if (fee < BigInt(1)) {
+    if (feeCalculation.fee < BigInt(1)) {
       LOG.warn("This bundle doesn't have any fee");
     }
 
+    // 6. Setup transaction builder and OPEX handler
     const txBuilder = MoonlightTransactionBuilder.fromPrivacyChannel(CHANNEL_CLIENT);
-
     const opexHandler = UtxoBasedStellarAccount.fromPrivacyChannel({
       channelClient: CHANNEL_CLIENT,
       root: OPEX_SK,
       options: {
-        batchSize: 200,
+        batchSize: BUNDLE_CONFIG.OPEX_UTXO_BATCH_SIZE,
       },
     });
 
-    const nOfCreate = 1;
-    while (opexHandler.getUTXOsByState(UTXOStatus.FREE).length < nOfCreate + 1) {
-      LOG.trace("Deriving UTXOs batch for OPEX account");
-      await opexHandler.deriveBatch({});
-      LOG.trace("Loading UTXOs batch for OPEX account");
-      await opexHandler.batchLoad();
-      LOG.trace(`Derived UTXOS: ${opexHandler.getAllUTXOs().length}`);
-      LOG.trace(
-        `Free UTXOS: ${opexHandler.getUTXOsByState(UTXOStatus.FREE).length}`
-      );
-      LOG.trace(
-        `Free SPENT: ${opexHandler.getUTXOsByState(UTXOStatus.SPENT).length}`
-      );
-      LOG.trace(
-        `Free UNSPENT: ${opexHandler.getUTXOsByState(UTXOStatus.UNSPENT).length}`
-      );
-      LOG.trace(
-        `Free UNLOADED: ${
-          opexHandler.getUTXOsByState(UTXOStatus.UNLOADED).length
-        }`
-      );
+    // 7. OPEX UTXO management
+    await ensureOpexUtxosAvailable(opexHandler, BUNDLE_CONFIG.REQUIRED_OPEX_UTXOS);
+    const reservedUtxos = opexHandler.reserveUTXOs(BUNDLE_CONFIG.REQUIRED_OPEX_UTXOS);
+    
+    if (!reservedUtxos) {
+      const availableCount = opexHandler.getUTXOsByState(UTXOStatus.FREE).length;
+      logAndThrow(new E.INSUFFICIENT_UTXOS(BUNDLE_CONFIG.REQUIRED_OPEX_UTXOS, availableCount));
     }
 
-    const reservedUTXOs = opexHandler.reserveUTXOs(nOfCreate);
-    if (reservedUTXOs === null) {
-      throw new Error("Not enough UTXOs available to reserve for create");
-    }
-    const targetAmount = fee;
+    // 8. Create fee operation
+    const feeOperation = MoonlightOperation.create(
+      reservedUtxos[0].publicKey,
+      feeCalculation.fee
+    );
+    txBuilder.addOperation(feeOperation);
+    LOG.debug("Fee operation created", { mlxdr: feeOperation.toMLXDR() });
 
-    const op = MoonlightOperation.create(reservedUTXOs[0].publicKey, targetAmount);
-    txBuilder.addOperation(op);
-    console.log("\n\n--------Operation", op.toMLXDR());
+    // 9. Get expiration and add operations to transaction
+    const expiration = await getTransactionExpiration();
+    addOperationsToTransaction(txBuilder, classified);
 
-    const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger()
-    const expiration = latestLedger.sequence + 1000;
+    // 10. Persist UTXOs
+    await persistCreateOperations(classified.create, bundleEntity.id, userSession.accountId);
+    await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId);
 
-    depositOperations.forEach((operation: OperationTypes.DepositOperation) => {
-      txBuilder.addOperation(operation as OperationTypes.DepositOperation);
+    // 11. Submit transaction
+    const transactionHash = await submitTransaction(txBuilder, expiration);
+
+    // 12. Update bundle status
+    await operationsBundleRepository.update(bundleEntity.id, {
+      status: BundleStatus.COMPLETED,
+      updatedAt: new Date(),
+      updatedBy: userSession.accountId,
     });
 
-    for (const operation of createOperations) {
-      await utxoRepository.create({
-        id: Buffer.from(operation.getUtxo()).toString("base64"),
-        accountId: userSession.accountId,
-        amount: operation.getAmount(),
-        createdAt: new Date(),
-        createdBy: userSession.accountId,
-        createdAtBundleId: newOperationsBundle.id,
-      });
-
-      txBuilder.addOperation(operation as OperationTypes.CreateOperation);
-    }
-
-    for (const operation of spendOperations) {
-      if (!operation.isSignedByUTXO()) {
-        throw new Error("Invalid Operations: Spend operation must be signed by UTXO owner");
-      }
-      
-      const utxo = await utxoRepository.findById(operation.getUtxo().toString());
-      if (!utxo) {
-        throw new Error("Invalid Operations: UTXO not found");
-      }
-      await utxoRepository.update(utxo.id, {
-        amount: utxo.amount - operation.getAmount(),
-        updatedAt: new Date(),
-        updatedBy: userSession.accountId,
-        spentAtBundleId: newOperationsBundle.id,
-        spentByAccountId: userSession.accountId
-      });
-
-      txBuilder.addOperation(operation as OperationTypes.SpendOperation);
-    }
-
-    await txBuilder.signWithProvider(TX_CONFIG.signers[1], expiration)
-
-    try {
-      const { hash } = await CHANNEL_CLIENT.invokeRaw({
-        operationArgs: {
-          function: ChannelInvokeMethods.transact,
-          args: [txBuilder.buildXDR()],
-          auth: [...txBuilder.getSignedAuthEntries()],
-        },
-        config: TX_CONFIG,
-      }).catch((error) => {
-        LOG.error("\n\n\n\Simulation failed", (error as SIM_ERRORS.SIMULATION_FAILED).meta.data.input.transaction.toXDR());
-        Deno.exit(1);
-      });
-
-      await operationsBundleRepository.update(newOperationsBundle.id, {
-        status: BundleStatus.COMPLETED,
-        updatedAt: new Date(),
-        updatedBy: userSession.accountId,
-      });
-
-      return {
-        ctx: input.ctx,
-        operationsBundleId: "blabalblabla",
-        // operationsBundleId: newOperationsBundle.id,
-        transactionHash: hash.toString(),
-      }
-    } catch (error) {
-      LOG.error("Error submitting bundle to channel contract", error);
-      throw error;
-    }
+    return {
+      ctx: input.ctx,
+      operationsBundleId: bundleEntity.id,
+      transactionHash,
+    };
   },
   {
     name: "ProcessNewBundleProcessEngine",

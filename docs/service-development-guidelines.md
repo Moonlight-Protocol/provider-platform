@@ -127,8 +127,10 @@ export const P_ServiceName = ProcessEngine.create(
 - **Instances**: `camelCase` (e.g., `userSession`, `operationsBundle`)
 
 ### Error Classes
-- **Suffix**: `Error` (e.g., `InvalidSessionError`, `BundleAlreadyPendingError`)
-- **Pattern**: `{Reason}{Entity}Error` (e.g., `InvalidOperationsError`)
+- **Platform errors (preferred for domain errors)**: `UPPER_SNAKE_CASE` (e.g., `INVALID_SESSION`, `BUNDLE_ALREADY_EXISTS`)
+- **Error code enums**: `{SERVICE}_ERROR_CODES` (e.g., `BUNDLE_ERROR_CODES.INVALID_SESSION = "BND_001"`)
+- **Source**: constant `source` describing the service context (e.g., `"@service/bundle"`)
+- **Legacy/simple errors**: PascalCase `*Error` may still be used in low-level or non-HTTP contexts, but service/HTTP-facing errors should use `PlatformError`
 
 ---
 
@@ -220,33 +222,103 @@ async function persistCreateOperations(
 
 ### 3. Error Handling (`*.errors.ts`)
 
-**Pattern:**
-- Domain-specific error classes
-- Descriptive messages
-- Class name as `name` property
-- Constructors that accept relevant context
+**Pattern (service/domain errors):**
+- Use `PlatformError` for domain and HTTP-facing errors
+- Define a service-specific error code enum
+- Define a `source` string for traceability
+- Provide:
+  - **code**: stable, unique error code (e.g., `BND_001`)
+  - **message**: short human-readable message
+  - **details**: longer technical description
+  - **api**: HTTP status + client-facing message/details
+  - **meta**: structured context (IDs, inputs, etc.)
+  - **baseError**: underlying error (when wrapping)
 
-**Example:**
+**Example (`bundle.errors.ts` style):**
 ```typescript
-export class InvalidSessionError extends Error {
-  constructor(message = "Invalid Session: Account not found in session") {
-    super(message);
-    this.name = "InvalidSessionError";
+import { PlatformError } from "@/error/index.ts";
+
+export enum BUNDLE_ERROR_CODES {
+  INVALID_SESSION = "BND_001",
+  BUNDLE_ALREADY_EXISTS = "BND_002",
+  INVALID_OPERATIONS = "BND_003",
+  INSUFFICIENT_UTXOS = "BND_004",
+  UTXO_NOT_FOUND = "BND_005",
+  SPEND_OPERATION_NOT_SIGNED = "BND_006",
+  NO_OPERATIONS_PROVIDED = "BND_007",
+}
+
+const source = "@service/bundle";
+
+export class INVALID_SESSION extends PlatformError<{ sessionId: string }> {
+  constructor(sessionId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.INVALID_SESSION,
+      message: "Invalid session",
+      details: `The session with ID '${sessionId}' was not found or is invalid.`,
+      api: {
+        status: 401,
+        message: "Invalid session",
+        details: "The provided session is invalid or has expired. Please authenticate again.",
+      },
+      meta: { sessionId },
+    });
   }
 }
 
-export class BundleAlreadyPendingError extends Error {
+export class BUNDLE_ALREADY_EXISTS extends PlatformError<{ bundleId: string }> {
   constructor(bundleId: string) {
-    super(`Invalid Operations Bundle: A PENDING Operations Bundle already exists (${bundleId})`);
-    this.name = "BundleAlreadyPendingError";
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.BUNDLE_ALREADY_EXISTS,
+      message: "Bundle already exists",
+      details: `A bundle with ID '${bundleId}' already exists in PENDING or COMPLETED status.`,
+      api: {
+        status: 409,
+        message: "Bundle already exists",
+        details:
+          "An operations bundle with the same ID is already being processed or has already been completed. " +
+          "Please wait for it to complete or use a different set of operations.",
+      },
+      meta: { bundleId },
+    });
   }
 }
 
-export class InvalidOperationsError extends Error {
-  constructor(message: string) {
-    super(`Invalid Operations: ${message}`);
-    this.name = "InvalidOperationsError";
+export class NO_OPERATIONS_PROVIDED extends PlatformError {
+  constructor() {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.NO_OPERATIONS_PROVIDED,
+      message: "No operations provided",
+      details: "The operations bundle must contain at least one operation.",
+      api: {
+        status: 400,
+        message: "No operations provided",
+        details: "The request must include at least one operation in the operations bundle.",
+      },
+    });
   }
+}
+```
+
+**Pattern (usage in processes):**
+- Import error module as a namespace: `import * as E from "./{service-name}.errors.ts";`
+- Use `logAndThrow` helper to:
+  - Log the error centrally
+  - Throw the `PlatformError` so it propagates to the HTTP error pipeline
+
+```typescript
+import * as E from "./bundle.errors.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+
+async function validateSession(sessionId: string) {
+  const userSession = await sessionRepository.findById(sessionId);
+  if (!userSession) {
+    logAndThrow(new E.INVALID_SESSION(sessionId));
+  }
+  return userSession;
 }
 ```
 
@@ -286,10 +358,10 @@ export type FeeCalculation = {
 - Linear and readable flow
 - Numbered comments for main sections
 - Use of helper functions for complexity
-- Appropriate error handling
+- Appropriate error handling using `PlatformError` + `logAndThrow`
 - Logging at strategic points
 
-**Example:**
+**Example (simplified, bundle-style):**
 ```typescript
 export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
@@ -301,21 +373,30 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
     // 2. Bundle ID generation and validation
     const bundleId = await generateBundleId(operationsMLXDR);
-    await validateBundleNotPending(bundleId);
+    const isBundleExpired = await assertAndThrowBundle(bundleId);
 
     // 3. Parse and classify operations
     const operations = await parseOperations(operationsMLXDR);
     const classified = classifyOperations(operations);
     validateSpendOperations(classified.spend);
 
-    // 4. Bundle creation
-    const newBundle = await operationsBundleRepository.create({
-      id: bundleId,
-      status: BundleStatus.PENDING,
-      ttl: calculateBundleTtl(),
-      createdBy: userSession.accountId,
-      createdAt: new Date(),
-    });
+    // 4. Bundle update or creation (idempotent-ish behaviour)
+    let bundleEntity: OperationsBundle;
+    if (isBundleExpired) {
+      bundleEntity = await operationsBundleRepository.update(bundleId, {
+        status: BundleStatus.PENDING,
+        updatedAt: new Date(),
+        updatedBy: userSession.accountId,
+      });
+    } else {
+      bundleEntity = await operationsBundleRepository.create({
+        id: bundleId,
+        status: BundleStatus.PENDING,
+        ttl: calculateBundleTtl(),
+        createdBy: userSession.accountId,
+        createdAt: new Date(),
+      });
+    }
 
     // 5. Fee calculation
     const amounts = calculateOperationAmounts(classified);
@@ -330,7 +411,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
     return {
       ctx: input.ctx,
-      operationsBundleId: newBundle.id,
+      operationsBundleId: bundleEntity.id,
       transactionHash,
     };
   },
@@ -424,8 +505,11 @@ if (!userSession) {
 
 **✅ Prefer:**
 ```typescript
+import * as E from "./bundle.errors.ts";
+import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+
 if (!userSession) {
-  throw new InvalidSessionError();
+  logAndThrow(new E.INVALID_SESSION(sessionId));
 }
 ```
 
