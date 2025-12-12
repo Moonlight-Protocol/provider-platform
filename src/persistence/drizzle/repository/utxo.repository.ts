@@ -1,5 +1,5 @@
 import { eq, and, isNull } from "drizzle-orm";
-import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import { utxo, type Utxo, type NewUtxo } from "@/persistence/drizzle/entity/utxo.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
@@ -8,8 +8,8 @@ export class UtxoRepository extends BaseRepository<
   Utxo,
   NewUtxo
 > {
-  constructor() {
-    super(drizzleClient, utxo);
+  constructor(db: DrizzleClient) {
+    super(db, utxo);
   }
 
   /**

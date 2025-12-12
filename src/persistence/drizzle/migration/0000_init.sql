@@ -77,6 +77,7 @@ CREATE TABLE "transactions" (
 --> statement-breakpoint
 CREATE TABLE "utxos" (
 	"id" text PRIMARY KEY NOT NULL,
+	"amount" bigint NOT NULL,
 	"account_id" text NOT NULL,
 	"spent_by_account_id" text,
 	"created_at_bundle_id" text,

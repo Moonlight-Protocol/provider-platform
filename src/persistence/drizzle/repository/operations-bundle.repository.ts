@@ -1,9 +1,10 @@
 import { eq, and, isNull } from "drizzle-orm";
-import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
   type OperationsBundle,
   type NewOperationsBundle,
+  type BundleStatus,
 } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
@@ -12,14 +13,14 @@ export class OperationsBundleRepository extends BaseRepository<
   OperationsBundle,
   NewOperationsBundle
 > {
-  constructor() {
-    super(drizzleClient, operationsBundle);
+  constructor(db: DrizzleClient) {
+    super(db, operationsBundle);
   }
 
   /**
    * Finds bundles by status
    */
-  async findByStatus(status: "PENDING" | "COMPLETED" | "EXPIRED") {
+  async findByStatus(status: BundleStatus.PENDING | BundleStatus.COMPLETED | BundleStatus.EXPIRED) {
     return await this.db
       .select()
       .from(operationsBundle)

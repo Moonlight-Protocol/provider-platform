@@ -2,6 +2,8 @@ import { type ContractId, type NetworkConfig, TestNet } from "@colibri/core";
 import { StellarNetworkId } from "@moonlight/moonlight-sdk";
 import * as E from "@/config/error.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+import { requireEnv } from "@/utils/env/loadEnv.ts";
+import { requireContractId } from "@/utils/env/requireContractId.ts";
 
 export function selectNetwork(envNetwork: string): {
   NETWORK_CONFIG: NetworkConfig;
@@ -14,9 +16,8 @@ export function selectNetwork(envNetwork: string): {
         NETWORK_CONFIG: TestNet(),
         NETWORK: StellarNetworkId.Testnet,
         CHANNEL_ASSET: {
-          code: "XLM",
-          contractId:
-            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC" as ContractId,
+          code: requireEnv("CHANNEL_ASSET_CODE"),
+          contractId: requireContractId("CHANNEL_CONTRACT_ID") as ContractId,
         },
       };
     case "mainnet":

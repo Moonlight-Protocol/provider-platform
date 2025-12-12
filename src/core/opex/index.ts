@@ -1,5 +1,5 @@
 import {
-  CHANEL_CONTRACT_ID,
+  CHANNEL_CONTRACT_ID,
   NETWORK,
   OPEX_SIGNER,
   OPEX_SK,
@@ -21,7 +21,7 @@ export const OPEX = new UtxoBasedStellarAccount({
   root: OPEX_SK,
   derivator: new StellarDerivator().withNetworkAndContract(
     NETWORK,
-    CHANEL_CONTRACT_ID
+    CHANNEL_CONTRACT_ID
   ),
 
   options: {
