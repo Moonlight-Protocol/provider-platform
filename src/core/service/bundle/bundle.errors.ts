@@ -8,6 +8,7 @@ export enum BUNDLE_ERROR_CODES {
   UTXO_NOT_FOUND = "BND_005",
   SPEND_OPERATION_NOT_SIGNED = "BND_006",
   NO_OPERATIONS_PROVIDED = "BND_007",
+  BUNDLE_NOT_FOUND = "BND_008",
 }
 
 const source = "@service/bundle";
@@ -30,6 +31,26 @@ export class INVALID_SESSION extends PlatformError<{ sessionId: string }> {
       meta: {
         sessionId,
       },
+    });
+  }
+}
+
+/**
+ * Error thrown when a bundle is not found
+ */
+export class BUNDLE_NOT_FOUND extends PlatformError<{ bundleId: string }> {
+  constructor(bundleId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.BUNDLE_NOT_FOUND,
+      message: "Bundle not found",
+      details: `The bundle with ID '${bundleId}' was not found.`,
+      api: {
+        status: 404,
+        message: "Bundle not found",
+        details: `The bundle with ID '${bundleId}' was not found.`,
+      },
+      meta: { bundleId },
     });
   }
 }
