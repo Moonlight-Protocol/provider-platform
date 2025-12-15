@@ -6,12 +6,15 @@ import type { requestSchema } from "@/http/v1/bundle/get.ts";
 import { responseSchema } from "@/http/v1/bundle/get.ts";
 import type { BundleGetProcessOutput } from "@/http/v1/bundle/get.ts";
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
+import { SessionRepository } from "@/persistence/drizzle/repository/session.repository.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 import * as E from "./bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const sessionRepository = new SessionRepository(drizzleClient);
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -23,6 +26,22 @@ async function findBundleOrThrow(bundleId: string): Promise<OperationsBundle> {
   }
 
   return bundle;
+}
+
+async function assertBundleOwnership(
+  ctx: Context,
+  bundle: OperationsBundle,
+): Promise<void> {
+  const sessionData = ctx.state.session as JwtSessionData;
+  const userSession = await sessionRepository.findById(sessionData.sessionId);
+
+  if (!userSession) {
+    logAndThrow(new E.INVALID_SESSION(sessionData.sessionId));
+  }
+
+  if (bundle.createdBy !== userSession.accountId) {
+    logAndThrow(new E.BUNDLE_ACCESS_FORBIDDEN(bundle.id, userSession.accountId));
+  }
 }
 
 function toBundleDTO(bundle: OperationsBundle): BundleGetProcessOutput["bundle"] {
@@ -47,6 +66,7 @@ export const P_GetBundleById = ProcessEngine.create(
     LOG.debug("Fetching bundle by ID", { bundleId });
 
     const bundle = await findBundleOrThrow(bundleId);
+    await assertBundleOwnership(ctx as Context, bundle);
     const dto = toBundleDTO(bundle);
 
     // Validate DTO against response schema (defensive)

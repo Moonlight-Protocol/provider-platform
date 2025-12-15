@@ -40,8 +40,10 @@ const assembleResponse = (
 export const getBundleHandler = (ctx: Context) => {
   // Map path param :bundleId into query string so PIPE_GetEndpoint +
   // P_ParseRequestQuery can validate and pass it through normally.
-  const { bundleId } = ctx.params;
-  if (bundleId) {
+  type RouteParams = { bundleId?: string };
+  const params = (ctx as unknown as { params?: RouteParams }).params;
+  if (params?.bundleId) {
+    const bundleId = params.bundleId;
     ctx.request.url.searchParams.set("bundleId", bundleId);
   }
 
