@@ -1,9 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import { Buffer } from "buffer";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
-import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
-import { SessionRepository } from "@/persistence/drizzle/repository/session.repository.ts";
-import { UtxoRepository } from "@/persistence/drizzle/repository/utxo.repository.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
@@ -31,6 +28,14 @@ import * as E from "./bundle.errors.ts";
 import type { ClassifiedOperations } from "./bundle.types.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
+import { 
+  OperationsBundleRepository,
+  SessionRepository,
+  UtxoRepository,
+  TransactionRepository,
+  BundleTransactionRepository,
+} from "@/persistence/drizzle/repository/index.ts";
 
 // Configuration constants
 const BUNDLE_CONFIG = {
@@ -44,6 +49,8 @@ const BUNDLE_CONFIG = {
 const sessionRepository = new SessionRepository(drizzleClient);
 const utxoRepository = new UtxoRepository(drizzleClient);
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const transactionRepository = new TransactionRepository();
+const bundleTransactionRepository = new BundleTransactionRepository();
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -130,8 +137,14 @@ async function persistCreateOperations(
   accountId: string
 ): Promise<void> {
   for (const operation of operations) {
+    const utxoId = Buffer.from(operation.getUtxo()).toString("base64");
+    const utxo = await utxoRepository.findById(utxoId);
+    if (utxo) {
+      continue;
+    }
+
     await utxoRepository.create({
-      id: Buffer.from(operation.getUtxo()).toString("base64"),
+      id: utxoId,
       accountId,
       amount: operation.getAmount(),
       createdAt: new Date(),
@@ -315,7 +328,24 @@ export const P_AddOperationsBundle = ProcessEngine.create(
     // 11. Submit transaction
     const transactionHash = await submitTransaction(txBuilder, expiration);
 
-    // 12. Update bundle status
+    // 12. Persist the transaction and vinculate it to the bundle
+    await transactionRepository.create({
+      id: transactionHash,
+      status: TransactionStatus.VERIFIED,
+      timeout: new Date(Date.now() + BUNDLE_CONFIG.TRANSACTION_EXPIRATION_OFFSET),
+      ledgerSequence: (await (NETWORK_RPC_SERVER.getLatestLedger())).sequence.toString(),
+      createdAt: new Date(),
+      createdBy: userSession.accountId,
+    });
+
+    await bundleTransactionRepository.create({
+      transactionId: transactionHash,
+      bundleId: bundleEntity.id,
+      createdAt: new Date(),
+      createdBy: userSession.accountId,
+    });
+
+    // 13. Update bundle status
     await operationsBundleRepository.update(bundleEntity.id, {
       status: BundleStatus.COMPLETED,
       updatedAt: new Date(),
