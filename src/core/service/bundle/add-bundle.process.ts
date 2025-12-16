@@ -66,7 +66,8 @@ async function validateSession(sessionId: string) {
 }
 
 /**
- * Validates that exists and the bundle is expired with the same ID, otherwise throws an error
+ * Validates that a bundle with the given ID does not exist, or if it does, ensures it is expired.
+ * Throws an error if an active bundle exists.
  */
 async function assertBundleIsNotExpired(bundleId: string): Promise<boolean> {
   const existingBundle = await operationsBundleRepository.findById(bundleId);
