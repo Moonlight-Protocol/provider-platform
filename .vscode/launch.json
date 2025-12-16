@@ -6,12 +6,6 @@
         "request": "launch",
         "type": "node",
         "runtimeExecutable": "deno",
-        // "runtimeArgs": [
-        //   "run",
-        //   "--inspect",
-        //   "--allow-all",
-        //   "--unstable-kv"
-        // ],
         "cwd": "${workspaceFolder}",
         "program": "${workspaceFolder}/src/main.ts",
         "outputCapture": "std"

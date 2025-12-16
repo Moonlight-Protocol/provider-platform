@@ -8,6 +8,8 @@ export enum BUNDLE_ERROR_CODES {
   UTXO_NOT_FOUND = "BND_005",
   SPEND_OPERATION_NOT_SIGNED = "BND_006",
   NO_OPERATIONS_PROVIDED = "BND_007",
+  BUNDLE_NOT_FOUND = "BND_008",
+  BUNDLE_ACCESS_FORBIDDEN = "BND_009",
 }
 
 const source = "@service/bundle";
@@ -30,6 +32,46 @@ export class INVALID_SESSION extends PlatformError<{ sessionId: string }> {
       meta: {
         sessionId,
       },
+    });
+  }
+}
+
+/**
+ * Error thrown when a bundle is not found
+ */
+export class BUNDLE_NOT_FOUND extends PlatformError<{ bundleId: string }> {
+  constructor(bundleId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.BUNDLE_NOT_FOUND,
+      message: "Bundle not found",
+      details: `The bundle with ID '${bundleId}' was not found.`,
+      api: {
+        status: 404,
+        message: "Bundle not found",
+        details: `The bundle with ID '${bundleId}' was not found.`,
+      },
+      meta: { bundleId },
+    });
+  }
+}
+
+/**
+ * Error thrown when the authenticated user does not own the requested bundle
+ */
+export class BUNDLE_ACCESS_FORBIDDEN extends PlatformError<{ bundleId: string; accountId: string }> {
+  constructor(bundleId: string, accountId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.BUNDLE_ACCESS_FORBIDDEN,
+      message: "Bundle access forbidden",
+      details: `The account '${accountId}' is not allowed to access bundle '${bundleId}'.`,
+      api: {
+        status: 403,
+        message: "Bundle access forbidden",
+        details: "You are not allowed to access this bundle. Only the creator can retrieve it.",
+      },
+      meta: { bundleId, accountId },
     });
   }
 }
