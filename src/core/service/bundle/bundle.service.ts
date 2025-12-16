@@ -1,7 +1,7 @@
 import { Buffer } from "buffer";
 import type { MoonlightOperation } from "@moonlight/moonlight-sdk";
 import { sha256Hash, type OperationTypes } from "@moonlight/moonlight-sdk";
-import type { ClassifiedOperations, FeeCalculation, OperationAmounts } from "./bundle.types.ts";
+import type { ClassifiedOperations, FeeCalculation, OperationAmounts } from "@/core/service/bundle/bundle.types.ts";
 
 /**
  * Classifies operations by type

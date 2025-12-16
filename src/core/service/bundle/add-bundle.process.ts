@@ -23,9 +23,9 @@ import {
   calculateFee,
   generateBundleId,
   calculateBundleTtl,
-} from "./bundle.service.ts";
-import * as E from "./bundle.errors.ts";
-import type { ClassifiedOperations } from "./bundle.types.ts";
+} from "@/core/service/bundle/bundle.service.ts";
+import * as E from "@/core/service/bundle/bundle.errors.ts";
+import type { ClassifiedOperations } from "@/core/service/bundle/bundle.types.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
@@ -68,7 +68,7 @@ async function validateSession(sessionId: string) {
 /**
  * Validates that exists and the bundle is expired with the same ID, otherwise throws an error
  */
-async function assertAndThrowBundle(bundleId: string): Promise<boolean> {
+async function assertBundleIsNotExpired(bundleId: string): Promise<boolean> {
   const existingBundle = await operationsBundleRepository.findById(bundleId);
 
   if (!existingBundle)
@@ -246,7 +246,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
     // 2. Bundle ID generation and validation
     const bundleId = await generateBundleId(operationsMLXDR);
-    const isBundleExpired = await assertAndThrowBundle(bundleId);
+    const isBundleExpired = await assertBundleIsNotExpired(bundleId);
 
     // 3. Parse and classify operations
     const operations = await parseOperations(operationsMLXDR);

@@ -35,16 +35,15 @@ export const { NETWORK_CONFIG, NETWORK, CHANNEL_ASSET } = selectNetwork(
 );
 const NETWORK_FEE = requireBaseFee("NETWORK_FEE");
 
-export const NETWORK_RPC_SERVER = new Server(NETWORK_CONFIG.rpcUrl as string)
+export const NETWORK_RPC_SERVER = new Server(NETWORK_CONFIG.rpcUrl as string);
 
 export const OPEX_SIGNER = LocalSigner.fromSecret(OPEX_SK);
-export const PROVIDER_SIGNER = LocalSigner.fromSecret(PROVIDER_SK);
 
 export const TX_CONFIG: TransactionConfig = {
   source: OPEX_PK,
   fee: NETWORK_FEE,
   timeout: 30,
-  signers: [OPEX_SIGNER, PROVIDER_SIGNER],
+  signers: [OPEX_SIGNER],
 };
 
 LOG.debug("Loaded ENV variables: ", { PORT: Number(PORT), MODE: MODE });

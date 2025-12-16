@@ -373,7 +373,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
     // 2. Bundle ID generation and validation
     const bundleId = await generateBundleId(operationsMLXDR);
-    const isBundleExpired = await assertAndThrowBundle(bundleId);
+    const isBundleExpired = await assertBundleIsNotExpired(bundleId);
 
     // 3. Parse and classify operations
     const operations = await parseOperations(operationsMLXDR);
