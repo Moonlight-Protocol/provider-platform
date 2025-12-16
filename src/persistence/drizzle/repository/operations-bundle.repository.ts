@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -30,6 +30,30 @@ export class OperationsBundleRepository extends BaseRepository<
           isNull(operationsBundle.deletedAt)
         )
       );
+  }
+
+  /**
+   * Finds bundles by creator account ID, optionally filtered by status
+   * Results are ordered by createdAt descending (most recent first)
+   */
+  async findByCreatedBy(
+    accountId: string,
+    status?: BundleStatus
+  ): Promise<OperationsBundle[]> {
+    const conditions = [
+      eq(operationsBundle.createdBy, accountId),
+      isNull(operationsBundle.deletedAt),
+    ];
+
+    if (status) {
+      conditions.push(eq(operationsBundle.status, status));
+    }
+
+    return await this.db
+      .select()
+      .from(operationsBundle)
+      .where(and(...conditions))
+      .orderBy(desc(operationsBundle.createdAt));
   }
 }
 

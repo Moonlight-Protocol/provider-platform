@@ -12,6 +12,7 @@ import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-b
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
+import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -44,15 +45,6 @@ async function assertBundleOwnership(
   }
 }
 
-function toBundleDTO(bundle: OperationsBundle): BundleGetProcessOutput["bundle"] {
-  return {
-    id: bundle.id,
-    status: bundle.status,
-    ttl: bundle.ttl.toISOString(),
-    createdAt: bundle.createdAt.toISOString(),
-    updatedAt: bundle.updatedAt ? bundle.updatedAt.toISOString() : null,
-  };
-}
 
 // ========== MAIN PROCESS ==========
 
