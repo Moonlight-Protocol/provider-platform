@@ -10,7 +10,7 @@ import { SessionRepository } from "@/persistence/drizzle/repository/session.repo
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
-import * as E from "./bundle.errors.ts";
+import * as E from "@/core/service/bundle/bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
