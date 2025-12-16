@@ -1,4 +1,4 @@
-import { z } from "npm:zod@3.24.2";
+import { z } from "zod";
 import { baseSuccessResponseSchema } from "@/http/default-schemas.ts";
 
 export const postBundleSchema = z.object({
