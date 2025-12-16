@@ -1,5 +1,5 @@
 {
-  "id": "1ec8f121-1cd9-4bef-be77-e21bdc2e9162",
+  "id": "55eb3a90-5a4b-4200-a1b5-6e2d0fe2fb3c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -470,6 +470,12 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "bigint",
+          "primaryKey": false,
           "notNull": true
         },
         "account_id": {

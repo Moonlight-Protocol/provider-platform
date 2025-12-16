@@ -6,6 +6,7 @@ import {
   type NewTransaction,
 } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
+import type { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 
 export class TransactionRepository extends BaseRepository<
   typeof transaction,
@@ -19,7 +20,7 @@ export class TransactionRepository extends BaseRepository<
   /**
    * Finds transactions by status
    */
-  async findByStatus(status: "UNVERIFIED" | "VERIFIED") {
+  async findByStatus(status: TransactionStatus) {
     return await this.db
       .select()
       .from(transaction)

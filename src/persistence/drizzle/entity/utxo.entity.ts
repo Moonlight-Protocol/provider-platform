@@ -1,4 +1,4 @@
-import { pgTable, text } from "drizzle-orm/pg-core";
+import { pgTable, text, bigint } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
@@ -6,6 +6,7 @@ import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle
 
 export const utxo = pgTable("utxos", {
   id: text("id").primaryKey(),
+  amount: bigint("amount", { mode: "bigint" }).notNull(),
   accountId: text("account_id")
     .notNull()
     .references(() => account.id),
