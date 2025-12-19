@@ -2,6 +2,7 @@ import { Buffer } from "buffer";
 import type { MoonlightOperation } from "@moonlight/moonlight-sdk";
 import { sha256Hash, type OperationTypes } from "@moonlight/moonlight-sdk";
 import type { ClassifiedOperations, FeeCalculation, OperationAmounts } from "@/core/service/bundle/bundle.types.ts";
+import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 
 /**
  * Classifies operations by type
@@ -105,5 +106,32 @@ export async function generateBundleId(operationsMLXDR: string[]): Promise<strin
  */
 export function calculateBundleTtl(): Date {
   return new Date(Date.now() + 1000 * 60 * 60 * 24);
+}
+
+/**
+ * Bundle DTO shape for API responses
+ */
+export type BundleDTO = {
+  id: string;
+  status: string;
+  ttl: string;
+  createdAt: string;
+  updatedAt: string | null;
+};
+
+/**
+ * Converts OperationsBundle entity to DTO for API responses
+ * 
+ * @param bundle - OperationsBundle entity
+ * @returns Bundle DTO with ISO date strings
+ */
+export function toBundleDTO(bundle: OperationsBundle): BundleDTO {
+  return {
+    id: bundle.id,
+    status: bundle.status,
+    ttl: bundle.ttl.toISOString(),
+    createdAt: bundle.createdAt.toISOString(),
+    updatedAt: bundle.updatedAt ? bundle.updatedAt.toISOString() : null,
+  };
 }
 
