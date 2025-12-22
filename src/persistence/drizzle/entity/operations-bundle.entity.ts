@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, pgEnum, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
@@ -19,6 +19,7 @@ export const operationsBundle = pgTable("operations_bundles", {
   id: text("id").primaryKey(),
   status: bundleStatusEnum("status").notNull(),
   ttl: timestamp("ttl", { withTimezone: true }).notNull(),
+  operationsMLXDR: jsonb("operations_mlxdr").$type<string[]>().notNull(),
   ...createBaseColumns(),
 });
 

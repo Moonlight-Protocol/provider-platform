@@ -259,6 +259,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
     if (isBundleExpired) {
       bundleEntity = await operationsBundleRepository.update(bundleId, {
         status: BundleStatus.PENDING,
+        operationsMLXDR: operationsMLXDR,
         updatedAt: new Date(),
         updatedBy: userSession.accountId,
       });
@@ -267,6 +268,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         id: bundleId,
         status: BundleStatus.PENDING,
         ttl: calculateBundleTtl(),
+        operationsMLXDR: operationsMLXDR,
         createdBy: userSession.accountId,
         createdAt: new Date(),
       });

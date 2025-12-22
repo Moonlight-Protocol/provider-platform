@@ -115,6 +115,7 @@ export type BundleDTO = {
   id: string;
   status: string;
   ttl: string;
+  operationsMLXDR: string[];
   createdAt: string;
   updatedAt: string | null;
 };
@@ -130,6 +131,7 @@ export function toBundleDTO(bundle: OperationsBundle): BundleDTO {
     id: bundle.id,
     status: bundle.status,
     ttl: bundle.ttl.toISOString(),
+    operationsMLXDR: bundle.operationsMLXDR,
     createdAt: bundle.createdAt.toISOString(),
     updatedAt: bundle.updatedAt ? bundle.updatedAt.toISOString() : null,
   };

@@ -11,6 +11,7 @@ const bundleItemSchema = z.object({
   id: z.string(),
   status: z.string(),
   ttl: z.string(),
+  operationsMLXDR: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string().nullable(),
 });
