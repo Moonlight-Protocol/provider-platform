@@ -5,14 +5,16 @@ import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transacti
 
 export enum BundleStatus {
   PENDING = "PENDING",
-  COMPLETED = "COMPLETED",
+  PROCESSING = "PROCESSING",
   EXPIRED = "EXPIRED",
+  COMPLETED = "COMPLETED",
 }
 
 export const bundleStatusEnum = pgEnum("bundle_status", [
   BundleStatus.PENDING,
-  BundleStatus.COMPLETED,
+  BundleStatus.PROCESSING,
   BundleStatus.EXPIRED,
+  BundleStatus.COMPLETED,
 ]);
 
 export const operationsBundle = pgTable("operations_bundles", {

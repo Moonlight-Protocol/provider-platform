@@ -19,6 +19,7 @@ const bundleItemSchema = z.object({
 export const requestSchema = z.object({
   status: z.enum([
     BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
     BundleStatus.COMPLETED,
     BundleStatus.EXPIRED,
   ]).optional(),
