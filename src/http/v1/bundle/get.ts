@@ -14,6 +14,7 @@ export const responseSchema = z.object({
   status: z.string(),
   ttl: z.string(),
   operationsMLXDR: z.array(z.string()),
+  fee: z.string(),
   createdAt: z.string(),
   updatedAt: z.string().nullable(),
 });

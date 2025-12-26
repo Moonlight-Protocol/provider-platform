@@ -254,12 +254,17 @@ export const P_AddOperationsBundle = ProcessEngine.create(
     const classified = classifyOperations(operations);
     validateSpendOperations(classified.spend);
       
-    // 4. Bundle update or creation
+    // 4. Fee calculation
+    const amounts = calculateOperationAmounts(classified);
+    const feeCalculation = calculateFee(amounts);
+      
+    // 5. Bundle update or creation
     let bundleEntity: OperationsBundle;
     if (isBundleExpired) {
       bundleEntity = await operationsBundleRepository.update(bundleId, {
         status: BundleStatus.PENDING,
         operationsMLXDR: operationsMLXDR,
+        fee: feeCalculation.fee,
         updatedAt: new Date(),
         updatedBy: userSession.accountId,
       });
@@ -269,15 +274,11 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         status: BundleStatus.PENDING,
         ttl: calculateBundleTtl(),
         operationsMLXDR: operationsMLXDR,
+        fee: feeCalculation.fee,
         createdBy: userSession.accountId,
         createdAt: new Date(),
       });
     }
-    
-
-    // 5. Fee calculation
-    const amounts = calculateOperationAmounts(classified);
-    const feeCalculation = calculateFee(amounts);
     
     LOG.debug("Fee calculation breakdown", {
       totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
