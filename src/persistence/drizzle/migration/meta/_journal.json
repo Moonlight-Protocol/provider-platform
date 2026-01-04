@@ -29,6 +29,13 @@
       "when": 1765378000000,
       "tag": "0003_add_fee_to_bundles",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1765379000000,
+      "tag": "0004_add_mempool_tables",
+      "breakpoints": true
     }
   ]
 }
