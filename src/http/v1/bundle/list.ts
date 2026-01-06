@@ -11,6 +11,8 @@ const bundleItemSchema = z.object({
   id: z.string(),
   status: z.string(),
   ttl: z.string(),
+  operationsMLXDR: z.array(z.string()),
+  fee: z.string(),
   createdAt: z.string(),
   updatedAt: z.string().nullable(),
 });
@@ -18,6 +20,7 @@ const bundleItemSchema = z.object({
 export const requestSchema = z.object({
   status: z.enum([
     BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
     BundleStatus.COMPLETED,
     BundleStatus.EXPIRED,
   ]).optional(),

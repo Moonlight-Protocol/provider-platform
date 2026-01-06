@@ -8,6 +8,27 @@
       "when": 1765375051183,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1765376000000,
+      "tag": "0001_add_operations_mlxdr_to_bundles",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1765377000000,
+      "tag": "0002_add_processing_status_to_bundle",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1765378000000,
+      "tag": "0003_add_fee_to_bundles",
+      "breakpoints": true
     }
   ]
 }
