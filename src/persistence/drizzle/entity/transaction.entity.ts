@@ -7,11 +7,13 @@ import { utxo } from "@/persistence/drizzle/entity/utxo.entity.ts";
 export enum TransactionStatus {
   UNVERIFIED = "UNVERIFIED",
   VERIFIED = "VERIFIED",
+  FAILED = "FAILED",
 }
 
 export const transactionStatusEnum = pgEnum("transaction_status", [
   TransactionStatus.UNVERIFIED,
   TransactionStatus.VERIFIED,
+  TransactionStatus.FAILED,
 ]);
 
 export const transaction = pgTable("transactions", {

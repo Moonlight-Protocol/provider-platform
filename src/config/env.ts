@@ -20,6 +20,14 @@ export const SERVICE_AUTH_SECRET = requireEnv("SERVICE_AUTH_SECRET");
 export const CHALLENGE_TTL = Number(requireEnv("CHALLENGE_TTL"));
 export const SESSION_TTL = Number(requireEnv("SESSION_TTL"));
 
+// Mempool
+export const MEMPOOL_SLOT_CAPACITY = Number(requireEnv("MEMPOOL_SLOT_CAPACITY"));
+export const MEMPOOL_EXPENSIVE_OP_WEIGHT = Number(requireEnv("MEMPOOL_EXPENSIVE_OP_WEIGHT"));
+export const MEMPOOL_CHEAP_OP_WEIGHT = Number(requireEnv("MEMPOOL_CHEAP_OP_WEIGHT"));
+export const MEMPOOL_EXECUTOR_INTERVAL_MS = Number(requireEnv("MEMPOOL_EXECUTOR_INTERVAL_MS"));
+export const MEMPOOL_VERIFIER_INTERVAL_MS = Number(requireEnv("MEMPOOL_VERIFIER_INTERVAL_MS"));
+export const MEMPOOL_TTL_CHECK_INTERVAL_MS = Number(requireEnv("MEMPOOL_TTL_CHECK_INTERVAL_MS"));
+
 // Moonlight
 export const CHANNEL_CONTRACT_ID = requireContractId("CHANNEL_CONTRACT_ID");
 export const CHANNEL_AUTH_ID = requireContractId("CHANNEL_AUTH_ID");

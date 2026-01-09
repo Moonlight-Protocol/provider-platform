@@ -30,3 +30,31 @@ export type FeeCalculation = {
   breakdown: OperationAmounts;
 };
 
+/**
+ * Configuration for calculating bundle weight
+ */
+export type WeightConfig = {
+  expensiveOpWeight: number;
+  cheapOpWeight: number;
+};
+
+/**
+ * Bundle structure for mempool slot
+ * Contains all necessary information for slot management and priority calculation
+ */
+export type SlotBundle = {
+  bundleId: string;
+  operationsMLXDR: string[];
+  operations: ClassifiedOperations;
+  fee: bigint;
+  weight: number;
+  ttl: Date;
+  createdAt: Date;
+  priorityScore: number;
+};
+
+/**
+ * Priority score type (numeric value for comparison)
+ */
+export type PriorityScore = number;
+

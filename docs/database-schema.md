@@ -188,7 +188,7 @@ Represents individual blockchain transactions.
 
 **Fields:**
 - `id` (text, PK): Unique transaction identifier
-- `status` (enum, NOT NULL): Transaction status - UNVERIFIED or VERIFIED
+- `status` (enum, NOT NULL): Transaction status - UNVERIFIED, VERIFIED, or FAILED
 - `timeout` (timestamp with time zone, NOT NULL): Transaction timeout timestamp
 - `ledger_sequence` (text, NOT NULL): Ledger sequence number
 
@@ -271,7 +271,7 @@ Transactions can create multiple UTXOs as outputs. This relationship tracks whic
 - **session_status**: ACTIVE, INACTIVE
 - **challenge_status**: VERIFIED, UNVERIFIED
 - **bundle_status**: PENDING, COMPLETED, EXPIRED
-- **transaction_status**: UNVERIFIED, VERIFIED
+- **transaction_status**: UNVERIFIED, VERIFIED, FAILED
 
 ### Timestamps
 
