@@ -11,21 +11,20 @@ export const requestSchema = z.object({
 
 export const responseSchema = z.object({
   operationsBundleId: z.string(),
-  transactionHash: z.string(),
+  status: z.string(),
 });
 
 type BundleProcessOutput = {
   ctx: Context;
   operationsBundleId: string;
-  transactionHash: string;
 };
 
 const assembleResponse = (
   input: BundleProcessOutput
 ): PostEndpointOutput<typeof responseSchema> => {
-  const message = "Bundle successfully processed";
+  const message = "Bundle received and queued for processing";
 
-  LOG.info(message);
+  LOG.info(message, { bundleId: input.operationsBundleId });
 
   return {
     ctx: input.ctx,
@@ -33,7 +32,7 @@ const assembleResponse = (
     message,
     data: {
       operationsBundleId: input.operationsBundleId,
-      transactionHash: input.transactionHash,
+      status: "PENDING",
     },
   };
 };
