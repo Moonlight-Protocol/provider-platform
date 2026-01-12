@@ -4,7 +4,7 @@ import {
   operationsBundle,
   type OperationsBundle,
   type NewOperationsBundle,
-  type BundleStatus,
+  BundleStatus,
 } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
