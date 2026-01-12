@@ -89,7 +89,7 @@ async function loadPendingBundlesFromDB(): Promise<SlotBundle[]> {
 /**
  * Slot class for managing bundles within a capacity limit
  */
-class Slot {
+export class Slot {
   private bundles: SlotBundle[] = [];
   private currentWeight: number = 0;
   private capacity: number;
