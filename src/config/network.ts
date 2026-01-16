@@ -1,4 +1,4 @@
-import { type ContractId, type NetworkConfig, TestNet } from "@colibri/core";
+import { NetworkConfig, NetworkProviders, type ContractId } from "@colibri/core";
 import { StellarNetworkId } from "@moonlight/moonlight-sdk";
 import * as E from "@/config/error.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
@@ -13,7 +13,7 @@ export function selectNetwork(envNetwork: string): {
   switch (envNetwork) {
     case "testnet":
       return {
-        NETWORK_CONFIG: TestNet(),
+        NETWORK_CONFIG: NetworkProviders.Nodies.TestNet(),
         NETWORK: StellarNetworkId.Testnet,
         CHANNEL_ASSET: {
           code: requireEnv("CHANNEL_ASSET_CODE"),

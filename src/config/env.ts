@@ -46,6 +46,7 @@ const NETWORK_FEE = requireBaseFee("NETWORK_FEE");
 export const NETWORK_RPC_SERVER = new Server(NETWORK_CONFIG.rpcUrl as string);
 
 export const OPEX_SIGNER = LocalSigner.fromSecret(OPEX_SK);
+export const PROVIDER_SIGNER = LocalSigner.fromSecret(PROVIDER_SK);
 
 export const TX_CONFIG: TransactionConfig = {
   source: OPEX_PK,

@@ -301,6 +301,27 @@ export class Mempool {
   }
 
   /**
+   * Re-adds bundles to the mempool after execution failure
+   * Used to restore bundles that failed during execution
+   * 
+   * @param bundles - Array of bundles to re-add
+   */
+  async reAddBundles(bundles: SlotBundle[]): Promise<void> {
+    LOG.debug(`Re-adding ${bundles.length} bundles to mempool after execution failure`);
+
+    for (const bundle of bundles) {
+      try {
+        await this.addBundle(bundle);
+        LOG.debug(`Bundle ${bundle.bundleId} re-added to mempool`);
+      } catch (error) {
+        LOG.error(`Failed to re-add bundle ${bundle.bundleId}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /**
    * Expires bundles that have passed their TTL
    */
   async expireBundles(): Promise<void> {

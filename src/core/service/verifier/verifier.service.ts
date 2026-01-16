@@ -16,14 +16,13 @@ export async function verifyTransactionOnNetwork(
   try {
     // Try to get transaction by hash
     const txResponse = await rpcServer.getTransaction(txHash);
-    
     if (!txResponse) {
       // Transaction not found - might be pending or failed
       return { status: "PENDING" };
     }
 
     // Check if transaction was successful
-    if (txResponse.successful === true) {
+    if (txResponse.status === "SUCCESS") {
       return {
         status: "VERIFIED",
         ledgerSequence: txResponse.ledger?.toString(),
@@ -31,7 +30,7 @@ export async function verifyTransactionOnNetwork(
     }
 
     // Transaction was included but failed
-    if (txResponse.successful === false) {
+    if (txResponse.status === "FAILED") {
       const resultCode = txResponse.resultXdr || "unknown";
       return {
         status: "FAILED",
