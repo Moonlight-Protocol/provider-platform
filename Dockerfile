@@ -32,4 +32,5 @@ WORKDIR /deno-dir
 COPY . .
 
 ENTRYPOINT ["/bin/deno"]
-CMD ["run", "-A", "./index.ts"]
+CMD ["deno", "task", "migrate"]
+CMD ["deno", "task", "serve"]
