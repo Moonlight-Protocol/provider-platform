@@ -12,7 +12,7 @@ primary_region = 'ams'
   PORT = '8080'
 
 [processes]
-  app = 'run -A ./main.ts'
+  app = 'deno task migrate && deno task serve'
 
 [http_service]
   internal_port = 8080
