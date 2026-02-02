@@ -30,5 +30,3 @@ COPY --from=bin /deno /bin/deno
 
 WORKDIR /deno-dir
 COPY . .
-
-ENTRYPOINT ["/bin/deno"]
