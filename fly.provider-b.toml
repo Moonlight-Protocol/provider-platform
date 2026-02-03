@@ -3,8 +3,8 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'moonlight-beta-privacy-provider-a'
-primary_region = 'ams'
+app = 'moonlight-beta-privacy-provider-b'
+primary_region = 'gru' # Sao Paulo, Brazil
 
 [build]
 
@@ -24,9 +24,9 @@ primary_region = 'ams'
   CHANNEL_ASSET_CODE = 'XLM'
 
   # PROVIDER MANAGEMENT
-  # GAIW4NXJOI5BQMDUPUUT2KNMSYPL3SZY45XCUDYYWM4KEJIXW5MO6DRE
+  # GDFAUQQHKD6UCRALPE7YET4RPBQHOUASYIJIKVJXX2X35BRPWPR6LJOK
   # PROVIDER_SK=set in fly.io env secrets
-  OPEX_PUBLIC = 'GAKKWPIJFCWX4HFUBTKOBP2JLWIQTNBS5EYWEK4RLBXO37IWB5SSDZYX'
+  OPEX_PUBLIC = 'GAJLGKYJLYYIDPD2XBTF577L6ABDAUR7DDPKFVIT3GXK2DB7SU353H6J'
   # OPEX_SECRET=set in fly.io env secrets
 
   # SERVICE
