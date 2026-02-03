@@ -30,7 +30,7 @@ primary_region = 'ams'
   # OPEX_SECRET=set in fly.io env secrets
 
   # SERVICE
-  SERVICE_DOMAIN = 'localhost'
+  SERVICE_DOMAIN = 'moonlight-beta-privacy-provider-a.fly.dev'
   SERVICE_FEE = '100' #stroops
   # SERVICE_AUTH_SECRET=set in fly.io env secrets
 
