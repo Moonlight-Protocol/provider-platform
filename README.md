@@ -119,3 +119,14 @@ If you wish to deploy to Fly.io, update the `fly.toml` file with your `OPEX_PUBL
     node -e "console.log(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))))"
     ```
 
+Once it's deployed, you will need to SSH into your app vm and initialize/migrate your database. You can do this with the Fly CLI]():
+
+```bash
+fly console ssh -s
+```
+
+This will let you pick one of your app VMs from a list. Look at your Fly dashboard and pick the one that is running your app. If you pick the right one, once you're SSHed in, you will be in the `/deno-dir` directory. Once there, run the migrations:
+
+```bash
+deno task migrate
+```
