@@ -18,6 +18,9 @@ erDiagram
         i256 supply
     }
     "Privacy Provider (bank, wallet, etc)" {
+        string provider_sk "Stellar account registered with Privacy Channel"
+        string opex_sk "Operating expense (treasury) account; pays fees & creates UTXOs"
+        string url "Endpoint hosting Provider Platform API"
     }
 ```
 
