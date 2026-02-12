@@ -6,7 +6,7 @@
 
 Moonlight: the missing privacy layer, for any blockchain, built on Stellar.
 
-Privacy Providers are a key component of Moonlight, providing a flexible, regulatory-friendly 3rd party for user onboarding.
+Privacy Providers are a key component of Moonlight, providing a flexible, regulatory-friendly 3rd party for user onboarding and transaction facilitation.
 
 ```mermaid
 erDiagram
@@ -18,7 +18,7 @@ erDiagram
         i256 supply
     }
     "Privacy Provider (bank, wallet, etc)" {
-        string provider_sk "Stellar account registered with Privacy Channel"
+        string provider_sk "Stellar account registered with Quorum"
         string opex_sk "Operating expense (treasury) account; pays fees & creates UTXOs"
         string url "Endpoint hosting Provider Platform API"
     }
