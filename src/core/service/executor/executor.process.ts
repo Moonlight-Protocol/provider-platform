@@ -206,6 +206,8 @@ export class Executor {
       // Get transaction expiration
       const expiration = await getTransactionExpiration();
 
+      LOG.info("Transaction", { txBuilder: txBuilder.buildXDR().toXDR() });
+
       // Submit transaction to network
       const transactionHash = await submitTransactionToNetwork(txBuilder, expiration);
 

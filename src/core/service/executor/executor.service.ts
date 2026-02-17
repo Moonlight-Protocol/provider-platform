@@ -47,7 +47,13 @@ export async function buildTransactionFromSlot(
   }
 
   // Calculate total fee from all bundles
-  const totalFee = bundles.reduce((sum, bundle) => sum + bundle.fee, BigInt(0));
+  const totalFee = bundles.reduce((sum, bundle) => {
+    LOG.info("bundle: ", bundle.bundleId);
+    LOG.info("fee: ", bundle.fee.toString());
+    return sum + bundle.fee;
+  }, BigInt(0));
+
+  LOG.info("Creating fee operation with total fee: ", totalFee.toString());
 
   // Create fee operation
   const feeOperation = MoonlightOperation.create(

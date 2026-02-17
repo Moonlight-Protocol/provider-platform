@@ -80,7 +80,7 @@ async function createSlotBundleFromEntity(
 async function loadPendingBundlesFromDB(): Promise<SlotBundle[]> {
   const bundles = await operationsBundleRepository.findPendingOrProcessing();
   const slotBundles = await Promise.all(
-    bundles.map((bundle) => createSlotBundleFromEntity(bundle))
+    bundles.map((bundle: OperationsBundle) => createSlotBundleFromEntity(bundle))
   );
   return slotBundles;
 }
