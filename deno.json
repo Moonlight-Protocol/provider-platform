@@ -19,10 +19,10 @@
   "nodeModulesDir": "auto",
   "imports": {
     "@/": "./src/",
-    "@colibri/core": "jsr:@colibri/core@^0.6.0",
+    "@colibri/core": "jsr:@colibri/core@^0.15.0",
     "@drizzle-team/brocli": "npm:@drizzle-team/brocli@^0.11.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
-    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.6.0",
+    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.6.1",
     "@types/pg": "npm:@types/pg@^8.15.6",
     "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
     "drizzle-kit": "npm:drizzle-kit@^0.31.6",

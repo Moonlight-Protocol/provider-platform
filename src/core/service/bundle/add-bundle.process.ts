@@ -16,9 +16,10 @@ import {
   calculateBundleTtl,
   calculateBundleWeight,
   calculatePriorityScore,
+  fetchUtxoBalances,
 } from "@/core/service/bundle/bundle.service.ts";
-import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
 import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT } from "@/config/env.ts";
+import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
 import type { ClassifiedOperations } from "@/core/service/bundle/bundle.types.ts";
@@ -29,11 +30,6 @@ import {
   SessionRepository,
   UtxoRepository,
 } from "@/persistence/drizzle/repository/index.ts";
-
-// Configuration constants
-const BUNDLE_CONFIG = {
-  TTL_HOURS: 24,
-} as const;
 
 // Repositories
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -63,7 +59,7 @@ async function validateSession(sessionId: string) {
  * Validates that a bundle with the given ID does not exist, or if it does, ensures it is expired.
  * Throws an error if an active bundle exists.
  */
-async function assertBundleIsNotExpired(bundleId: string): Promise<boolean> {
+async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
   const existingBundle = await operationsBundleRepository.findById(bundleId);
 
   if (!existingBundle)
@@ -131,22 +127,40 @@ async function persistCreateOperations(
 
 /**
  * Updates UTXOs in the database from spend operations
+ * 
+ * Note: The spend amount is fetched directly from the network since
+ * SpendOperation intentionally does not have an amount attribute.
  */
 async function persistSpendOperations(
   operations: OperationTypes.SpendOperation[],
   bundleId: string,
   accountId: string
 ): Promise<void> {
-  for (const operation of operations) {
-    const utxoId = operation.getUtxo().toString();
+  if (operations.length === 0) {
+    return;
+  }
+
+  // Fetch all UTXO balances from the network in batch for better performance
+  const utxoPublicKeys = operations.map((op) => op.getUtxo());
+  const balances = await fetchUtxoBalances(utxoPublicKeys);
+
+  for (let i = 0; i < operations.length; i++) {
+    const operation = operations[i];
+    const utxoPublicKey = operation.getUtxo();
+    // Convert UTXO public key to base64 string to match the format used in persistCreateOperations
+    const utxoId = Buffer.from(utxoPublicKey).toString("base64");
+    LOG.info(`  /n/n utxo Id: ${utxoId} /n/n`);
     const utxo = await utxoRepository.findById(utxoId);
     
     if (!utxo) {
       logAndThrow(new E.UTXO_NOT_FOUND(utxoId));
     }
+
+    // The spend amount is the full balance of the UTXO (since we're spending it entirely)
+    const spendAmount = balances[i] || BigInt(0);
     
     await utxoRepository.update(utxo.id, {
-      amount: utxo.amount - operation.getAmount(),
+      amount: utxo.amount - spendAmount,
       updatedAt: new Date(),
       updatedBy: accountId,
       spentAtBundleId: bundleId,
@@ -193,7 +207,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
     // 2. Bundle ID generation and validation
     const bundleId = await generateBundleId(operationsMLXDR);
-    const isBundleExpired = await assertBundleIsNotExpired(bundleId);
+    const isBundleExpired = await assertBundleIsExpired(bundleId);
 
     // 3. Parse and classify operations
     const operations = await parseOperations(operationsMLXDR);
@@ -201,7 +215,9 @@ export const P_AddOperationsBundle = ProcessEngine.create(
     validateSpendOperations(classified.spend);
       
     // 4. Fee calculation
-    const amounts = calculateOperationAmounts(classified);
+    LOG.info("before calculateOperationAmounts: ", classified);
+    const amounts = await calculateOperationAmounts(classified);
+    LOG.info("amounts: ", amounts);
     const feeCalculation = calculateFee(amounts);
       
     // 5. Bundle update or creation

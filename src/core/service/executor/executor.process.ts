@@ -5,10 +5,10 @@ import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.enti
 import { getMempool } from "@/core/mempool/index.ts";
 import { MEMPOOL_EXECUTOR_INTERVAL_MS } from "@/config/env.ts";
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
-import { TX_CONFIG, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import { TX_CONFIG, NETWORK_RPC_SERVER, PROVIDER_SIGNER } from "@/config/env.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
 import type { SIM_ERRORS } from "@colibri/core";
-import { buildTransactionFromSlot } from "./executor.service.ts";
+import { buildTransactionFromSlot } from "@/core/service/executor/executor.service.ts";
 import type { MoonlightTransactionBuilder } from "@moonlight/moonlight-sdk";
 import { 
   OperationsBundleRepository,
@@ -40,8 +40,8 @@ async function submitTransactionToNetwork(
   txBuilder: MoonlightTransactionBuilder,
   expiration: number
 ): Promise<string> {
-  await txBuilder.signWithProvider(TX_CONFIG.signers[1], expiration);
-  
+  await txBuilder.signWithProvider(PROVIDER_SIGNER, expiration);
+
   try {
     const { hash } = await CHANNEL_CLIENT.invokeRaw({
       operationArgs: {
@@ -124,6 +124,7 @@ async function handleExecutionFailure(
 export class Executor {
   private intervalId: number | null = null;
   private isRunning: boolean = false;
+  private isProcessing: boolean = false;
 
   /**
    * Starts the executor loop
@@ -165,25 +166,47 @@ export class Executor {
    * Executes the next slot from the mempool
    */
   async executeNext(): Promise<void> {
+    // Check if already processing a slot
+    if (this.isProcessing) {
+      LOG.debug("Executor already processing a slot, skipping");
+      return;
+    }
+
+    const mempool = getMempool();
+    let slot: ReturnType<typeof mempool.removeFirstSlot> = null;
+    let bundleIds: string[] = [];
+
     try {
-      const mempool = getMempool();
-      const slot = mempool.getNextSlot();
+      // Set processing lock
+      this.isProcessing = true;
+
+      // Remove slot from mempool BEFORE processing to prevent concurrent execution
+      slot = mempool.removeFirstSlot();
 
       if (!slot || slot.isEmpty()) {
         // No slots to process
         return;
       }
 
+      // Get bundle IDs before processing
+      bundleIds = slot.getBundles().map((b) => b.bundleId);
+
       LOG.debug("Executing slot", { 
         bundleCount: slot.getBundleCount(),
-        weight: slot.getTotalWeight() 
+        weight: slot.getTotalWeight(),
+        bundleIds 
       });
 
       // Build transaction from slot
-      const { txBuilder, bundleIds } = await buildTransactionFromSlot(slot);
+      const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot);
+      
+      // Use bundleIds from build result to ensure consistency
+      bundleIds = buildBundleIds;
 
       // Get transaction expiration
       const expiration = await getTransactionExpiration();
+
+      LOG.info("Transaction", { txBuilder: txBuilder.buildXDR().toXDR() });
 
       // Submit transaction to network
       const transactionHash = await submitTransactionToNetwork(txBuilder, expiration);
@@ -197,39 +220,41 @@ export class Executor {
       // Create transaction record and link bundles
       await createTransactionRecord(transactionHash, bundleIds);
 
-      // Remove slot from mempool (successfully processed)
-      mempool.removeFirstSlot();
-
       LOG.info("Slot executed successfully", { 
         transactionHash,
         bundleCount: bundleIds.length 
       });
 
     } catch (error) {
-      const mempool = getMempool();
-      const slot = mempool.getNextSlot();
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      LOG.error("Slot execution failed", { 
+        error: errorMessage,
+        bundleIds 
+      });
 
-      if (slot && !slot.isEmpty()) {
-        const bundleIds = slot.getBundles().map((b) => b.bundleId);
-        
-        // Handle failure
+      // Handle failure: re-add bundles to mempool and update status
+      if (slot && !slot.isEmpty() && bundleIds.length > 0) {
+        // Re-add bundles to mempool for retry
+        const bundles = slot.getBundles();
+        await mempool.reAddBundles(bundles);
+
+        // Update bundle statuses to PENDING
         await handleExecutionFailure(
-          error instanceof Error ? error : new Error(String(error)),
+          error instanceof Error ? error : new Error(errorMessage),
           bundleIds
         );
 
-        // Remove failed slot from mempool
-        mempool.removeFirstSlot();
-
-        LOG.error("Slot execution failed", { 
-          error: error instanceof Error ? error.message : String(error),
-          bundleIds 
-        });
+        LOG.info("Bundles re-added to mempool for retry", { bundleIds });
       } else {
-        LOG.error("Execution error with no slot", { 
-          error: error instanceof Error ? error.message : String(error) 
+        LOG.error("Execution error with no slot or bundles to re-add", { 
+          error: errorMessage,
+          hasSlot: !!slot,
+          bundleCount: bundleIds.length
         });
       }
+    } finally {
+      // Always release processing lock
+      this.isProcessing = false;
     }
   }
 }
