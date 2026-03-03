@@ -80,7 +80,7 @@ async function createSlotBundleFromEntity(
 async function loadPendingBundlesFromDB(): Promise<SlotBundle[]> {
   const bundles = await operationsBundleRepository.findPendingOrProcessing();
   const slotBundles = await Promise.all(
-    bundles.map((bundle) => createSlotBundleFromEntity(bundle))
+    bundles.map((bundle: OperationsBundle) => createSlotBundleFromEntity(bundle))
   );
   return slotBundles;
 }
@@ -89,7 +89,7 @@ async function loadPendingBundlesFromDB(): Promise<SlotBundle[]> {
 /**
  * Slot class for managing bundles within a capacity limit
  */
-class Slot {
+export class Slot {
   private bundles: SlotBundle[] = [];
   private currentWeight: number = 0;
   private capacity: number;
@@ -298,6 +298,27 @@ export class Mempool {
       return null;
     }
     return this.slots.shift() || null;
+  }
+
+  /**
+   * Re-adds bundles to the mempool after execution failure
+   * Used to restore bundles that failed during execution
+   * 
+   * @param bundles - Array of bundles to re-add
+   */
+  async reAddBundles(bundles: SlotBundle[]): Promise<void> {
+    LOG.debug(`Re-adding ${bundles.length} bundles to mempool after execution failure`);
+
+    for (const bundle of bundles) {
+      try {
+        await this.addBundle(bundle);
+        LOG.debug(`Bundle ${bundle.bundleId} re-added to mempool`);
+      } catch (error) {
+        LOG.error(`Failed to re-add bundle ${bundle.bundleId}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   /**

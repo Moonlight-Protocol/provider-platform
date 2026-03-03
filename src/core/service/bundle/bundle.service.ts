@@ -1,8 +1,9 @@
 import { Buffer } from "buffer";
 import type { MoonlightOperation } from "@moonlight/moonlight-sdk";
-import { sha256Hash, type OperationTypes } from "@moonlight/moonlight-sdk";
+import { sha256Hash, type OperationTypes, ChannelReadMethods, type UTXOPublicKey } from "@moonlight/moonlight-sdk";
 import type { ClassifiedOperations, FeeCalculation, OperationAmounts } from "@/core/service/bundle/bundle.types.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 
 /**
  * Classifies operations by type
@@ -22,6 +23,43 @@ export function classifyOperations(
 }
 
 /**
+ * Fetches the balance of one or more UTXOs directly from the network
+ * 
+ * @param utxoPublicKeys - Array of UTXO public keys
+ * @returns Array of balances corresponding to each UTXO (in bigint)
+ */
+export async function fetchUtxoBalances(
+  utxoPublicKeys: UTXOPublicKey[]
+): Promise<bigint[]> {
+  if (utxoPublicKeys.length === 0) {
+    return [];
+  }
+
+  const result = await CHANNEL_CLIENT.read({
+    method: ChannelReadMethods.utxo_balances,
+    methodArgs: {
+      utxos: utxoPublicKeys.map((u) => Buffer.from(u)),
+    },
+  });
+
+  // The result is an array of balances, convert to bigint
+  return (result as Array<string | number | bigint>).map((balance) => BigInt(balance));
+}
+
+/**
+ * Fetches the balance of a single UTXO
+ * 
+ * @param utxoPublicKey - UTXO public key
+ * @returns Balance of the UTXO (in bigint)
+ */
+export async function fetchUtxoBalance(
+  utxoPublicKey: UTXOPublicKey
+): Promise<bigint> {
+  const balances = await fetchUtxoBalances([utxoPublicKey]);
+  return balances[0] || BigInt(0);
+}
+
+/**
  * Calculates the total of a list of operations (DRY)
  * 
  * @param operations - List of operations
@@ -38,21 +76,30 @@ export function calculateOperationsTotal<T extends MoonlightOperation>(
 /**
  * Calculates the totals for each operation type
  * 
+ * Note: For spend operations, the amount is fetched directly from the network
+ * since SpendOperation intentionally does not have an amount attribute.
+ * 
  * @param classified - Classified operations
  * @returns Breakdown of amounts by operation type
  */
-export function calculateOperationAmounts(
+export async function calculateOperationAmounts(
   classified: ClassifiedOperations
-): OperationAmounts {
+): Promise<OperationAmounts> {
+  // Fetch spend operation amounts from the network
+  const spendUtxos = classified.spend.map((op) => op.getUtxo());
+  const spendBalances = await fetchUtxoBalances(spendUtxos);
+  
+  const totalSpendAmount = spendBalances.reduce(
+    (acc, balance) => acc + balance,
+    BigInt(0)
+  );
+
   return {
     totalCreateAmount: classified.create.reduce(
       (acc, op) => acc + op.getAmount(),
       BigInt(0)
     ),
-    totalSpendAmount: classified.spend.reduce(
-      (acc, op) => acc + op.getAmount(),
-      BigInt(0)
-    ),
+    totalSpendAmount,
     totalDepositAmount: classified.deposit.reduce(
       (acc, op) => acc + op.getAmount(),
       BigInt(0)
