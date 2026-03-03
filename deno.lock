@@ -15,8 +15,10 @@
     "jsr:@std/assert@1": "1.0.16",
     "jsr:@std/bytes@1": "1.0.6",
     "jsr:@std/bytes@^1.0.4": "1.0.6",
+    "jsr:@std/cli@1.0.12": "1.0.12",
     "jsr:@std/collections@^1.0.9": "1.1.3",
     "jsr:@std/crypto@1": "1.0.5",
+    "jsr:@std/dotenv@~0.225.6": "0.225.6",
     "jsr:@std/encoding@0.224.0": "0.224.0",
     "jsr:@std/encoding@1": "1.0.10",
     "jsr:@std/encoding@^1.0.10": "1.0.10",
@@ -41,7 +43,8 @@
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:pg@^8.16.3": "8.16.3",
     "npm:postgres@^3.4.7": "3.4.7",
-    "npm:zod@3.24.2": "3.24.2"
+    "npm:zod@3.24.2": "3.24.2",
+    "npm:zod@^3.24.0": "3.24.2"
   },
   "jsr": {
     "@colibri/core@0.5.3": {
@@ -115,8 +118,10 @@
       "integrity": "007b1dca50a20f7d036d186fb24875ce2eb19d9c0b3a32878edc1d0e8181aa9a",
       "dependencies": [
         "jsr:@std/bytes@^1.0.4",
+        "jsr:@std/cli",
         "jsr:@std/collections",
-        "jsr:@std/ulid"
+        "jsr:@std/ulid",
+        "npm:zod@^3.24.0"
       ]
     },
     "@std/assert@1.0.16": {
@@ -125,11 +130,17 @@
     "@std/bytes@1.0.6": {
       "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
     },
+    "@std/cli@1.0.12": {
+      "integrity": "e5cfb7814d189da174ecd7a34fbbd63f3513e24a1b307feb2fcd5da47a070d90"
+    },
     "@std/collections@1.1.3": {
       "integrity": "bf8b0818886df6a32b64c7d3b037a425111f28278d69fd0995aeb62777c986b0"
     },
     "@std/crypto@1.0.5": {
       "integrity": "0dcfbb319fe0bba1bd3af904ceb4f948cde1b92979ec1614528380ed308a3b40"
+    },
+    "@std/dotenv@0.225.6": {
+      "integrity": "1d6f9db72f565bd26790fa034c26e45ecb260b5245417be76c2279e5734c421b"
     },
     "@std/encoding@0.224.0": {
       "integrity": "efb6dca97d3e9c31392bd5c8cfd9f9fc9decf5a1f4d1f78af7900a493bcf89b5"
@@ -999,6 +1010,7 @@
       "jsr:@moonlight/moonlight-sdk@0.6",
       "jsr:@oak/oak@^17.1.4",
       "jsr:@olli/kvdex@^3.1.4",
+      "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",
       "npm:@stellar/stellar-sdk@14.2.0",
