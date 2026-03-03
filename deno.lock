@@ -18,6 +18,7 @@
     "jsr:@std/collections@^1.0.9": "1.1.3",
     "jsr:@std/collections@^1.1.3": "1.1.3",
     "jsr:@std/crypto@1": "1.0.5",
+    "jsr:@std/dotenv@~0.225.6": "0.225.6",
     "jsr:@std/encoding@0.224.0": "0.224.0",
     "jsr:@std/encoding@1": "1.0.10",
     "jsr:@std/encoding@^1.0.10": "1.0.10",
@@ -130,6 +131,9 @@
     },
     "@std/crypto@1.0.5": {
       "integrity": "0dcfbb319fe0bba1bd3af904ceb4f948cde1b92979ec1614528380ed308a3b40"
+    },
+    "@std/dotenv@0.225.6": {
+      "integrity": "1d6f9db72f565bd26790fa034c26e45ecb260b5245417be76c2279e5734c421b"
     },
     "@std/encoding@0.224.0": {
       "integrity": "efb6dca97d3e9c31392bd5c8cfd9f9fc9decf5a1f4d1f78af7900a493bcf89b5"
@@ -1018,6 +1022,7 @@
       "jsr:@moonlight/moonlight-sdk@~0.6.1",
       "jsr:@oak/oak@^17.1.4",
       "jsr:@olli/kvdex@^3.1.4",
+      "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",
       "npm:@stellar/stellar-sdk@14.2.0",

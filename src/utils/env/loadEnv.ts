@@ -1,4 +1,4 @@
-import { load } from "dotenv";
+import { load } from "@std/dotenv";
 
 const env = await load({ allowEmptyValues: true }); // Reads from .env file
 
