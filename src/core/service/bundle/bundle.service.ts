@@ -139,3 +139,62 @@ export function toBundleDTO(bundle: OperationsBundle): BundleDTO {
   };
 }
 
+/**
+ * Calculates the weight of a bundle based on operation types
+ * Expensive operations (spend, withdraw) have higher weight than cheap operations (deposit, create)
+ * 
+ * @param classified - Classified operations
+ * @param config - Weight configuration with expensive and cheap operation weights
+ * @returns Total weight of the bundle
+ */
+export function calculateBundleWeight(
+  classified: ClassifiedOperations,
+  config: { expensiveOpWeight: number; cheapOpWeight: number }
+): number {
+  const expensiveOpsCount = classified.spend.length + classified.withdraw.length;
+  const cheapOpsCount = classified.deposit.length + classified.create.length;
+  
+  return (expensiveOpsCount * config.expensiveOpWeight) + (cheapOpsCount * config.cheapOpWeight);
+}
+
+/**
+ * Calculates the priority score of a bundle for slot allocation
+ * Higher score means higher priority
+ * 
+ * Priority factors (in order of importance):
+ * 1. Fee (higher fee = higher priority)
+ * 2. Creation time (older = higher priority)
+ * 3. TTL proximity (closer to expiration = higher priority)
+ * 
+ * @param bundle - Slot bundle with fee, ttl, and createdAt
+ * @returns Priority score (higher = more priority)
+ */
+export function calculatePriorityScore(bundle: {
+  fee: bigint;
+  ttl: Date;
+  createdAt: Date;
+}): number {
+  const now = Date.now();
+  const ttlTime = bundle.ttl.getTime();
+  const createdAtTime = bundle.createdAt.getTime();
+  
+  // Normalize fee to a score (using log to prevent very large fees from dominating)
+  // Convert bigint to number for calculation (assuming fees are within safe number range)
+  const feeScore = Number(bundle.fee) / 1_000_000; // Normalize by dividing by 1M
+  
+  // Age: older bundles get higher priority
+  // Calculate age in hours, normalize (older = higher score)
+  const ageHours = (now - createdAtTime) / (1000 * 60 * 60);
+  const ageScore = Math.min(ageHours / 24, 1.0); // Cap at 1.0 for bundles older than 24h
+  
+  // TTL proximity: closer to expiration = higher priority
+  // Calculate time remaining in milliseconds, convert to hours for normalization
+  const timeRemainingMs = ttlTime - now;
+  const timeRemainingHours = Math.max(0, timeRemainingMs / (1000 * 60 * 60));
+  // Inverse: less time remaining = higher score (max 24 hours = 1.0, 0 hours = 24.0)
+  const ttlScore = timeRemainingHours > 0 ? 24 / (timeRemainingHours + 1) : 24;
+  
+  // Weighted combination: fee (60%), age (30%), TTL (10%)
+  return (feeScore * 0.6) + (ageScore * 0.3) + (ttlScore * 0.1);
+}
+

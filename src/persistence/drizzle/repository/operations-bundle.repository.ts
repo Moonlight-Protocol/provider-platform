@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, or, isNull, desc } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -20,7 +20,7 @@ export class OperationsBundleRepository extends BaseRepository<
   /**
    * Finds bundles by status
    */
-  async findByStatus(status: BundleStatus.PENDING | BundleStatus.COMPLETED | BundleStatus.EXPIRED) {
+  async findByStatus(status: BundleStatus.PENDING | BundleStatus.COMPLETED | BundleStatus.EXPIRED | BundleStatus.PROCESSING) {
     return await this.db
       .select()
       .from(operationsBundle)
@@ -28,6 +28,25 @@ export class OperationsBundleRepository extends BaseRepository<
         and(
           eq(operationsBundle.status, status),
           isNull(operationsBundle.deletedAt)
+        )
+      );
+  }
+
+  /**
+   * Finds bundles with status PENDING or PROCESSING
+   * Used for mempool initialization
+   */
+  async findPendingOrProcessing(): Promise<OperationsBundle[]> {
+    return await this.db
+      .select()
+      .from(operationsBundle)
+      .where(
+        and(
+          isNull(operationsBundle.deletedAt),
+          or(
+            eq(operationsBundle.status, BundleStatus.PENDING),
+            eq(operationsBundle.status, BundleStatus.PROCESSING)
+          )
         )
       );
   }
