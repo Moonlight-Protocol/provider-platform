@@ -22,7 +22,7 @@
     "@colibri/core": "jsr:@colibri/core@^0.16.1",
     "@drizzle-team/brocli": "npm:@drizzle-team/brocli@^0.11.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
-    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.6.1",
+    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.6.2",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.6",
     "@types/pg": "npm:@types/pg@^8.15.6",
     "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
