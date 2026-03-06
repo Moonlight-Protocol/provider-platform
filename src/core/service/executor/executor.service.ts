@@ -4,7 +4,6 @@ import type { TransactionBuildResult } from "@/core/service/executor/executor.ty
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { UtxoBasedStellarAccount, UTXOStatus } from "@moonlight/moonlight-sdk";
 import { OPEX_SK } from "@/config/env.ts";
-import { LOG } from "../../../config/logger.ts";
 
 const EXECUTOR_CONFIG = {
   OPEX_UTXO_BATCH_SIZE: 200,
@@ -47,13 +46,7 @@ export async function buildTransactionFromSlot(
   }
 
   // Calculate total fee from all bundles
-  const totalFee = bundles.reduce((sum, bundle) => {
-    LOG.info("bundle: ", bundle.bundleId);
-    LOG.info("fee: ", bundle.fee.toString());
-    return sum + bundle.fee;
-  }, BigInt(0));
-
-  LOG.info("Creating fee operation with total fee: ", totalFee.toString());
+  const totalFee = bundles.reduce((sum, bundle) => sum + bundle.fee, BigInt(0));
 
   // Create fee operation
   const feeOperation = MoonlightOperation.create(
@@ -64,29 +57,10 @@ export async function buildTransactionFromSlot(
 
   // Add all operations from all bundles
   for (const bundle of bundles) {
-    // Add deposit operations
-    bundle.operations.deposit.forEach((op) => {
-      LOG.info("Adding deposit operation", { mlxdr: op.toMLXDR() });
-      txBuilder.addOperation(op);
-    });
-
-    // Add create operations
-    bundle.operations.create.forEach((op) => {
-      LOG.info("Adding create operation", { mlxdr: op.toMLXDR() });
-      txBuilder.addOperation(op);
-    });
-
-    // Add spend operations
-    bundle.operations.spend.forEach((op) => {
-      LOG.info("Adding spend operation", { mlxdr: op.toMLXDR() });
-      txBuilder.addOperation(op);
-    });
-
-    // Add withdraw operations
-    bundle.operations.withdraw.forEach((op) => {
-      LOG.info("Adding withdraw operation", { mlxdr: op.toMLXDR() });
-      txBuilder.addOperation(op);
-    });
+    bundle.operations.deposit.forEach((op) => txBuilder.addOperation(op));
+    bundle.operations.create.forEach((op) => txBuilder.addOperation(op));
+    bundle.operations.spend.forEach((op) => txBuilder.addOperation(op));
+    bundle.operations.withdraw.forEach((op) => txBuilder.addOperation(op));
   }
 
   const bundleIds = bundles.map((b) => b.bundleId);
