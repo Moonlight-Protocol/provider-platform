@@ -43,7 +43,7 @@ export const { NETWORK_CONFIG, NETWORK, CHANNEL_ASSET } = selectNetwork(
 );
 const NETWORK_FEE = requireBaseFee("NETWORK_FEE");
 
-export const NETWORK_RPC_SERVER = new Server(NETWORK_CONFIG.rpcUrl as string);
+export const NETWORK_RPC_SERVER = new Server(NETWORK_CONFIG.rpcUrl as string, { allowHttp: NETWORK_CONFIG.allowHttp });
 
 export const OPEX_SIGNER = LocalSigner.fromSecret(OPEX_SK);
 export const PROVIDER_SIGNER = LocalSigner.fromSecret(PROVIDER_SK);

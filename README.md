@@ -24,109 +24,89 @@ erDiagram
     }
 ```
 
-# Run Locally
+## Docker
 
-This app comes with a `.env.example` with some missing values. Copy it to `.env`:
+The provider platform runs as two containers: PostgreSQL and the Deno app.
+
+### Quick start
 
 ```bash
 cp .env.example .env
+# Fill in .env with your keys and contract IDs
+
+docker compose up -d
 ```
 
-Then, to fill it in, you will need to:
+This starts PostgreSQL and the provider app on port 3000.
 
-- Run [Docker Desktop](https://www.docker.com/products/docker-desktop/) or [an alternative](https://mattrickard.com/docker-desktop-alternatives)
-- Run a local Stellar blockchain: `stellar container start local`
-- Build and deploy [the Quorum & Privacy Channel contracts](https://github.com/Moonlight-Protocol/soroban-core) to your local network. Copy the addresses of these contracts into your `.env` for `CHANNEL_CONTRACT_ID` (the privacy channel) and `CHANNEL_AUTH_ID` (the quorum contract).
-- Generate two stellar accounts:
-  
-  - A provider account:
+### Running migrations
 
-    ```bash
-    stellar keys generate provider --network local --fund
-    ```
+The Dockerfile supports an optional entrypoint script mounted at `/app/entrypoint.sh`. If present, it runs instead of the default `deno task serve`, allowing you to run migrations or other setup before starting.
 
-    Register this account with the quorum contract you deployed in the last step. You will need to do this as the admin account you configured while initializing that contract.
-
-    ```bash
-    stellar contract invoke \
-      --network local \
-      --id channel_auth_contract \
-      --source admin \ # or whatever you called this key!
-      --
-      add_provider provider
-    ```
-
-    Then copy this account's secret key:
-
-    ```bash
-    stellar keys show provider
-    ```
-
-    Paste it into your `.env` file for the `PROVIDER_SK` value.
-
-  
-  - A treasury / Operating Expense (OpEx) account, responsible for holding and using funds to cover network fees and fuel ramping workflows with deposits/withdrawals facilitated by the provider:
-
-    ```bash
-    stellar keys generate treasury --network local --fund
-    ```
-
-    Copy its public key:
-
-    ```bash
-    stellar keys address treasury
-    ```
-
-    And paste it into your `.env` file for the `OPEX_PUBLIC` value.
-
-    Copy its secret key:
-
-    ```bash
-    stellar keys show treasury
-    ```
-
-    And paste it into your `.env` file for the `OPEX_SECRET` value.
-
-Now you can run this project with the [Docker Compose](https://docs.docker.com/compose/) CLI:
-
-`docker-compose up -d`
-
-This will initialize, migrate, & start a database, then start `deno task serve` to serve the Provider API on the port specified in `.env` (`8000` by default). You can check that you get a successful response from your local API by visiting:
-
-```
-http://localhost:8000/api/v1/stellar/auth?account=GAS567Y7AT2W3B32TMIPLD4WF3JWNFTAAJBZNCLIAGTIFJWEOOULCN35
+```bash
+ENTRYPOINT_SCRIPT=/path/to/your/entrypoint.sh docker compose up -d
 ```
 
-# Deploy (to testnet)
+Example entrypoint that runs migrations:
 
-If you want to test everything end-to-end, you can follow a similar process to the above, replacing `local` with `testnet`.
+```bash
+#!/bin/sh
+set -e
+deno task db:migrate
+exec deno task serve
+```
 
-If you want to integrate with the existing testnet privacy channel & quorum contract maintained by the Moonlight team (see `fly.toml` file for contract addresses), you can create `provider` and `treasury` accounts using a similar workflow to the above, then message us to get your `provider` account registered with our quorum contract.
+If no entrypoint is mounted, the app starts directly without migrations.
 
-Then you'll need to deploy this service.
+### DB only
 
-We maintain two providers, deployed to [fly.io](https://fly.io). For this reason, we already have a `fly.toml` file and a `fly.provider-b.toml` file in this repository. It will be the easiest for you to also deploy to Fly.io.
+To run just PostgreSQL (e.g. when running the app with Deno locally):
 
-Note: these configs and instructions are provided AS MINIMAL EXAMPLES. The Moonlight team are NOT infrastructure experts, and we may have configured things suboptimally. Feel free to improve on our work, if you know better!
+```bash
+docker compose up -d db
+```
 
-If you wish to deploy to Fly.io, update the `fly.toml` file with your `OPEX_PUBLIC`, being sure to commit your change and push it to GitHub. Then sign up for Fly.io. From your Fly.io dashboard, deploy from GitHub, selecting this project. Make sure you set the branch to `dev`. Set Environment Variables for your secrets:
+Then run the app directly:
 
-  * `PROVIDER_SK`: the value given by `stellar keys show provider`
-  * `OPEX_SECRET`: the value given by `stellar keys show treasury`
-  * `SERVICE_AUTH_SECRET`: generate a value. You can use:
+```bash
+deno task db:migrate
+deno task serve
+```
 
-    ```bash
-    node -e "console.log(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))))"
-    ```
+## Run locally (without Docker)
 
-Once it's deployed, you will need to SSH into your app vm and initialize/migrate your database. You can do this with the Fly CLI]():
+Copy `.env.example` to `.env` and fill in the values. You will need:
+
+- A local Stellar network: `stellar container start local`
+- Deployed contracts from [soroban-core](https://github.com/Moonlight-Protocol/soroban-core)
+- A provider account registered with the quorum contract
+- A treasury (OpEx) account for fees
+
+See the [local-dev](https://github.com/Moonlight-Protocol/local-dev) repo for automated setup.
+
+```bash
+docker compose up -d db
+deno task db:migrate
+deno task serve
+```
+
+## Deploy (to testnet)
+
+Follow a similar process to local setup, replacing `local` with `testnet`.
+
+To integrate with the existing testnet privacy channel maintained by the Moonlight team (see `fly.toml` for contract addresses), create `provider` and `treasury` accounts, then contact us to get your provider registered with our quorum contract.
+
+We deploy to [fly.io](https://fly.io). The `fly.toml` and `fly.provider-b.toml` files are provided as minimal examples.
+
+To deploy to Fly.io: update `fly.toml` with your `OPEX_PUBLIC`, push to GitHub, then deploy from your Fly.io dashboard (branch: `dev`). Set these secrets:
+
+- `PROVIDER_SK`: `stellar keys show provider`
+- `OPEX_SECRET`: `stellar keys show treasury`
+- `SERVICE_AUTH_SECRET`: generate with `node -e "console.log(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))))"`
+
+After deploying, SSH in and run migrations:
 
 ```bash
 fly console ssh -s
-```
-
-This will let you pick one of your app VMs from a list. Look at your Fly dashboard and pick the one that is running your app. If you pick the right one, once you're SSHed in, you will be in the `/deno-dir` directory. Once there, run the migrations:
-
-```bash
-deno task migrate
+deno task db:migrate
 ```

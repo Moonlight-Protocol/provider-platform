@@ -1,32 +1,19 @@
-# Based on https://github.com/denoland/deno_docker/blob/main/alpine.dockerfile
-
 ARG DENO_VERSION=2.4.5
-ARG BIN_IMAGE=denoland/deno:bin-${DENO_VERSION}
-FROM ${BIN_IMAGE} AS bin
 
-FROM gcr.io/distroless/cc as cc
+FROM denoland/deno:${DENO_VERSION}
 
-FROM alpine:latest
+WORKDIR /app
 
-# Inspired by https://github.com/dojyorin/deno_docker_image/blob/master/src/alpine.dockerfile
-COPY --from=cc --chown=root:root --chmod=755 /lib/*-linux-gnu/* /usr/local/lib/
-COPY --from=cc --chown=root:root --chmod=755 /lib/ld-linux-* /lib/
+# Cache dependencies
+COPY deno.json deno.lock ./
+RUN deno install
 
-RUN addgroup --gid 1000 deno \
-  && adduser --uid 1000 --disabled-password deno --ingroup deno \
-  && mkdir /deno-dir/ \
-  && chown deno:deno /deno-dir/ \
-  && mkdir /lib64 \
-  && ln -s /usr/local/lib/ld-linux-* /lib64/
-
-ENV LD_LIBRARY_PATH="/usr/local/lib"
-ENV DENO_USE_CGROUPS=1
-ENV DENO_DIR /deno-dir/
-ENV DENO_INSTALL_ROOT /usr/local
-
-ARG DENO_VERSION
-ENV DENO_VERSION=${DENO_VERSION}
-COPY --from=bin /deno /bin/deno
-
-WORKDIR /deno-dir
+# Copy source
 COPY . .
+
+EXPOSE 3000
+
+# Optional entrypoint script can be mounted at /app/entrypoint.sh
+# to run migrations or other setup before starting the app.
+# If not mounted, the app starts directly.
+CMD ["sh", "-c", "if [ -f /app/entrypoint.sh ]; then sh /app/entrypoint.sh; else deno task serve; fi"]

@@ -17,7 +17,22 @@ export function selectNetwork(envNetwork: string): {
         NETWORK: StellarNetworkId.Testnet,
         CHANNEL_ASSET: {
           code: requireEnv("CHANNEL_ASSET_CODE"),
-          contractId: requireContractId("CHANNEL_CONTRACT_ID") as ContractId,
+          contractId: requireContractId("CHANNEL_ASSET_CONTRACT_ID") as ContractId,
+        },
+      };
+    case "local":
+      return {
+        NETWORK_CONFIG: NetworkConfig.CustomNet({
+          networkPassphrase: "Standalone Network ; February 2017",
+          rpcUrl: "http://localhost:8000/soroban/rpc",
+          horizonUrl: "http://localhost:8000",
+          friendbotUrl: "http://localhost:8000/friendbot",
+          allowHttp: true,
+        }),
+        NETWORK: "Standalone Network ; February 2017" as StellarNetworkId,
+        CHANNEL_ASSET: {
+          code: requireEnv("CHANNEL_ASSET_CODE"),
+          contractId: requireContractId("CHANNEL_ASSET_CONTRACT_ID") as ContractId,
         },
       };
     case "mainnet":

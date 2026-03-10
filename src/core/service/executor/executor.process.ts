@@ -43,11 +43,13 @@ async function submitTransactionToNetwork(
   await txBuilder.signWithProvider(PROVIDER_SIGNER, expiration);
 
   try {
+    const authEntries = txBuilder.getSignedAuthEntries();
+
     const { hash } = await CHANNEL_CLIENT.invokeRaw({
       operationArgs: {
         function: ChannelInvokeMethods.transact,
         args: [txBuilder.buildXDR()],
-        auth: [...txBuilder.getSignedAuthEntries()],
+        auth: [...authEntries],
       },
       config: TX_CONFIG,
     });
@@ -56,10 +58,17 @@ async function submitTransactionToNetwork(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     LOG.error("Transaction submission failed", { error: errorMessage });
-    if ((error as SIM_ERRORS.SIMULATION_FAILED)?.meta?.data?.input?.transaction) {
-      LOG.error("Failed transaction XDR", { 
-        xdr: (error as SIM_ERRORS.SIMULATION_FAILED).meta.data.input.transaction.toXDR() 
+    const simError = error as SIM_ERRORS.SIMULATION_FAILED;
+    if (simError?.meta?.data) {
+      const simResponse = simError.meta.data.simulationResponse ?? simError.meta.data;
+      LOG.error("Simulation details", {
+        simError: JSON.stringify(simResponse, null, 2),
       });
+      if (simError.meta.data.input?.transaction) {
+        LOG.error("Failed transaction XDR", {
+          xdr: simError.meta.data.input.transaction.toXDR()
+        });
+      }
     }
     throw error;
   }

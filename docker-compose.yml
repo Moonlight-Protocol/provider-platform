@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   db:
     image: postgres:latest
@@ -9,7 +8,26 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db-data:/var/lib/postgresql
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ${ENTRYPOINT_SCRIPT:-/dev/null}:/app/entrypoint.sh
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-devpass}@db:5432/${POSTGRES_DB:-provider_platform_db}"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   db-data:
