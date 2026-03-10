@@ -54,8 +54,18 @@ primary_region = 'ams'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
+
+  [[http_service.checks]]
+    interval = "5s"
+    timeout = "3s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/api/v1/stellar/auth?account=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+
+[deploy]
+  strategy = "bluegreen"
 
 [[vm]]
   memory = '1gb'
