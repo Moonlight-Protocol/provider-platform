@@ -2,7 +2,7 @@ import { NetworkConfig, NetworkProviders, type ContractId } from "@colibri/core"
 import { StellarNetworkId } from "@moonlight/moonlight-sdk";
 import * as E from "@/config/error.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
-import { requireEnv } from "@/utils/env/loadEnv.ts";
+import { requireEnv, loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 import { requireContractId } from "@/utils/env/requireContractId.ts";
 
 export function selectNetwork(envNetwork: string): {
@@ -20,13 +20,16 @@ export function selectNetwork(envNetwork: string): {
           contractId: requireContractId("CHANNEL_ASSET_CONTRACT_ID") as ContractId,
         },
       };
-    case "local":
+    case "local": {
+      const rpcUrl = loadOptionalEnv("STELLAR_RPC_URL") ??
+        "http://localhost:8000/soroban/rpc";
+      const horizonUrl = rpcUrl.replace("/soroban/rpc", "");
       return {
         NETWORK_CONFIG: NetworkConfig.CustomNet({
           networkPassphrase: "Standalone Network ; February 2017",
-          rpcUrl: "http://localhost:8000/soroban/rpc",
-          horizonUrl: "http://localhost:8000",
-          friendbotUrl: "http://localhost:8000/friendbot",
+          rpcUrl,
+          horizonUrl,
+          friendbotUrl: `${horizonUrl}/friendbot`,
           allowHttp: true,
         }),
         NETWORK: "Standalone Network ; February 2017" as StellarNetworkId,
@@ -35,6 +38,7 @@ export function selectNetwork(envNetwork: string): {
           contractId: requireContractId("CHANNEL_ASSET_CONTRACT_ID") as ContractId,
         },
       };
+    }
     case "mainnet":
     // return {
     //   NETWORK_CONFIG: MainNet(),
