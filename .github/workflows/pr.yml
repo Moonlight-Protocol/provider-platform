@@ -1,0 +1,38 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: moonlight-protocol/provider-platform
+    outputs:
+      image: ghcr.io/moonlight-protocol/provider-platform:pr-${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/moonlight-protocol/provider-platform:pr-${{ github.event.pull_request.head.sha }}
+
+  e2e:
+    needs: build
+    uses: Moonlight-Protocol/local-dev/.github/workflows/e2e-reusable.yml@main
+    with:
+      provider_image_override: ${{ needs.build.outputs.image }}
+    secrets:
+      E2E_TRIGGER_TOKEN: ${{ secrets.E2E_TRIGGER_TOKEN }}
