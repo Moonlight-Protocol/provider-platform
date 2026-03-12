@@ -30,6 +30,7 @@
     "jsr:@std/ulid@1": "1.0.0",
     "jsr:@zaubrik/djwt@^3.0.2": "3.0.2",
     "npm:@drizzle-team/brocli@0.11": "0.11.0",
+    "npm:@opentelemetry/api@^1.9.0": "1.9.0",
     "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
     "npm:@stellar/stellar-sdk@^14.2.0": "14.6.1",
     "npm:@stellar/stellar-sdk@^14.6.1": "14.6.1",
@@ -38,8 +39,9 @@
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
     "npm:chalk@^5.3.0": "5.6.2",
+    "npm:drizzle-kit@*": "0.31.9_esbuild@0.25.12",
     "npm:drizzle-kit@~0.31.6": "0.31.9_esbuild@0.25.12",
-    "npm:drizzle-orm@~0.44.7": "0.44.7_@types+pg@8.18.0_pg@8.20.0_postgres@3.4.8",
+    "npm:drizzle-orm@~0.44.7": "0.44.7_@opentelemetry+api@1.9.0_@types+pg@8.18.0_pg@8.20.0_postgres@3.4.8",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:pg@^8.16.3": "8.20.0",
     "npm:postgres@^3.4.7": "3.4.8",
@@ -445,6 +447,9 @@
     "@noble/hashes@1.8.0": {
       "integrity": "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="
     },
+    "@opentelemetry/api@1.9.0": {
+      "integrity": "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="
+    },
     "@stellar/js-xdr@3.1.2": {
       "integrity": "sha512-VVolPL5goVEIsvuGqDc5uiKxV03lzfWdvYg1KikvwheDmTBO68CKDji3bAZ/kppZrx5iTA8z3Ld5yuytcvhvOQ=="
     },
@@ -608,14 +613,16 @@
       ],
       "bin": true
     },
-    "drizzle-orm@0.44.7_@types+pg@8.18.0_pg@8.20.0_postgres@3.4.8": {
+    "drizzle-orm@0.44.7_@opentelemetry+api@1.9.0_@types+pg@8.18.0_pg@8.20.0_postgres@3.4.8": {
       "integrity": "sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==",
       "dependencies": [
+        "@opentelemetry/api",
         "@types/pg",
         "pg",
         "postgres"
       ],
       "optionalPeers": [
+        "@opentelemetry/api",
         "@types/pg",
         "pg",
         "postgres"
@@ -1023,6 +1030,7 @@
       "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",
+      "npm:@opentelemetry/api@^1.9.0",
       "npm:@stellar/stellar-sdk@14.2.0",
       "npm:@types/pg@^8.15.6",
       "npm:asn1js@3.0.5",
