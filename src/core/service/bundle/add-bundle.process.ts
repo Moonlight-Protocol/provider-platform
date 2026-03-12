@@ -25,11 +25,12 @@ import * as E from "@/core/service/bundle/bundle.errors.ts";
 import type { ClassifiedOperations } from "@/core/service/bundle/bundle.types.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
-import { 
+import {
   OperationsBundleRepository,
   SessionRepository,
   UtxoRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { withSpan } from "@/core/tracing.ts";
 
 // Repositories
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -48,11 +49,16 @@ const MEMPOOL_WEIGHT_CONFIG: WeightConfig = {
  * Validates the user session
  */
 async function validateSession(sessionId: string) {
-  const userSession = await sessionRepository.findById(sessionId);
-  if (!userSession) {
-    logAndThrow(new E.INVALID_SESSION(sessionId));
-  }
-  return userSession;
+  return withSpan("Bundle.validateSession", async (span) => {
+    span.addEvent("looking_up_session", { "session.id": sessionId });
+    const userSession = await sessionRepository.findById(sessionId);
+    if (!userSession) {
+      span.addEvent("session_not_found");
+      logAndThrow(new E.INVALID_SESSION(sessionId));
+    }
+    span.addEvent("session_valid", { "account.id": userSession.accountId });
+    return userSession;
+  });
 }
 
 /**
@@ -60,30 +66,43 @@ async function validateSession(sessionId: string) {
  * Throws an error if an active bundle exists.
  */
 async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
-  const existingBundle = await operationsBundleRepository.findById(bundleId);
+  return withSpan("Bundle.assertBundleIsExpired", async (span) => {
+    span.addEvent("checking_existing_bundle", { "bundle.id": bundleId });
+    const existingBundle = await operationsBundleRepository.findById(bundleId);
 
-  if (!existingBundle)
-    return false;
+    if (!existingBundle) {
+      span.addEvent("bundle_not_found");
+      return false;
+    }
 
-  if (existingBundle.status !== BundleStatus.EXPIRED)
-    logAndThrow(new E.BUNDLE_ALREADY_EXISTS(bundleId));
-  
-  return true;
+    if (existingBundle.status !== BundleStatus.EXPIRED) {
+      span.addEvent("bundle_exists_not_expired", { "bundle.status": existingBundle.status });
+      logAndThrow(new E.BUNDLE_ALREADY_EXISTS(bundleId));
+    }
+
+    span.addEvent("bundle_expired");
+    return true;
+  });
 }
 
 /**
  * Parses MLXDR operations
  */
 async function parseOperations(operationsMLXDR: string[]): Promise<Array<OperationTypes.CreateOperation | OperationTypes.SpendOperation | OperationTypes.DepositOperation | OperationTypes.WithdrawOperation>> {
-  const operations = await Promise.all(
-    operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr))
-  );
-  
-  if (operations.length === 0) {
-    logAndThrow(new E.NO_OPERATIONS_PROVIDED());
-  }
-  
-  return operations;
+  return withSpan("Bundle.parseOperations", async (span) => {
+    span.addEvent("parsing_operations", { "operations.count": operationsMLXDR.length });
+    const operations = await Promise.all(
+      operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr))
+    );
+
+    if (operations.length === 0) {
+      span.addEvent("no_operations");
+      logAndThrow(new E.NO_OPERATIONS_PROVIDED());
+    }
+
+    span.addEvent("operations_parsed", { "operations.count": operations.length });
+    return operations;
+  });
 }
 
 /**
@@ -107,27 +126,32 @@ async function persistCreateOperations(
   bundleId: string,
   accountId: string
 ): Promise<void> {
-  for (const operation of operations) {
-    const utxoId = Buffer.from(operation.getUtxo()).toString("base64");
-    const utxo = await utxoRepository.findById(utxoId);
-    if (utxo) {
-      continue;
-    }
+  return withSpan("Bundle.persistCreateOperations", async (span) => {
+    span.addEvent("persisting_create_utxos", { "operations.count": operations.length, "bundle.id": bundleId });
+    for (const operation of operations) {
+      const utxoId = Buffer.from(operation.getUtxo()).toString("base64");
+      const utxo = await utxoRepository.findById(utxoId);
+      if (utxo) {
+        span.addEvent("utxo_already_exists", { "utxo.id": utxoId });
+        continue;
+      }
 
-    await utxoRepository.create({
-      id: utxoId,
-      accountId,
-      amount: operation.getAmount(),
-      createdAt: new Date(),
-      createdBy: accountId,
-      createdAtBundleId: bundleId,
-    });
-  }
+      await utxoRepository.create({
+        id: utxoId,
+        accountId,
+        amount: operation.getAmount(),
+        createdAt: new Date(),
+        createdBy: accountId,
+        createdAtBundleId: bundleId,
+      });
+    }
+    span.addEvent("create_utxos_persisted");
+  });
 }
 
 /**
  * Updates UTXOs in the database from spend operations
- * 
+ *
  * Note: The spend amount is fetched directly from the network since
  * SpendOperation intentionally does not have an amount attribute.
  */
@@ -136,37 +160,40 @@ async function persistSpendOperations(
   bundleId: string,
   accountId: string
 ): Promise<void> {
-  if (operations.length === 0) {
-    return;
-  }
-
-  // Fetch all UTXO balances from the network in batch for better performance
-  const utxoPublicKeys = operations.map((op) => op.getUtxo());
-  const balances = await fetchUtxoBalances(utxoPublicKeys);
-
-  for (let i = 0; i < operations.length; i++) {
-    const operation = operations[i];
-    const utxoPublicKey = operation.getUtxo();
-    // Convert UTXO public key to base64 string to match the format used in persistCreateOperations
-    const utxoId = Buffer.from(utxoPublicKey).toString("base64");
-    LOG.info(`  /n/n utxo Id: ${utxoId} /n/n`);
-    const utxo = await utxoRepository.findById(utxoId);
-    
-    if (!utxo) {
-      logAndThrow(new E.UTXO_NOT_FOUND(utxoId));
+  return withSpan("Bundle.persistSpendOperations", async (span) => {
+    if (operations.length === 0) {
+      span.addEvent("no_spend_operations");
+      return;
     }
 
-    // The spend amount is the full balance of the UTXO (since we're spending it entirely)
-    const spendAmount = balances[i] || BigInt(0);
-    
-    await utxoRepository.update(utxo.id, {
-      amount: utxo.amount - spendAmount,
-      updatedAt: new Date(),
-      updatedBy: accountId,
-      spentAtBundleId: bundleId,
-      spentByAccountId: accountId,
-    });
-  }
+    span.addEvent("fetching_utxo_balances", { "operations.count": operations.length });
+    const utxoPublicKeys = operations.map((op) => op.getUtxo());
+    const balances = await fetchUtxoBalances(utxoPublicKeys);
+
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
+      const utxoPublicKey = operation.getUtxo();
+      const utxoId = Buffer.from(utxoPublicKey).toString("base64");
+      LOG.info(`  /n/n utxo Id: ${utxoId} /n/n`);
+      const utxo = await utxoRepository.findById(utxoId);
+
+      if (!utxo) {
+        span.addEvent("utxo_not_found", { "utxo.id": utxoId });
+        logAndThrow(new E.UTXO_NOT_FOUND(utxoId));
+      }
+
+      const spendAmount = balances[i] || BigInt(0);
+
+      await utxoRepository.update(utxo.id, {
+        amount: utxo.amount - spendAmount,
+        updatedAt: new Date(),
+        updatedBy: accountId,
+        spentAtBundleId: bundleId,
+        spentByAccountId: accountId,
+      });
+    }
+    span.addEvent("spend_utxos_persisted");
+  });
 }
 
 /**
@@ -199,78 +226,104 @@ function createSlotBundle(
 
 export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
-    const { operationsMLXDR } = input.body;
-    const sessionData = input.ctx.state.session as JwtSessionData;
+    return withSpan("P_AddOperationsBundle", async (span) => {
+      const { operationsMLXDR } = input.body;
+      const sessionData = input.ctx.state.session as JwtSessionData;
 
-    // 1. Session validation
-    const userSession = await validateSession(sessionData.sessionId);
+      // 1. Session validation
+      span.addEvent("validating_session");
+      const userSession = await validateSession(sessionData.sessionId);
 
-    // 2. Bundle ID generation and validation
-    const bundleId = await generateBundleId(operationsMLXDR);
-    const isBundleExpired = await assertBundleIsExpired(bundleId);
+      // 2. Bundle ID generation and validation
+      span.addEvent("generating_bundle_id");
+      const bundleId = await generateBundleId(operationsMLXDR);
+      span.setAttribute("bundle.id", bundleId);
+      const isBundleExpired = await assertBundleIsExpired(bundleId);
 
-    // 3. Parse and classify operations
-    const operations = await parseOperations(operationsMLXDR);
-    const classified = classifyOperations(operations);
-    validateSpendOperations(classified.spend);
-      
-    // 4. Fee calculation
-    LOG.info("before calculateOperationAmounts: ", classified);
-    const amounts = await calculateOperationAmounts(classified);
-    LOG.info("amounts: ", amounts);
-    const feeCalculation = calculateFee(amounts);
-      
-    // 5. Bundle update or creation
-    let bundleEntity: OperationsBundle;
-    if (isBundleExpired) {
-      bundleEntity = await operationsBundleRepository.update(bundleId, {
-        status: BundleStatus.PENDING,
-        operationsMLXDR: operationsMLXDR,
-        fee: feeCalculation.fee,
-        updatedAt: new Date(),
-        updatedBy: userSession.accountId,
+      // 3. Parse and classify operations
+      span.addEvent("parsing_and_classifying_operations");
+      const operations = await parseOperations(operationsMLXDR);
+      const classified = classifyOperations(operations);
+      validateSpendOperations(classified.spend);
+
+      span.addEvent("operations_classified", {
+        "operations.create": classified.create.length,
+        "operations.spend": classified.spend.length,
+        "operations.deposit": classified.deposit.length,
+        "operations.withdraw": classified.withdraw.length,
       });
-    } else {
-      bundleEntity = await operationsBundleRepository.create({
-        id: bundleId,
-        status: BundleStatus.PENDING,
-        ttl: calculateBundleTtl(),
-        operationsMLXDR: operationsMLXDR,
-        fee: feeCalculation.fee,
-        createdBy: userSession.accountId,
-        createdAt: new Date(),
+
+      // 4. Fee calculation
+      span.addEvent("calculating_fee");
+      LOG.info("before calculateOperationAmounts: ", classified);
+      const amounts = await calculateOperationAmounts(classified);
+      LOG.info("amounts: ", amounts);
+      const feeCalculation = calculateFee(amounts);
+
+      span.addEvent("fee_calculated", {
+        "fee.amount": feeCalculation.fee.toString(),
+        "fee.totalInflows": feeCalculation.totalInflows.toString(),
+        "fee.totalOutflows": feeCalculation.totalOutflows.toString(),
       });
-    }
-    
-    LOG.debug("Fee calculation breakdown", {
-      totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
-      totalCreateAmount: feeCalculation.breakdown.totalCreateAmount.toString(),
-      totalWithdrawAmount: feeCalculation.breakdown.totalWithdrawAmount.toString(),
-      totalSpendAmount: feeCalculation.breakdown.totalSpendAmount.toString(),
-      totalInflows: feeCalculation.totalInflows.toString(),
-      totalOutflows: feeCalculation.totalOutflows.toString(),
-      fee: feeCalculation.fee.toString(),
+
+      // 5. Bundle update or creation
+      let bundleEntity: OperationsBundle;
+      if (isBundleExpired) {
+        span.addEvent("updating_expired_bundle");
+        bundleEntity = await operationsBundleRepository.update(bundleId, {
+          status: BundleStatus.PENDING,
+          operationsMLXDR: operationsMLXDR,
+          fee: feeCalculation.fee,
+          updatedAt: new Date(),
+          updatedBy: userSession.accountId,
+        });
+      } else {
+        span.addEvent("creating_new_bundle");
+        bundleEntity = await operationsBundleRepository.create({
+          id: bundleId,
+          status: BundleStatus.PENDING,
+          ttl: calculateBundleTtl(),
+          operationsMLXDR: operationsMLXDR,
+          fee: feeCalculation.fee,
+          createdBy: userSession.accountId,
+          createdAt: new Date(),
+        });
+      }
+
+      LOG.debug("Fee calculation breakdown", {
+        totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
+        totalCreateAmount: feeCalculation.breakdown.totalCreateAmount.toString(),
+        totalWithdrawAmount: feeCalculation.breakdown.totalWithdrawAmount.toString(),
+        totalSpendAmount: feeCalculation.breakdown.totalSpendAmount.toString(),
+        totalInflows: feeCalculation.totalInflows.toString(),
+        totalOutflows: feeCalculation.totalOutflows.toString(),
+        fee: feeCalculation.fee.toString(),
+      });
+
+      if (feeCalculation.fee < BigInt(1)) {
+        span.addEvent("zero_fee_warning");
+        LOG.warn("This bundle doesn't have any fee");
+      }
+
+      // 6. Persist UTXOs
+      span.addEvent("persisting_utxos");
+      await persistCreateOperations(classified.create, bundleEntity.id, userSession.accountId);
+      await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId);
+
+      // 7. Create SlotBundle and add to Mempool
+      span.addEvent("adding_to_mempool");
+      const slotBundle = createSlotBundle(bundleEntity, classified);
+      const mempool = getMempool();
+      await mempool.addBundle(slotBundle);
+
+      span.addEvent("bundle_added_to_mempool", { "bundle.id": bundleEntity.id });
+      LOG.info(`Bundle ${bundleEntity.id} added to mempool for asynchronous processing`);
+
+      return {
+        ctx: input.ctx,
+        operationsBundleId: bundleEntity.id,
+      };
     });
-
-    if (feeCalculation.fee < BigInt(1)) {
-      LOG.warn("This bundle doesn't have any fee");
-    }
-
-    // 6. Persist UTXOs
-    await persistCreateOperations(classified.create, bundleEntity.id, userSession.accountId);
-    await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId);
-
-    // 7. Create SlotBundle and add to Mempool
-    const slotBundle = createSlotBundle(bundleEntity, classified);
-    const mempool = getMempool();
-    await mempool.addBundle(slotBundle);
-
-    LOG.info(`Bundle ${bundleEntity.id} added to mempool for asynchronous processing`);
-
-    return {
-      ctx: input.ctx,
-      operationsBundleId: bundleEntity.id,
-    };
   },
   {
     name: "ProcessNewBundleProcessEngine",

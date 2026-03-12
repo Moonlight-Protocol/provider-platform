@@ -23,6 +23,7 @@ import {
 } from "@/core/service/mempool/mempool.service.ts";
 import type { MempoolStats } from "@/core/service/mempool/mempool.types.ts";
 import * as E from "@/core/service/mempool/mempool.errors.ts";
+import { withSpan } from "@/core/tracing.ts";
 
 const MEMPOOL_CONFIG = {
   SLOT_CAPACITY: MEMPOOL_SLOT_CAPACITY,
@@ -235,51 +236,54 @@ export class Mempool {
    * Tries to fit in existing slots, creates new slot if necessary
    */
   async addBundle(bundleData: SlotBundle): Promise<void> {
-    // Check if bundle is expired
-    if (isBundleExpired(bundleData)) {
-      LOG.warn(`Bundle ${bundleData.bundleId} is expired, marking as EXPIRED`);
+    return withSpan("Mempool.addBundle", async (span) => {
+      span.setAttribute("bundle.id", bundleData.bundleId);
+      span.setAttribute("bundle.weight", bundleData.weight);
+
+      if (isBundleExpired(bundleData)) {
+        span.addEvent("bundle_expired");
+        LOG.warn(`Bundle ${bundleData.bundleId} is expired, marking as EXPIRED`);
+        await operationsBundleRepository.update(bundleData.bundleId, {
+          status: BundleStatus.EXPIRED,
+          updatedAt: new Date(),
+        });
+        return;
+      }
+
+      let bundleToAdd: SlotBundle | null = bundleData;
+
+      for (const slot of this.slots) {
+        if (!bundleToAdd) break;
+
+        const removed = slot.add(bundleToAdd);
+        if (removed === null) {
+          bundleToAdd = null;
+          span.addEvent("added_to_existing_slot");
+          LOG.debug(`Bundle ${bundleData.bundleId} added to existing slot`);
+        } else if (removed !== bundleToAdd) {
+          bundleToAdd = removed;
+        }
+      }
+
+      if (bundleToAdd) {
+        const newSlot = new Slot(this.capacity);
+        const result = newSlot.add(bundleToAdd);
+        if (result === null) {
+          this.slots.push(newSlot);
+          span.addEvent("added_to_new_slot");
+          LOG.debug(`Bundle ${bundleData.bundleId} added to new slot`);
+        } else {
+          span.addEvent("slot_full", { "bundle.weight": bundleData.weight, "slot.capacity": this.capacity });
+          LOG.error(`Bundle ${bundleData.bundleId} cannot fit in any slot, weight: ${bundleData.weight}, capacity: ${this.capacity}`);
+          throw new E.SLOT_FULL(bundleData.weight, this.capacity);
+        }
+      }
+
+      span.addEvent("updating_status_to_processing");
       await operationsBundleRepository.update(bundleData.bundleId, {
-        status: BundleStatus.EXPIRED,
+        status: BundleStatus.PROCESSING,
         updatedAt: new Date(),
       });
-      return;
-    }
-
-    let bundleToAdd: SlotBundle | null = bundleData;
-
-    // Try to fit in existing slots
-    for (const slot of this.slots) {
-      if (!bundleToAdd) break;
-
-      const removed = slot.add(bundleToAdd);
-      if (removed === null) {
-        // Bundle was successfully added
-        bundleToAdd = null;
-        LOG.debug(`Bundle ${bundleData.bundleId} added to existing slot`);
-      } else if (removed !== bundleToAdd) {
-        // A different bundle was removed, try to re-add the removed one
-        bundleToAdd = removed;
-      }
-    }
-
-    // If bundle still needs to be added, create a new slot
-    if (bundleToAdd) {
-      const newSlot = new Slot(this.capacity);
-      const result = newSlot.add(bundleToAdd);
-      if (result === null) {
-        this.slots.push(newSlot);
-        LOG.debug(`Bundle ${bundleData.bundleId} added to new slot`);
-      } else {
-        // Even new slot can't fit (shouldn't happen if capacity is reasonable)
-        LOG.error(`Bundle ${bundleData.bundleId} cannot fit in any slot, weight: ${bundleData.weight}, capacity: ${this.capacity}`);
-        throw new E.SLOT_FULL(bundleData.weight, this.capacity);
-      }
-    }
-
-    // Update bundle status to PROCESSING
-    await operationsBundleRepository.update(bundleData.bundleId, {
-      status: BundleStatus.PROCESSING,
-      updatedAt: new Date(),
     });
   }
 
@@ -307,53 +311,64 @@ export class Mempool {
    * @param bundles - Array of bundles to re-add
    */
   async reAddBundles(bundles: SlotBundle[]): Promise<void> {
-    LOG.debug(`Re-adding ${bundles.length} bundles to mempool after execution failure`);
+    return withSpan("Mempool.reAddBundles", async (span) => {
+      span.addEvent("re_adding_bundles", { "bundles.count": bundles.length });
+      LOG.debug(`Re-adding ${bundles.length} bundles to mempool after execution failure`);
 
-    for (const bundle of bundles) {
-      try {
-        await this.addBundle(bundle);
-        LOG.debug(`Bundle ${bundle.bundleId} re-added to mempool`);
-      } catch (error) {
-        LOG.error(`Failed to re-add bundle ${bundle.bundleId}`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
+      let succeeded = 0;
+      let failed = 0;
+      for (const bundle of bundles) {
+        try {
+          await this.addBundle(bundle);
+          succeeded++;
+          LOG.debug(`Bundle ${bundle.bundleId} re-added to mempool`);
+        } catch (error) {
+          failed++;
+          span.addEvent("re_add_failed", { "bundle.id": bundle.bundleId });
+          LOG.error(`Failed to re-add bundle ${bundle.bundleId}`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
-    }
+      span.addEvent("re_add_complete", { "succeeded": succeeded, "failed": failed });
+    });
   }
 
   /**
    * Expires bundles that have passed their TTL
    */
   async expireBundles(): Promise<void> {
-    const expiredBundleIds: string[] = [];
+    return withSpan("Mempool.expireBundles", async (span) => {
+      const expiredBundleIds: string[] = [];
 
-    // Collect expired bundles from all slots
-    for (let i = this.slots.length - 1; i >= 0; i--) {
-      const slot = this.slots[i];
-      const bundles = slot.getBundles();
-      
-      for (const bundle of bundles) {
-        if (isBundleExpired(bundle)) {
-          expiredBundleIds.push(bundle.bundleId);
-          // Remove the expired bundle from slot
-          this.removeBundleFromSlot(slot, bundle.bundleId);
+      for (let i = this.slots.length - 1; i >= 0; i--) {
+        const slot = this.slots[i];
+        const bundles = slot.getBundles();
+
+        for (const bundle of bundles) {
+          if (isBundleExpired(bundle)) {
+            expiredBundleIds.push(bundle.bundleId);
+            this.removeBundleFromSlot(slot, bundle.bundleId);
+          }
+        }
+
+        if (slot.isEmpty()) {
+          this.slots.splice(i, 1);
         }
       }
 
-      // Remove empty slots
-      if (slot.isEmpty()) {
-        this.slots.splice(i, 1);
+      if (expiredBundleIds.length > 0) {
+        span.addEvent("expiring_bundles", { "expired.count": expiredBundleIds.length });
       }
-    }
 
-    // Update expired bundles in database
-    for (const bundleId of expiredBundleIds) {
-      await operationsBundleRepository.update(bundleId, {
-        status: BundleStatus.EXPIRED,
-        updatedAt: new Date(),
-      });
-      LOG.info(`Bundle ${bundleId} expired and marked as EXPIRED`);
-    }
+      for (const bundleId of expiredBundleIds) {
+        await operationsBundleRepository.update(bundleId, {
+          status: BundleStatus.EXPIRED,
+          updatedAt: new Date(),
+        });
+        LOG.info(`Bundle ${bundleId} expired and marked as EXPIRED`);
+      }
+    });
   }
 
   /**
