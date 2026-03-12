@@ -96,7 +96,7 @@ Follow a similar process to local setup, replacing `local` with `testnet`.
 
 To integrate with the existing testnet privacy channel maintained by the Moonlight team (see `fly.toml` for contract addresses), create `provider` and `treasury` accounts, then contact us to get your provider registered with our quorum contract.
 
-We deploy to [fly.io](https://fly.io). The `fly.toml` and `fly.provider-b.toml` files are provided as minimal examples.
+We deploy to [fly.io](https://fly.io). The `fly.toml` file is provided as a minimal example.
 
 To deploy to Fly.io: update `fly.toml` with your `OPEX_PUBLIC`, push to GitHub, then deploy from your Fly.io dashboard (branch: `dev`). Set these secrets:
 
