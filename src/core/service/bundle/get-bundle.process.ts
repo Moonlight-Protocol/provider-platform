@@ -13,6 +13,7 @@ import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
+import { withSpan } from "@/core/tracing.ts";
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -52,22 +53,28 @@ export const P_GetBundleById = ProcessEngine.create(
   async (
     input: GetEndpointInput<typeof requestSchema>,
   ): Promise<BundleGetProcessOutput> => {
-    const { ctx, query } = input;
-    const { bundleId } = query;
+    return withSpan("P_GetBundleById", async (span) => {
+      const { ctx, query } = input;
+      const { bundleId } = query;
 
-    LOG.debug("Fetching bundle by ID", { bundleId });
+      span.setAttribute("bundle.id", bundleId);
+      LOG.debug("Fetching bundle by ID", { bundleId });
 
-    const bundle = await findBundleOrThrow(bundleId);
-    await assertBundleOwnership(ctx as Context, bundle);
-    const dto = toBundleDTO(bundle);
+      span.addEvent("finding_bundle");
+      const bundle = await findBundleOrThrow(bundleId);
 
-    // Validate DTO against response schema (defensive)
-    const parsed = responseSchema.parse(dto);
+      span.addEvent("checking_ownership");
+      await assertBundleOwnership(ctx as Context, bundle);
 
-    return {
-      ctx: ctx as Context,
-      bundle: parsed,
-    };
+      const dto = toBundleDTO(bundle);
+      const parsed = responseSchema.parse(dto);
+
+      span.addEvent("bundle_retrieved", { "bundle.status": bundle.status });
+      return {
+        ctx: ctx as Context,
+        bundle: parsed,
+      };
+    });
   },
   {
     name: "GetBundleByIdProcessEngine",

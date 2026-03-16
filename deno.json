@@ -1,6 +1,6 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
@@ -36,7 +36,8 @@
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
     "@olli/kvdex": "jsr:@olli/kvdex@^3.1.4",
     "zod": "npm:zod@3.24.2",
-    "chalk": "npm:chalk@^5.3.0"
+    "chalk": "npm:chalk@^5.3.0",
+    "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0"
   },
   "deploy": {
     "project": "159af174-b645-4039-be9c-493de4886f26",

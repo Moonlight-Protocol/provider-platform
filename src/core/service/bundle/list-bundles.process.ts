@@ -12,6 +12,7 @@ import type { BundleStatus } from "@/persistence/drizzle/entity/operations-bundl
 import * as E from "@/core/service/bundle/bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
+import { withSpan } from "@/core/tracing.ts";
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
@@ -48,26 +49,29 @@ export const P_ListBundlesByUser = ProcessEngine.create(
   async (
     input: GetEndpointInput<typeof requestSchema>,
   ): Promise<BundleListProcessOutput> => {
-    const { ctx, query } = input;
-    const sessionData = ctx.state.session as JwtSessionData;
+    return withSpan("P_ListBundlesByUser", async (span) => {
+      const { ctx, query } = input;
+      const sessionData = ctx.state.session as JwtSessionData;
 
-    LOG.debug("Fetching bundles for user", {
-      sessionId: sessionData.sessionId,
-      status: query.status,
+      LOG.debug("Fetching bundles for user", {
+        sessionId: sessionData.sessionId,
+        status: query.status,
+      });
+
+      span.addEvent("validating_session");
+      const accountId = await validateSessionAndGetAccountId(sessionData.sessionId);
+
+      span.addEvent("finding_bundles", { "account.id": accountId });
+      const bundles = await findBundlesByUser(accountId, query.status);
+
+      span.addEvent("bundles_found", { "bundles.count": bundles.length });
+      LOG.debug("Bundles found", { count: bundles.length, accountId });
+
+      return {
+        ctx: ctx as Context,
+        bundles,
+      };
     });
-
-    // Validate session and get account ID
-    const accountId = await validateSessionAndGetAccountId(sessionData.sessionId);
-
-    // Find bundles created by this account
-    const bundles = await findBundlesByUser(accountId, query.status);
-
-    LOG.debug("Bundles found", { count: bundles.length, accountId });
-
-    return {
-      ctx: ctx as Context,
-      bundles,
-    };
   },
   {
     name: "ListBundlesByUserProcessEngine",

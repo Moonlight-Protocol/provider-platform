@@ -4,11 +4,12 @@ import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.ent
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { MEMPOOL_VERIFIER_INTERVAL_MS, NETWORK_RPC_SERVER } from "@/config/env.ts";
 import { verifyTransactionOnNetwork } from "@/core/service/verifier/verifier.service.ts";
-import { 
+import {
   TransactionRepository,
   BundleTransactionRepository,
   OperationsBundleRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { withSpan } from "@/core/tracing.ts";
 
 const VERIFIER_CONFIG = {
   INTERVAL_MS: MEMPOOL_VERIFIER_INTERVAL_MS,
@@ -130,60 +131,74 @@ export class Verifier {
    * Verifies all unverified transactions
    */
   async verifyTransactions(): Promise<void> {
-    try {
-      // Get all unverified transactions
-      const unverifiedTransactions = await transactionRepository.findByStatus(
-        TransactionStatus.UNVERIFIED
-      );
+    return withSpan("Verifier.verifyTransactions", async (span) => {
+      try {
+        const unverifiedTransactions = await transactionRepository.findByStatus(
+          TransactionStatus.UNVERIFIED
+        );
 
-      if (unverifiedTransactions.length === 0) {
-        // No transactions to verify
-        return;
+        if (unverifiedTransactions.length === 0) {
+          span.addEvent("no_transactions_to_verify");
+          return;
+        }
+
+        span.addEvent("verifying_transactions", { "transactions.count": unverifiedTransactions.length });
+        LOG.debug(`Verifying ${unverifiedTransactions.length} transactions`);
+
+        for (const transaction of unverifiedTransactions) {
+          await this.verifyTransaction(transaction.id);
+        }
+
+        span.addEvent("verification_cycle_complete");
+      } catch (error) {
+        span.addEvent("verification_error", {
+          "error.message": error instanceof Error ? error.message : String(error),
+        });
+        LOG.error("Error during transaction verification", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      LOG.debug(`Verifying ${unverifiedTransactions.length} transactions`);
-
-      // Verify each transaction
-      for (const transaction of unverifiedTransactions) {
-        await this.verifyTransaction(transaction.id);
-      }
-    } catch (error) {
-      LOG.error("Error during transaction verification", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    });
   }
 
   /**
    * Verifies a single transaction
    */
   private async verifyTransaction(txId: string): Promise<void> {
-    try {
-      // Get bundles linked to this transaction
-      const bundleTransactions = await bundleTransactionRepository.findByTransactionId(txId);
-      const bundleIds = bundleTransactions.map((bt) => bt.bundleId);
+    return withSpan("Verifier.verifyTransaction", async (span) => {
+      try {
+        span.setAttribute("tx.id", txId);
 
-      if (bundleIds.length === 0) {
-        LOG.warn(`No bundles found for transaction ${txId}`);
-        return;
+        span.addEvent("looking_up_bundle_transactions");
+        const bundleTransactions = await bundleTransactionRepository.findByTransactionId(txId);
+        const bundleIds = bundleTransactions.map((bt) => bt.bundleId);
+
+        if (bundleIds.length === 0) {
+          span.addEvent("no_bundles_found");
+          LOG.warn(`No bundles found for transaction ${txId}`);
+          return;
+        }
+
+        span.addEvent("verifying_on_network", { "bundles.count": bundleIds.length });
+        const result = await verifyTransactionOnNetwork(txId, NETWORK_RPC_SERVER);
+
+        span.addEvent("verification_result", { "result.status": result.status });
+
+        if (result.status === "VERIFIED") {
+          await handleVerificationSuccess(txId, bundleIds);
+        } else if (result.status === "FAILED") {
+          await handleVerificationFailure(txId, result.reason, bundleIds);
+        } else {
+          LOG.debug(`Transaction ${txId} still pending verification`);
+        }
+      } catch (error) {
+        span.addEvent("verification_failed", {
+          "error.message": error instanceof Error ? error.message : String(error),
+        });
+        LOG.error(`Failed to verify transaction ${txId}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      // Verify transaction on network
-      const result = await verifyTransactionOnNetwork(txId, NETWORK_RPC_SERVER);
-
-      // Handle verification result
-      if (result.status === "VERIFIED") {
-        await handleVerificationSuccess(txId, bundleIds);
-      } else if (result.status === "FAILED") {
-        await handleVerificationFailure(txId, result.reason, bundleIds);
-      } else {
-        // PENDING - transaction not yet found on network, will check again next cycle
-        LOG.debug(`Transaction ${txId} still pending verification`);
-      }
-    } catch (error) {
-      LOG.error(`Failed to verify transaction ${txId}`, {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    });
   }
 }
