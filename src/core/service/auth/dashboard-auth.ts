@@ -126,9 +126,15 @@ export async function verifyDashboardChallenge(
       throw new Error("Signer is not authorized on the provider account");
     }
 
-    // 4. Issue JWT
+    // 4. Issue JWT — hash nonce so raw challenge material isn't in the token
     span.addEvent("issuing_jwt");
-    const token = await config.generateToken(publicKey, nonce);
+    const hashBytes = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce))
+    );
+    const hashedSessionId = Array.from(hashBytes.slice(0, 16))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    const token = await config.generateToken(publicKey, hashedSessionId);
 
     LOG.info("Dashboard auth successful", { publicKey });
     return { token };
