@@ -100,14 +100,35 @@ export async function verifyDashboardChallenge(
     // Consume the challenge (one-time use)
     pendingChallenges.delete(nonce);
 
-    // 2. Verify Ed25519 signature
+    // 2. Verify Ed25519 signature (supports both SEP-53 and raw formats)
     span.addEvent("verifying_signature");
     try {
       const keypair = Keypair.fromPublicKey(publicKey);
-      const nonceBuffer = Buffer.from(nonce, "base64");
-      const sigBuffer = Buffer.from(signature, "base64");
-      if (!keypair.verify(nonceBuffer, sigBuffer)) {
-        throw new Error("Invalid signature");
+
+      // Decode signature — try hex first (SEP-53 / signMessage), then base64 (raw)
+      const sigBuffer = /^[0-9a-f]+$/i.test(signature)
+        ? Buffer.from(signature, "hex")
+        : Buffer.from(signature, "base64");
+
+      // Try SEP-53 format first: sign(SHA256("Stellar Signed Message:\n" + message))
+      const sep53Prefix = "Stellar Signed Message:\n";
+      const prefixedMessage = Buffer.concat([
+        Buffer.from(sep53Prefix, "utf-8"),
+        Buffer.from(nonce, "utf-8"),
+      ]);
+      const messageHash = Buffer.from(
+        await crypto.subtle.digest("SHA-256", prefixedMessage),
+      );
+
+      if (keypair.verify(messageHash, sigBuffer)) {
+        span.addEvent("signature_verified_sep53");
+      } else {
+        // Fall back to raw signature over nonce bytes
+        const nonceBuffer = Buffer.from(nonce, "base64");
+        if (!keypair.verify(nonceBuffer, sigBuffer)) {
+          throw new Error("Invalid signature");
+        }
+        span.addEvent("signature_verified_raw");
       }
     } catch (e) {
       throw e instanceof Error && e.message === "Invalid signature"
