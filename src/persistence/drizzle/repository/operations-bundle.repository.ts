@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, desc } from "drizzle-orm";
+import { eq, and, or, isNull, desc, count, gte, lte } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -49,6 +49,46 @@ export class OperationsBundleRepository extends BaseRepository<
           )
         )
       );
+  }
+
+  /**
+   * Counts bundles by status
+   */
+  async countByStatus(status: BundleStatus): Promise<number> {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(operationsBundle)
+      .where(
+        and(
+          eq(operationsBundle.status, status),
+          isNull(operationsBundle.deletedAt)
+        )
+      );
+    return result?.count ?? 0;
+  }
+
+  /**
+   * Finds bundles by status with optional date range filter
+   */
+  async findByStatusAndDateRange(
+    status: BundleStatus,
+    from?: Date,
+    to?: Date,
+    limit = 10000,
+  ): Promise<OperationsBundle[]> {
+    const conditions = [
+      eq(operationsBundle.status, status),
+      isNull(operationsBundle.deletedAt),
+    ];
+    if (from) conditions.push(gte(operationsBundle.createdAt, from));
+    if (to) conditions.push(lte(operationsBundle.createdAt, to));
+
+    return await this.db
+      .select()
+      .from(operationsBundle)
+      .where(and(...conditions))
+      .orderBy(desc(operationsBundle.createdAt))
+      .limit(limit);
   }
 
   /**

@@ -1,4 +1,4 @@
-import { SERVICE_AUTH_SECRET } from "@/config/env.ts";
+import { SERVICE_AUTH_SECRET, MODE } from "@/config/env.ts";
 
 function generateSecret() {
   // Generate 32 random bytes
@@ -9,6 +9,11 @@ function generateSecret() {
 }
 
 if (!SERVICE_AUTH_SECRET) {
+  if (MODE === "production") {
+    throw new Error(
+      "SERVICE_AUTH_SECRET must be set in production. A random secret would invalidate all JWTs on restart."
+    );
+  }
   console.warn(
     "WARNING: SERVICE_AUTH_SECRET is not set. Generating a random secret. This is NOT recommended for production environments."
   );
