@@ -29,6 +29,19 @@ function signNonce(keypair: typeof TEST_KEYPAIR, nonce: string): string {
   return sigBuffer.toString("base64");
 }
 
+async function signNonceSep53(keypair: typeof TEST_KEYPAIR, nonce: string): Promise<string> {
+  const prefix = "Stellar Signed Message:\n";
+  const prefixedMessage = Buffer.concat([
+    Buffer.from(prefix, "utf-8"),
+    Buffer.from(nonce, "utf-8"),
+  ]);
+  const hash = Buffer.from(
+    await crypto.subtle.digest("SHA-256", prefixedMessage),
+  );
+  const sigBuffer = keypair.sign(hash);
+  return sigBuffer.toString("hex");
+}
+
 Deno.test("createDashboardChallenge - returns a nonce", () => {
   const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
   assertEquals(typeof nonce, "string");
@@ -106,6 +119,32 @@ Deno.test("verifyDashboardChallenge - valid signature + different provider (no H
     () => verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, DIFFERENT_PROVIDER_CONFIG),
     Error,
     "Signer is not authorized",
+  );
+});
+
+Deno.test("verifyDashboardChallenge - SEP-53 hex signature + self signer = success", async () => {
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const signature = await signNonceSep53(TEST_KEYPAIR, nonce);
+
+  const { token } = await verifyDashboardChallenge(
+    nonce,
+    signature,
+    TEST_PUBLIC_KEY,
+    SELF_SIGNER_CONFIG,
+  );
+
+  assertEquals(typeof token, "string");
+  assertEquals(token.length > 0, true);
+});
+
+Deno.test("verifyDashboardChallenge - SEP-53 wrong key rejected", async () => {
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const signature = await signNonceSep53(Keypair.random(), nonce);
+
+  await assertRejects(
+    () => verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    Error,
+    "Invalid signature",
   );
 });
 
