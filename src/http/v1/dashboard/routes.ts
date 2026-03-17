@@ -15,13 +15,11 @@ const dashboardRouter = new Router();
 dashboardRouter.post("/dashboard/auth/challenge", lowRateLimitMiddleware, postChallengeHandler);
 dashboardRouter.post("/dashboard/auth/verify", lowRateLimitMiddleware, postVerifyHandler);
 
-// --- Protected endpoints ---
-dashboardRouter.use("/dashboard", jwtMiddleware);
-
-dashboardRouter.get("/dashboard/channels", getChannelsHandler);
-dashboardRouter.get("/dashboard/mempool", getMempoolHandler);
-dashboardRouter.get("/dashboard/operations", getOperationsHandler);
-dashboardRouter.get("/dashboard/treasury", getTreasuryHandler);
-dashboardRouter.get("/dashboard/audit-export", getAuditExportHandler);
+// --- Protected endpoints (JWT checked inline per-route) ---
+dashboardRouter.get("/dashboard/channels", jwtMiddleware, getChannelsHandler);
+dashboardRouter.get("/dashboard/mempool", jwtMiddleware, getMempoolHandler);
+dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler);
+dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
+dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
 
 export default dashboardRouter;

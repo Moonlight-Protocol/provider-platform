@@ -7,7 +7,7 @@ import dashboardRouter from "@/http/v1/dashboard/routes.ts";
 const apiRouter = new Router();
 
 apiRouter.use("/api/v1", stellarRouter.routes(), stellarRouter.allowedMethods());
-apiRouter.use("/api/v1", bundleRouter.routes(), bundleRouter.allowedMethods());
 apiRouter.use("/api/v1", dashboardRouter.routes(), dashboardRouter.allowedMethods());
+apiRouter.use("/api/v1", bundleRouter.routes(), bundleRouter.allowedMethods());
 
 export default apiRouter;
