@@ -16,8 +16,8 @@ export default async function (clientAccount: string, challengeHash: string) {
   const payload = {
     iss: "https://" + SERVICE_DOMAIN,
     sub: clientAccount,
-    iat: getNumericDate(Date.now() / 1000),
-    exp: getNumericDate(Date.now() / 1000 + SESSION_TTL),
+    iat: getNumericDate(0),
+    exp: getNumericDate(SESSION_TTL),
     sessionId: challengeHash,
   };
 

@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, count } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   transaction,
@@ -30,6 +30,22 @@ export class TransactionRepository extends BaseRepository<
           isNull(transaction.deletedAt)
         )
       );
+  }
+
+  /**
+   * Counts transactions by status
+   */
+  async countByStatus(status: TransactionStatus): Promise<number> {
+    const [result] = await this.db
+      .select({ count: count() })
+      .from(transaction)
+      .where(
+        and(
+          eq(transaction.status, status),
+          isNull(transaction.deletedAt)
+        )
+      );
+    return result?.count ?? 0;
   }
 
   /**

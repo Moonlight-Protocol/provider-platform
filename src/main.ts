@@ -8,11 +8,15 @@ import { traceContextMiddleware } from "@/http/middleware/trace-context.ts";
 import { PORT } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 import { initializeMempoolSystem, shutdownMempoolSystem } from "@/core/mempool/index.ts";
+import { startEventWatcher, stopEventWatcher } from "@/core/service/event-watcher/index.ts";
 
 async function bootstrap() {
   try {
     // Initialize mempool system before starting HTTP server
     await initializeMempoolSystem();
+
+    // Start watching for Channel Auth contract events
+    await startEventWatcher();
 
     const app = new Application();
 
@@ -27,6 +31,7 @@ async function bootstrap() {
     // Setup graceful shutdown
     const shutdown = () => {
       LOG.info("Shutting down server...");
+      stopEventWatcher();
       shutdownMempoolSystem();
       Deno.exit(0);
     };
@@ -39,6 +44,7 @@ async function bootstrap() {
     LOG.error("Failed to start server", {
       error: error instanceof Error ? error.message : String(error),
     });
+    stopEventWatcher();
     shutdownMempoolSystem();
     Deno.exit(1);
   }

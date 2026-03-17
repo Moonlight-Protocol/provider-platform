@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp, jsonb, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, pgEnum, timestamp, jsonb, bigint, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
@@ -24,7 +24,13 @@ export const operationsBundle = pgTable("operations_bundles", {
   operationsMLXDR: jsonb("operations_mlxdr").$type<string[]>().notNull(),
   fee: bigint("fee", { mode: "bigint" }).notNull(),
   ...createBaseColumns(),
-});
+}, (table) => [
+  index("idx_bundles_status_deleted_created").on(
+    table.status,
+    table.deletedAt,
+    table.createdAt,
+  ),
+]);
 
 // Relations
 export const operationsBundleRelations = relations(
