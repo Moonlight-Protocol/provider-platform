@@ -7,4 +7,5 @@ export * from "@/persistence/drizzle/repository/operations-bundle.repository.ts"
 export * from "@/persistence/drizzle/repository/transaction.repository.ts";
 export * from "@/persistence/drizzle/repository/utxo.repository.ts";
 export * from "@/persistence/drizzle/repository/bundle-transaction.repository.ts";
+export * from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 

@@ -92,6 +92,29 @@ export class OperationsBundleRepository extends BaseRepository<
   }
 
   /**
+   * Finds bundles that transitioned to the given status within a time window.
+   * Filters on updatedAt (when the status changed), not createdAt.
+   */
+  async findByStatusUpdatedSince(
+    status: BundleStatus,
+    since: Date,
+    limit = 10000,
+  ): Promise<OperationsBundle[]> {
+    return await this.db
+      .select()
+      .from(operationsBundle)
+      .where(
+        and(
+          eq(operationsBundle.status, status),
+          gte(operationsBundle.updatedAt, since),
+          isNull(operationsBundle.deletedAt),
+        )
+      )
+      .orderBy(desc(operationsBundle.updatedAt))
+      .limit(limit);
+  }
+
+  /**
    * Finds bundles by creator account ID, optionally filtered by status
    * Results are ordered by createdAt descending (most recent first)
    */

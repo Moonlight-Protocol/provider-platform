@@ -1,5 +1,7 @@
 import { type Context, Status } from "@oak/oak";
-import { getMempool } from "@/core/mempool/index.ts";
+import { getMempool, platformVersion } from "@/core/mempool/index.ts";
+import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 import {
   MEMPOOL_SLOT_CAPACITY,
   MEMPOOL_EXPENSIVE_OP_WEIGHT,
@@ -9,20 +11,35 @@ import {
   MEMPOOL_TTL_CHECK_INTERVAL_MS,
 } from "@/config/env.ts";
 
+const metricRepo = new MempoolMetricRepository(drizzleClient);
+
 /**
  * GET /dashboard/mempool
  *
- * Returns mempool state (depth, slot utilization) and configuration.
+ * Returns live mempool state, historical averages, and configuration.
+ * Averages are computed from the last hour of metric snapshots.
  */
-export const getMempoolHandler = (ctx: Context) => {
+export const getMempoolHandler = async (ctx: Context) => {
   const mempool = getMempool();
   const stats = mempool.getStats();
+
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const averages = await metricRepo.getAveragesSince(oneHourAgo);
 
   ctx.response.status = Status.OK;
   ctx.response.body = {
     message: "Mempool state retrieved",
     data: {
-      stats,
+      platformVersion,
+      live: stats,
+      averages: {
+        windowMinutes: 60,
+        sampleCount: averages.sampleCount,
+        avgQueueDepth: round(averages.avgQueueDepth),
+        avgSlotCount: round(averages.avgSlotCount),
+        avgProcessingMs: round(averages.avgProcessingMs),
+        avgThroughputPerMin: round(averages.avgThroughputPerMin),
+      },
       config: {
         slotCapacity: MEMPOOL_SLOT_CAPACITY,
         expensiveOpWeight: MEMPOOL_EXPENSIVE_OP_WEIGHT,
@@ -34,3 +51,8 @@ export const getMempoolHandler = (ctx: Context) => {
     },
   };
 };
+
+function round(n: number, decimals = 2): number {
+  const factor = 10 ** decimals;
+  return Math.round(n * factor) / factor;
+}

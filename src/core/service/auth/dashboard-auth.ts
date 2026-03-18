@@ -110,25 +110,42 @@ export async function verifyDashboardChallenge(
         ? Buffer.from(signature, "hex")
         : Buffer.from(signature, "base64");
 
-      // Try SEP-53 format first: sign(SHA256("Stellar Signed Message:\n" + message))
-      const sep53Prefix = "Stellar Signed Message:\n";
-      const prefixedMessage = Buffer.concat([
-        Buffer.from(sep53Prefix, "utf-8"),
-        Buffer.from(nonce, "utf-8"),
-      ]);
-      const messageHash = Buffer.from(
-        await crypto.subtle.digest("SHA-256", prefixedMessage),
+      const nonceBytes = Buffer.from(nonce, "utf-8");
+
+      // Try SEP-43 format (Freighter signMessage):
+      // sign(SHA256(0x00 0x00 || len(message) as 4-byte BE || message))
+      const sep43Header = Buffer.alloc(6);
+      sep43Header[0] = 0x00; // version
+      sep43Header[1] = 0x00;
+      sep43Header.writeUInt32BE(nonceBytes.length, 2);
+      const sep43Payload = Buffer.concat([sep43Header, nonceBytes]);
+      const sep43Hash = Buffer.from(
+        await crypto.subtle.digest("SHA-256", sep43Payload),
       );
 
-      if (keypair.verify(messageHash, sigBuffer)) {
-        span.addEvent("signature_verified_sep53");
+      if (keypair.verify(sep43Hash, sigBuffer)) {
+        span.addEvent("signature_verified_sep43");
       } else {
-        // Fall back to raw signature over nonce bytes
-        const nonceBuffer = Buffer.from(nonce, "base64");
-        if (!keypair.verify(nonceBuffer, sigBuffer)) {
-          throw new Error("Invalid signature");
+        // Try SEP-53 format: sign(SHA256("Stellar Signed Message:\n" + message))
+        const sep53Prefix = "Stellar Signed Message:\n";
+        const sep53Payload = Buffer.concat([
+          Buffer.from(sep53Prefix, "utf-8"),
+          nonceBytes,
+        ]);
+        const sep53Hash = Buffer.from(
+          await crypto.subtle.digest("SHA-256", sep53Payload),
+        );
+
+        if (keypair.verify(sep53Hash, sigBuffer)) {
+          span.addEvent("signature_verified_sep53");
+        } else {
+          // Fall back to raw signature over nonce bytes (E2E / SDK flow)
+          const rawNonce = Buffer.from(nonce, "base64");
+          if (!keypair.verify(rawNonce, sigBuffer)) {
+            throw new Error("Invalid signature");
+          }
+          span.addEvent("signature_verified_raw");
         }
-        span.addEvent("signature_verified_raw");
       }
     } catch (e) {
       throw e instanceof Error && e.message === "Invalid signature"

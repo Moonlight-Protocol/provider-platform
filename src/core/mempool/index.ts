@@ -1,6 +1,7 @@
 import { Mempool } from "@/core/service/mempool/mempool.process.ts";
 import { Executor } from "@/core/service/executor/executor.process.ts";
 import { Verifier } from "@/core/service/verifier/verifier.process.ts";
+import { MetricsCollector } from "@/core/service/mempool-metrics/metrics-collector.ts";
 import { MEMPOOL_SLOT_CAPACITY, MEMPOOL_TTL_CHECK_INTERVAL_MS } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -21,6 +22,16 @@ export let executor: Executor;
  * Will be initialized during application startup
  */
 export let verifier: Verifier;
+
+/**
+ * Singleton instance of the MetricsCollector
+ */
+export let metricsCollector: MetricsCollector;
+
+/**
+ * Platform version, read once at startup from deno.json.
+ */
+export let platformVersion = "unknown";
 
 /**
  * Interval ID for TTL check
@@ -71,6 +82,20 @@ export async function initializeMempoolSystem(): Promise<void> {
   verifier = new Verifier();
   verifier.start();
 
+  // Read platform version once at startup (import.meta.dirname resolves
+  // to the module's directory, so this works regardless of CWD)
+  try {
+    const denoJsonPath = new URL("../../../deno.json", import.meta.url).pathname;
+    const denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
+    platformVersion = denoJson.version ?? "unknown";
+  } catch {
+    LOG.warn("Could not read deno.json for platform version");
+  }
+
+  // Initialize MetricsCollector
+  metricsCollector = new MetricsCollector(platformVersion);
+  metricsCollector.start();
+
   // Start periodic TTL check
   ttlCheckIntervalId = setInterval(async () => {
     try {
@@ -98,6 +123,10 @@ export function shutdownMempoolSystem(): void {
 
   if (verifier) {
     verifier.stop();
+  }
+
+  if (metricsCollector) {
+    metricsCollector.stop();
   }
 
   if (ttlCheckIntervalId !== null) {
