@@ -22,6 +22,8 @@ export interface ChannelRecord {
 }
 
 const REGISTRY_KV_KEY = ["channel-registry", "channels"];
+const KV_DIR = new URL("../../../../.data", import.meta.url).pathname;
+const KV_PATH = `${KV_DIR}/memory-kvdb.db`;
 
 /**
  * In-memory registry of channels this PP is registered in.
@@ -48,8 +50,8 @@ export class ChannelRegistry {
    * channels not already present. Must be called before use.
    */
   async initialize(): Promise<void> {
-    await Deno.mkdir(".data", { recursive: true });
-    this.kv = await Deno.openKv("./.data/memory-kvdb.db");
+    await Deno.mkdir(KV_DIR, { recursive: true });
+    this.kv = await Deno.openKv(KV_PATH);
 
     // Restore persisted state
     const stored = await this.kv.get<ChannelRecord[]>(REGISTRY_KV_KEY);

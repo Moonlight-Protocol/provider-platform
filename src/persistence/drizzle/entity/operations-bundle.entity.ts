@@ -30,6 +30,11 @@ export const operationsBundle = pgTable("operations_bundles", {
     table.deletedAt,
     table.createdAt,
   ),
+  index("idx_bundles_status_updated").on(
+    table.status,
+    table.deletedAt,
+    table.updatedAt,
+  ),
 ]);
 
 // Relations

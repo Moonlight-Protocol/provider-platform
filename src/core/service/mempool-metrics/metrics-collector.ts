@@ -6,6 +6,7 @@ import { getMempool } from "@/core/mempool/index.ts";
 import { LOG } from "@/config/logger.ts";
 
 const COLLECTION_INTERVAL_MS = 60_000; // 1 minute
+const RETENTION_DAYS = 7;
 
 export class MetricsCollector {
   private intervalId: number | null = null;
@@ -94,6 +95,13 @@ export class MetricsCollector {
         avgProcessingMs,
         throughputPerMin,
       });
+
+      // Cleanup: delete metrics older than retention period
+      const retentionCutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+      const deleted = await this.metricRepo.deleteOlderThan(retentionCutoff);
+      if (deleted > 0) {
+        LOG.debug("Cleaned up old metrics", { deleted, retentionDays: RETENTION_DAYS });
+      }
     } catch (error) {
       LOG.error("MetricsCollector failed to collect", {
         error: error instanceof Error ? error.message : String(error),

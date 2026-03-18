@@ -1,4 +1,4 @@
-import { desc, gte, avg, count } from "drizzle-orm";
+import { desc, gte, lt, avg, count } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   mempoolMetric,
@@ -56,5 +56,16 @@ export class MempoolMetricRepository {
       avgThroughputPerMin: Number(result?.avgThroughputPerMin ?? 0),
       sampleCount: result?.sampleCount ?? 0,
     };
+  }
+
+  /**
+   * Deletes metrics older than the given date. Returns the number of rows deleted.
+   */
+  async deleteOlderThan(before: Date): Promise<number> {
+    const rows = await this.db
+      .delete(mempoolMetric)
+      .where(lt(mempoolMetric.recordedAt, before))
+      .returning({ id: mempoolMetric.id });
+    return rows.length;
   }
 }

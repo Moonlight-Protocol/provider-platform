@@ -14,3 +14,5 @@ CREATE TABLE "mempool_metrics" (
 CREATE INDEX "idx_mempool_metrics_recorded_at" ON "mempool_metrics" USING btree ("recorded_at");
 --> statement-breakpoint
 CREATE INDEX "idx_mempool_metrics_version" ON "mempool_metrics" USING btree ("platform_version");
+--> statement-breakpoint
+CREATE INDEX "idx_bundles_status_updated" ON "operations_bundles" USING btree ("status","deleted_at","updated_at");
