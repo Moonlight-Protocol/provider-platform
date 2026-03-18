@@ -36,3 +36,11 @@ jobs:
       provider_image_override: ${{ needs.build.outputs.image }}
     secrets:
       E2E_TRIGGER_TOKEN: ${{ secrets.E2E_TRIGGER_TOKEN }}
+
+  lifecycle:
+    needs: build
+    uses: Moonlight-Protocol/local-dev/.github/workflows/lifecycle-reusable.yml@main
+    with:
+      provider_image_override: ${{ needs.build.outputs.image }}
+    secrets:
+      E2E_TRIGGER_TOKEN: ${{ secrets.E2E_TRIGGER_TOKEN }}
