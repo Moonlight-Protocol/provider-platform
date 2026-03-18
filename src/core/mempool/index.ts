@@ -1,6 +1,7 @@
 import { Mempool } from "@/core/service/mempool/mempool.process.ts";
 import { Executor } from "@/core/service/executor/executor.process.ts";
 import { Verifier } from "@/core/service/verifier/verifier.process.ts";
+import { MetricsCollector } from "@/core/service/mempool-metrics/metrics-collector.ts";
 import { MEMPOOL_SLOT_CAPACITY, MEMPOOL_TTL_CHECK_INTERVAL_MS } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -21,6 +22,11 @@ export let executor: Executor;
  * Will be initialized during application startup
  */
 export let verifier: Verifier;
+
+/**
+ * Singleton instance of the MetricsCollector
+ */
+export let metricsCollector: MetricsCollector;
 
 /**
  * Interval ID for TTL check
@@ -71,6 +77,11 @@ export async function initializeMempoolSystem(): Promise<void> {
   verifier = new Verifier();
   verifier.start();
 
+  // Initialize MetricsCollector
+  const denoJson = JSON.parse(await Deno.readTextFile("deno.json"));
+  metricsCollector = new MetricsCollector(denoJson.version ?? "unknown");
+  metricsCollector.start();
+
   // Start periodic TTL check
   ttlCheckIntervalId = setInterval(async () => {
     try {
@@ -98,6 +109,10 @@ export function shutdownMempoolSystem(): void {
 
   if (verifier) {
     verifier.stop();
+  }
+
+  if (metricsCollector) {
+    metricsCollector.stop();
   }
 
   if (ttlCheckIntervalId !== null) {

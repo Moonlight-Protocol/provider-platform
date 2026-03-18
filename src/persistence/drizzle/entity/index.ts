@@ -8,4 +8,5 @@ export * from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 export * from "@/persistence/drizzle/entity/transaction.entity.ts";
 export * from "@/persistence/drizzle/entity/utxo.entity.ts";
 export * from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
+export * from "@/persistence/drizzle/entity/mempool-metric.entity.ts";
 
