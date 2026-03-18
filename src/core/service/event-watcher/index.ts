@@ -43,6 +43,7 @@ eventWatcher.onEvent((event) => {
 });
 
 export async function startEventWatcher(): Promise<void> {
+  await channelRegistry.initialize();
   await eventWatcher.start();
 }
 
