@@ -5,6 +5,7 @@ import apiVi from "@/http/v1/v1.routes.ts";
 import { appendRequestIdMiddleware } from "@/http/middleware/append-request-id.ts";
 import { appendResponseHeadersMiddleware } from "@/http/middleware/append-response-headers.ts";
 import { traceContextMiddleware } from "@/http/middleware/trace-context.ts";
+import { corsMiddleware } from "@/http/middleware/cors.ts";
 import { PORT } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 import { initializeMempoolSystem, shutdownMempoolSystem } from "@/core/mempool/index.ts";
@@ -20,6 +21,7 @@ async function bootstrap() {
 
     const app = new Application();
 
+    app.use(corsMiddleware);
     app.use(traceContextMiddleware);
     app.use(globalRateLimitMiddleware);
     app.use(appendRequestIdMiddleware);
