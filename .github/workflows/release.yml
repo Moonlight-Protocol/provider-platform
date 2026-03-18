@@ -54,4 +54,4 @@ jobs:
           token: ${{ secrets.E2E_TRIGGER_TOKEN }}
           repository: ${{ github.repository_owner }}/local-dev
           event-type: module-release
-          client-payload: '{"module": "provider-platform", "version": "${{ github.ref_name }}"}'
+          client-payload: '{"module": "provider-platform", "version": "${{ steps.meta.outputs.version }}"}'
