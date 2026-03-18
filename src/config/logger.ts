@@ -15,8 +15,4 @@ if (LOG_LEVEL !== undefined && LOG_LEVEL in LogLevel) {
   );
 }
 
-LOG = new Logger(LogLevel[LOG_LEVEL]);
-
-LOG.debug("Logger initialized with level:", LOG_LEVEL);
-
 export { LOG };

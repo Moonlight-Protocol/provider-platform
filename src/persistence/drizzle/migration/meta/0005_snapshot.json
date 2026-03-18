@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
   "id": "927b9be9-79fb-420b-a6b9-4822a13fce56",
   "prevId": "6d5184df-921c-406c-852c-1346f4f185f8",
+=======
+  "id": "0b55d112-369f-4672-81fd-6f3e28716771",
+  "prevId": "55eb3a90-5a4b-4200-a1b5-6e2d0fe2fb3c",
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -363,6 +368,22 @@
           "primaryKey": false,
           "notNull": true
         },
+<<<<<<< HEAD
+=======
+        "retry_count": {
+          "name": "retry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_failure_reason": {
+          "name": "last_failure_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -396,6 +417,7 @@
           "notNull": false
         }
       },
+<<<<<<< HEAD
       "indexes": {
         "idx_bundles_status_deleted_created": {
           "name": "idx_bundles_status_deleted_created",
@@ -452,6 +474,9 @@
           "with": {}
         }
       },
+=======
+      "indexes": {},
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -741,6 +766,7 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+<<<<<<< HEAD
     },
     "public.mempool_metrics": {
       "name": "mempool_metrics",
@@ -848,6 +874,8 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+=======
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
     }
   },
   "enums": {
@@ -892,7 +920,12 @@
         "PENDING",
         "PROCESSING",
         "EXPIRED",
+<<<<<<< HEAD
         "COMPLETED"
+=======
+        "COMPLETED",
+        "FAILED"
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
       ]
     },
     "public.transaction_status": {

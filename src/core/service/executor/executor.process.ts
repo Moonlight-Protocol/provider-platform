@@ -3,7 +3,7 @@ import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { MEMPOOL_EXECUTOR_INTERVAL_MS } from "@/config/env.ts";
+import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS } from "@/config/env.ts";
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { TX_CONFIG, NETWORK_RPC_SERVER, PROVIDER_SIGNER } from "@/config/env.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
@@ -20,6 +20,7 @@ import { withSpan } from "@/core/tracing.ts";
 const EXECUTOR_CONFIG = {
   INTERVAL_MS: MEMPOOL_EXECUTOR_INTERVAL_MS,
   TRANSACTION_EXPIRATION_OFFSET: 1000,
+  MAX_RETRY_ATTEMPTS: MEMPOOL_MAX_RETRY_ATTEMPTS,
 } as const;
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
@@ -117,25 +118,61 @@ async function createTransactionRecord(
 async function handleExecutionFailure(
   error: Error,
   bundleIds: string[]
-): Promise<void> {
+): Promise<Array<{ bundleId: string; nextRetryCount: number; lastFailureReason: string }>> {
   return withSpan("Executor.handleExecutionFailure", async (span) => {
     const errorMessage = error.message || "Unknown error";
     span.addEvent("handling_failure", { "error.message": errorMessage, "bundles.count": bundleIds.length });
     LOG.error("Execution failed", { error: errorMessage, bundleIds });
 
-    // Update bundles back to PENDING status for retry
+    const bundlesToRetry: Array<{
+      bundleId: string;
+      nextRetryCount: number;
+      lastFailureReason: string;
+    }> = [];
+
     for (const bundleId of bundleIds) {
       try {
-        await operationsBundleRepository.update(bundleId, {
-          status: BundleStatus.PENDING,
-          updatedAt: new Date(),
-        });
-        span.addEvent("bundle_reset_to_pending", { "bundle.id": bundleId });
+        const bundle = await operationsBundleRepository.findById(bundleId);
+        if (!bundle) {
+          LOG.warn(`Bundle ${bundleId} not found while handling execution failure`);
+          continue;
+        }
+
+        const nextRetryCount = (bundle.retryCount ?? 0) + 1;
+        const hasReachedMaxAttempts = nextRetryCount >= EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS;
+
+        if (hasReachedMaxAttempts) {
+          await operationsBundleRepository.update(bundleId, {
+            status: BundleStatus.FAILED,
+            retryCount: nextRetryCount,
+            lastFailureReason: errorMessage,
+            updatedAt: new Date(),
+          });
+          LOG.warn("Bundle moved to dead-letter after max retry attempts reached", {
+            bundleId,
+            retryCount: nextRetryCount,
+          });
+        } else {
+          await operationsBundleRepository.update(bundleId, {
+            status: BundleStatus.PENDING,
+            retryCount: nextRetryCount,
+            lastFailureReason: errorMessage,
+            updatedAt: new Date(),
+          });
+          span.addEvent("bundle_reset_to_pending", { "bundle.id": bundleId });
+
+          bundlesToRetry.push({
+            bundleId,
+            nextRetryCount,
+            lastFailureReason: errorMessage,
+          });
+        }
       } catch (updateError) {
         span.addEvent("bundle_reset_failed", { "bundle.id": bundleId });
         LOG.error(`Failed to update bundle ${bundleId} status`, { error: updateError });
       }
     }
+    return bundlesToRetry;
   });
 }
 
@@ -188,7 +225,6 @@ export class Executor {
    */
   async executeNext(): Promise<void> {
     if (this.isProcessing) {
-      LOG.debug("Executor already processing a slot, skipping");
       return;
     }
 
@@ -209,9 +245,81 @@ export class Executor {
 
         bundleIds = slot.getBundles().map((b) => b.bundleId);
 
+<<<<<<< HEAD
         span.addEvent("executing_slot", {
           "slot.bundleCount": slot.getBundleCount(),
           "slot.weight": slot.getTotalWeight(),
+=======
+      // Build transaction from slot
+      const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot);
+      
+      // Use bundleIds from build result to ensure consistency
+      bundleIds = buildBundleIds;
+
+      // Get transaction expiration
+      const expiration = await getTransactionExpiration();
+
+      // Submit transaction to network
+      const transactionHash = await submitTransactionToNetwork(txBuilder, expiration);
+
+      LOG.info("Transaction submitted successfully", { 
+        transactionHash,
+        bundleCount: bundleIds.length,
+        bundleIds 
+      });
+
+      // Create transaction record and link bundles
+      await createTransactionRecord(transactionHash, bundleIds);
+
+      LOG.info("Slot executed successfully", { 
+        transactionHash,
+        bundleCount: bundleIds.length 
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      LOG.error("Slot execution failed", { 
+        error: errorMessage,
+        bundleIds 
+      });
+
+      // Handle failure: re-add bundles to mempool (only those still elegible) and update status
+      if (slot && !slot.isEmpty() && bundleIds.length > 0) {
+        // Update bundle statuses and retry counters
+        const bundlesToRetryMeta = await handleExecutionFailure(
+          error instanceof Error ? error : new Error(errorMessage),
+          bundleIds
+        );
+
+        const metaByBundleId = new Map(
+          bundlesToRetryMeta.map((m) => [m.bundleId, m] as const)
+        );
+
+        // Reuse the in-memory slot bundle objects, but update retryCount/lastFailureReason
+        // based on the decision computed from the database.
+        const bundlesToRetry = slot
+          .getBundles()
+          .filter((b) => metaByBundleId.has(b.bundleId));
+
+        for (const bundle of bundlesToRetry) {
+          const meta = metaByBundleId.get(bundle.bundleId);
+          if (!meta) continue;
+          bundle.retryCount = meta.nextRetryCount;
+          bundle.lastFailureReason = meta.lastFailureReason;
+        }
+
+        if (bundlesToRetry.length > 0) {
+          await mempool.reAddBundles(bundlesToRetry);
+          LOG.info("Bundles re-added to mempool for retry", {
+            bundleIds: bundlesToRetry.map((b) => b.bundleId),
+          });
+        }
+      } else {
+        LOG.error("Execution error with no slot or bundles to re-add", { 
+          error: errorMessage,
+          hasSlot: !!slot,
+          bundleCount: bundleIds.length
+>>>>>>> 16c49e0 (chore: Add retry and dead-letter to the Mempool engine)
         });
 
         LOG.debug("Executing slot", {

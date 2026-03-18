@@ -96,7 +96,6 @@ export class Verifier {
    */
   start(): void {
     if (this.isRunning) {
-      LOG.warn("Verifier is already running");
       return;
     }
 
