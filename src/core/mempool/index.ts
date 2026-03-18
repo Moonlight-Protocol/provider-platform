@@ -29,6 +29,11 @@ export let verifier: Verifier;
 export let metricsCollector: MetricsCollector;
 
 /**
+ * Platform version, read once at startup from deno.json.
+ */
+export let platformVersion = "unknown";
+
+/**
  * Interval ID for TTL check
  */
 let ttlCheckIntervalId: number | null = null;
@@ -77,9 +82,18 @@ export async function initializeMempoolSystem(): Promise<void> {
   verifier = new Verifier();
   verifier.start();
 
+  // Read platform version once at startup (import.meta.dirname resolves
+  // to the module's directory, so this works regardless of CWD)
+  try {
+    const denoJsonPath = new URL("../../../deno.json", import.meta.url).pathname;
+    const denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
+    platformVersion = denoJson.version ?? "unknown";
+  } catch {
+    LOG.warn("Could not read deno.json for platform version");
+  }
+
   // Initialize MetricsCollector
-  const denoJson = JSON.parse(await Deno.readTextFile("deno.json"));
-  metricsCollector = new MetricsCollector(denoJson.version ?? "unknown");
+  metricsCollector = new MetricsCollector(platformVersion);
   metricsCollector.start();
 
   // Start periodic TTL check

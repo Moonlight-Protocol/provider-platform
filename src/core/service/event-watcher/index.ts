@@ -30,9 +30,9 @@ export const eventWatcher = new EventWatcher({
 const providerAddress = PROVIDER_SIGNER.publicKey();
 
 // Only process events relevant to this PP's provider address
-eventWatcher.onEvent((event) => {
+eventWatcher.onEvent(async (event) => {
   if (event.address === providerAddress || event.type === "contract_initialized") {
-    channelRegistry.handleEvent(event);
+    await channelRegistry.handleEvent(event);
   } else {
     LOG.debug("Ignoring event for different provider", {
       eventType: event.type,
@@ -49,4 +49,5 @@ export async function startEventWatcher(): Promise<void> {
 
 export function stopEventWatcher(): void {
   eventWatcher.stop();
+  channelRegistry.close();
 }

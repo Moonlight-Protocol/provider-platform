@@ -48,18 +48,19 @@ export class MetricsCollector {
       const mempool = getMempool();
       const stats = mempool.getStats();
 
-      // Get bundles completed in the last collection window
+      // Get bundles that transitioned to COMPLETED/EXPIRED in the last window
+      // Uses updatedAt (when status changed), not createdAt
       const windowStart = new Date(Date.now() - COLLECTION_INTERVAL_MS);
-      const completed = await this.bundleRepo.findByStatusAndDateRange(
+      const completed = await this.bundleRepo.findByStatusUpdatedSince(
         BundleStatus.COMPLETED,
         windowStart,
       );
-      const expired = await this.bundleRepo.findByStatusAndDateRange(
+      const expired = await this.bundleRepo.findByStatusUpdatedSince(
         BundleStatus.EXPIRED,
         windowStart,
       );
 
-      // Compute processing times from completed bundles
+      // Compute processing times from completed bundles (createdAt → updatedAt)
       const processingTimesMs = completed
         .filter((b) => b.createdAt && b.updatedAt)
         .map((b) => new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime())
@@ -101,8 +102,8 @@ export class MetricsCollector {
   }
 }
 
-function percentile(sorted: number[], p: number): number {
-  const arr = [...sorted].sort((a, b) => a - b);
+function percentile(values: number[], p: number): number {
+  const arr = [...values].sort((a, b) => a - b);
   const idx = Math.ceil(arr.length * p) - 1;
   return arr[Math.max(0, idx)];
 }

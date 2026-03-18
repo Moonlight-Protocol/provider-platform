@@ -1,5 +1,5 @@
 import { type Context, Status } from "@oak/oak";
-import { getMempool } from "@/core/mempool/index.ts";
+import { getMempool, platformVersion } from "@/core/mempool/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 import {
@@ -26,13 +26,11 @@ export const getMempoolHandler = async (ctx: Context) => {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const averages = await metricRepo.getAveragesSince(oneHourAgo);
 
-  const denoJson = JSON.parse(await Deno.readTextFile("deno.json"));
-
   ctx.response.status = Status.OK;
   ctx.response.body = {
     message: "Mempool state retrieved",
     data: {
-      platformVersion: denoJson.version ?? "unknown",
+      platformVersion,
       live: stats,
       averages: {
         windowMinutes: 60,
