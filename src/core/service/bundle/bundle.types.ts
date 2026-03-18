@@ -51,6 +51,8 @@ export type SlotBundle = {
   ttl: Date;
   createdAt: Date;
   priorityScore: number;
+  retryCount: number;
+  lastFailureReason?: string | null;
 };
 
 /**

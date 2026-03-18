@@ -72,6 +72,8 @@ async function createSlotBundleFromEntity(
     ttl: bundle.ttl,
     createdAt: bundle.createdAt,
     priorityScore,
+    retryCount: bundle.retryCount ?? 0,
+    lastFailureReason: bundle.lastFailureReason ?? null,
   };
 }
 

@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp, jsonb, bigint, index } from "drizzle-orm/pg-core";
+import { pgTable, text, pgEnum, timestamp, jsonb, bigint, integer, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
@@ -8,6 +8,7 @@ export enum BundleStatus {
   PROCESSING = "PROCESSING",
   EXPIRED = "EXPIRED",
   COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
 }
 
 export const bundleStatusEnum = pgEnum("bundle_status", [
@@ -15,6 +16,7 @@ export const bundleStatusEnum = pgEnum("bundle_status", [
   BundleStatus.PROCESSING,
   BundleStatus.EXPIRED,
   BundleStatus.COMPLETED,
+  BundleStatus.FAILED,
 ]);
 
 export const operationsBundle = pgTable("operations_bundles", {
@@ -23,6 +25,8 @@ export const operationsBundle = pgTable("operations_bundles", {
   ttl: timestamp("ttl", { withTimezone: true }).notNull(),
   operationsMLXDR: jsonb("operations_mlxdr").$type<string[]>().notNull(),
   fee: bigint("fee", { mode: "bigint" }).notNull(),
+  retryCount: integer("retry_count").notNull().default(0),
+  lastFailureReason: text("last_failure_reason"),
   ...createBaseColumns(),
 }, (table) => [
   index("idx_bundles_status_deleted_created").on(

@@ -290,16 +290,6 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         });
       }
 
-      LOG.debug("Fee calculation breakdown", {
-        totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
-        totalCreateAmount: feeCalculation.breakdown.totalCreateAmount.toString(),
-        totalWithdrawAmount: feeCalculation.breakdown.totalWithdrawAmount.toString(),
-        totalSpendAmount: feeCalculation.breakdown.totalSpendAmount.toString(),
-        totalInflows: feeCalculation.totalInflows.toString(),
-        totalOutflows: feeCalculation.totalOutflows.toString(),
-        fee: feeCalculation.fee.toString(),
-      });
-
       if (feeCalculation.fee < BigInt(1)) {
         span.addEvent("zero_fee_warning");
         LOG.warn("This bundle doesn't have any fee");
