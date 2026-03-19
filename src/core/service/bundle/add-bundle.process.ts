@@ -160,23 +160,27 @@ async function persistSpendOperations(
   bundleId: string,
   accountId: string
 ): Promise<void> {
-  return withSpan("Bundle.persistSpendOperations", async (span) => {
-    if (operations.length === 0) {
-      span.addEvent("no_spend_operations");
-      return;
-    }
+  if (operations.length === 0) {
+    return;
+  }
 
-    span.addEvent("fetching_utxo_balances", { "operations.count": operations.length });
+  return withSpan("Bundle.persistSpendOperations", async (span) => {
+    span.addEvent("persisting_spend_utxos", {
+      "operations.count": operations.length,
+      "bundle.id": bundleId,
+    });
+
+    // Fetch all UTXO balances from the network in batch for better performance.
     const utxoPublicKeys = operations.map((op) => op.getUtxo());
     const balances = await fetchUtxoBalances(utxoPublicKeys);
 
     for (let i = 0; i < operations.length; i++) {
       const operation = operations[i];
       const utxoPublicKey = operation.getUtxo();
+      // Convert UTXO public key to base64 string to match the format used in persistCreateOperations.
       const utxoId = Buffer.from(utxoPublicKey).toString("base64");
-      LOG.info(`  /n/n utxo Id: ${utxoId} /n/n`);
-      const utxo = await utxoRepository.findById(utxoId);
 
+      const utxo = await utxoRepository.findById(utxoId);
       if (!utxo) {
         span.addEvent("utxo_not_found", { "utxo.id": utxoId });
         logAndThrow(new E.UTXO_NOT_FOUND(utxoId));
@@ -192,6 +196,7 @@ async function persistSpendOperations(
         spentByAccountId: accountId,
       });
     }
+
     span.addEvent("spend_utxos_persisted");
   });
 }
@@ -219,6 +224,8 @@ function createSlotBundle(
     ttl: bundleEntity.ttl,
     createdAt: bundleEntity.createdAt,
     priorityScore,
+    retryCount: bundleEntity.retryCount ?? 0,
+    lastFailureReason: bundleEntity.lastFailureReason ?? null,
   };
 }
 
