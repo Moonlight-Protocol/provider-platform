@@ -18,6 +18,26 @@ jobs:
       - name: Setup Fly.io CLI
         uses: superfly/flyctl-actions/setup-flyctl@master
 
+      - name: Clean up stale machines
+        run: |
+          # Bluegreen deploys can leave orphaned machines from failed swaps.
+          # Destroy any machine that isn't in a healthy state before deploying.
+          APP="moonlight-beta-privacy-provider-a"
+          MACHINES=$(flyctl machines list --json -a "$APP")
+          echo "$MACHINES" | jq -r '.[] | "\(.id) \(.region) \(.state)"'
+
+          STALE=$(echo "$MACHINES" | jq -r '.[] | select(.state != "started" and .state != "stopped") | .id')
+          if [ -n "$STALE" ]; then
+            echo "Destroying stale machines: $STALE"
+            for ID in $STALE; do
+              flyctl machines destroy "$ID" --force -a "$APP" || true
+            done
+          else
+            echo "No stale machines found"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Deploy to Fly.io
         run: flyctl deploy --remote-only
         env:
