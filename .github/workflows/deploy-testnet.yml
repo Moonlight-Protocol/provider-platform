@@ -9,6 +9,10 @@ concurrency:
   group: deploy-testnet
   cancel-in-progress: true
 
+env:
+  APP: moonlight-beta-privacy-provider-a
+  REGIONS: ams gru
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -20,25 +24,40 @@ jobs:
 
       - name: Deploy to Fly.io
         run: |
-          APP="moonlight-beta-privacy-provider-a"
-
           # First attempt
           if flyctl deploy --remote-only; then
             echo "Deploy succeeded"
-            exit 0
+          else
+            echo "Deploy failed — cleaning up unreachable machines..."
+            flyctl machines list --json -a "$APP" | jq -r '.[] | "\(.id) \(.region) \(.state)"'
+
+            for ID in $(flyctl machines list --json -a "$APP" | jq -r '.[].id'); do
+              echo "  Destroying $ID"
+              flyctl machines destroy "$ID" --force -a "$APP" || true
+            done
+
+            echo "Retrying deploy..."
+            flyctl deploy --remote-only
           fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-          echo "Deploy failed — checking for unreachable machines..."
-          flyctl machines list --json -a "$APP" | jq -r '.[] | "\(.id) \(.region) \(.state)"'
+      - name: Ensure all regions have machines
+        run: |
+          MACHINES=$(flyctl machines list --json -a "$APP")
+          echo "Current machines:"
+          echo "$MACHINES" | jq -r '.[] | "  \(.id) \(.region) \(.state)"'
 
-          # Destroy all machines and retry. Bluegreen recreates them from scratch.
-          echo "Destroying all machines for clean bluegreen deploy..."
-          for ID in $(flyctl machines list --json -a "$APP" | jq -r '.[].id'); do
-            echo "  Destroying $ID"
-            flyctl machines destroy "$ID" --force -a "$APP" || true
+          for REGION in $REGIONS; do
+            COUNT=$(echo "$MACHINES" | jq -r "[.[] | select(.region == \"$REGION\")] | length")
+            if [ "$COUNT" -eq 0 ]; then
+              # Clone from any running machine into the missing region
+              SOURCE=$(echo "$MACHINES" | jq -r '[.[] | select(.state == "started")][0].id')
+              echo "No machine in $REGION — cloning $SOURCE"
+              flyctl machines clone "$SOURCE" --region "$REGION" -a "$APP"
+            else
+              echo "Region $REGION: $COUNT machine(s)"
+            fi
           done
-
-          echo "Retrying deploy..."
-          flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
