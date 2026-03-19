@@ -9,4 +9,7 @@ export * from "@/persistence/drizzle/entity/transaction.entity.ts";
 export * from "@/persistence/drizzle/entity/utxo.entity.ts";
 export * from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
 export * from "@/persistence/drizzle/entity/mempool-metric.entity.ts";
+export * from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
+export * from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
+export * from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 
