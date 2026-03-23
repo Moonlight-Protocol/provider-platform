@@ -1,4 +1,5 @@
 import { Keypair } from "stellar-sdk";
+import { Buffer } from "buffer";
 import { LOG } from "@/config/logger.ts";
 import { withSpan } from "@/core/tracing.ts";
 

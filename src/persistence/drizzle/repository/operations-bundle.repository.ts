@@ -20,7 +20,7 @@ export class OperationsBundleRepository extends BaseRepository<
   /**
    * Finds bundles by status
    */
-  async findByStatus(status: BundleStatus.PENDING | BundleStatus.COMPLETED | BundleStatus.EXPIRED | BundleStatus.PROCESSING) {
+  async findByStatus(status: BundleStatus) {
     return await this.db
       .select()
       .from(operationsBundle)

@@ -1,6 +1,6 @@
 import type { Middleware } from "@oak/oak";
 import { LOG } from "@/config/logger.ts";
-import * as E from "@/http//middleware/rate-limit/error.ts";
+import * as E from "@/http/middleware/rate-limit/error.ts";
 import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
 export function createRateLimitMiddleware(
