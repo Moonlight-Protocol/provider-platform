@@ -84,6 +84,13 @@ function submitTransactionToNetwork(
       LOG.error("Transaction submission failed", { error: errorMessage });
       span.addEvent("submission_failed", { "error.message": errorMessage });
       const baseError = error instanceof Error ? error : new Error(errorMessage);
+      const failureContext: {
+        phase: string;
+        simulation?: SimulationFailureContext;
+      } = {
+        phase: "submitTransactionToNetwork",
+      };
+
       const simError = error as SIM_ERRORS.SIMULATION_FAILED;
       if (simError?.meta?.data) {
         const simResponse = simError.meta.data.simulationResponse ?? simError.meta.data;
@@ -103,23 +110,16 @@ function submitTransactionToNetwork(
 
         const simulationResponseJson = safeJsonStringify(simResponse);
 
-        const failureContext: {
-          phase: string;
-          simulation?: SimulationFailureContext;
-        } = {
-          phase: "submitTransactionToNetwork",
-          simulation: {
-            simulationResponse: simulationResponseJson
-              ? truncate(simulationResponseJson, 4000)
-              : undefined,
-            failedTxXdr,
-          },
+        failureContext.simulation = {
+          simulationResponse: simulationResponseJson
+            ? truncate(simulationResponseJson, 4000)
+            : undefined,
+          failedTxXdr,
         };
-
-        // Attach extra context to the thrown error so the caller can persist it.
-        (baseError as { failureContext?: typeof failureContext }).failureContext = failureContext;
       }
 
+      // Attach extra context to the thrown error so the caller can persist it.
+      (baseError as { failureContext?: typeof failureContext }).failureContext = failureContext;
       throw baseError;
     }
   });

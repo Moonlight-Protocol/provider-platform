@@ -5,7 +5,6 @@ import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
 import { requireContractId } from "@/utils/env/requireContractId.ts";
-import type { Logger as _Logger } from "@/utils/logger/index.ts";
 import { Server } from "stellar-sdk/rpc";
 
 // Every required variable is retrieved via requireEnv.

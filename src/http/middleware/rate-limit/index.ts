@@ -1,6 +1,6 @@
 import type { Middleware } from "@oak/oak";
 import { LOG } from "@/config/logger.ts";
-import * as E from "@/http//middleware/rate-limit/error.ts";
+import { EXCEEDED_LIMIT, FAILED_TO_DETECT_IP } from "@/http/middleware/rate-limit/error.ts";
 import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
 export function createRateLimitMiddleware(
@@ -28,10 +28,10 @@ export function createRateLimitMiddleware(
 
       if (entry.count > limit) {
         LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
-        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT());
+        return await PIPE_APIError(ctx).run(new EXCEEDED_LIMIT());
       }
     } catch (error) {
-      const warningError = new E.FAILED_TO_DETECT_IP(error);
+      const warningError = new FAILED_TO_DETECT_IP(error);
       LOG.error(warningError.message, warningError);
 
       // Fallback when IP detection fails
@@ -55,7 +55,7 @@ export function createRateLimitMiddleware(
 
       if (entry.count > limit) {
         LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
-        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT());
+        return await PIPE_APIError(ctx).run(new EXCEEDED_LIMIT());
       }
     }
 

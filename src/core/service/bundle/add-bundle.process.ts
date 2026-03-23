@@ -75,12 +75,15 @@ async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
       return false;
     }
 
-    if (existingBundle.status !== BundleStatus.EXPIRED) {
+    if (
+      existingBundle.status !== BundleStatus.EXPIRED &&
+      existingBundle.status !== BundleStatus.FAILED
+    ) {
       span.addEvent("bundle_exists_not_expired", { "bundle.status": existingBundle.status });
       logAndThrow(new E.BUNDLE_ALREADY_EXISTS(bundleId));
     }
 
-    span.addEvent("bundle_expired");
+    span.addEvent("bundle_can_be_reused", { "bundle.status": existingBundle.status });
     return true;
   });
 }

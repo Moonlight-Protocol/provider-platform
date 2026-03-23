@@ -2,7 +2,11 @@ import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
-import { MEMPOOL_VERIFIER_INTERVAL_MS, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import {
+  MEMPOOL_MAX_RETRY_ATTEMPTS,
+  MEMPOOL_VERIFIER_INTERVAL_MS,
+  NETWORK_RPC_SERVER,
+} from "@/config/env.ts";
 import { verifyTransactionOnNetwork } from "@/core/service/verifier/verifier.service.ts";
 import {
   TransactionRepository,
@@ -32,24 +36,7 @@ async function updateTransactionStatus(
   });
 }
 
-/**
- * Updates bundles status based on transaction verification result
- */
-async function updateBundlesStatus(
-  bundleIds: string[],
-  status: BundleStatus
-): Promise<void> {
-  for (const bundleId of bundleIds) {
-    try {
-      await operationsBundleRepository.update(bundleId, {
-        status,
-        updatedAt: new Date(),
-      });
-    } catch (error) {
-      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
-    }
-  }
-}
+const VERIFIER_MAX_RETRY_ATTEMPTS = MEMPOOL_MAX_RETRY_ATTEMPTS;
 
 /**
  * Handles verification failure by updating transaction and bundles
@@ -64,8 +51,37 @@ async function handleVerificationFailure(
   // Update transaction status to FAILED
   await updateTransactionStatus(txId, TransactionStatus.FAILED);
 
-  // Update bundles back to PENDING for potential retry
-  await updateBundlesStatus(bundleIds, BundleStatus.PENDING);
+  for (const bundleId of bundleIds) {
+    try {
+      const bundle = await operationsBundleRepository.findById(bundleId);
+      if (!bundle) {
+        LOG.warn(`Bundle ${bundleId} not found while handling verification failure`);
+        continue;
+      }
+
+      const nextRetryCount = (bundle.retryCount ?? 0) + 1;
+      const hasReachedMaxAttempts = nextRetryCount >= VERIFIER_MAX_RETRY_ATTEMPTS;
+
+      const lastFailureReason = JSON.stringify({
+        occurredAt: new Date().toISOString(),
+        phase: "verification",
+        error: {
+          message: reason,
+        },
+        txId,
+        bundleId,
+      });
+
+      await operationsBundleRepository.update(bundleId, {
+        status: hasReachedMaxAttempts ? BundleStatus.FAILED : BundleStatus.PENDING,
+        retryCount: nextRetryCount,
+        lastFailureReason,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
+    }
+  }
 }
 
 /**
@@ -80,8 +96,16 @@ async function handleVerificationSuccess(
   // Update transaction status to VERIFIED
   await updateTransactionStatus(txId, TransactionStatus.VERIFIED);
 
-  // Update bundles to COMPLETED
-  await updateBundlesStatus(bundleIds, BundleStatus.COMPLETED);
+  for (const bundleId of bundleIds) {
+    try {
+      await operationsBundleRepository.update(bundleId, {
+        status: BundleStatus.COMPLETED,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
+    }
+  }
 }
 
 /**
