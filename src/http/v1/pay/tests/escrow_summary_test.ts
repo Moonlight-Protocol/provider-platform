@@ -23,6 +23,7 @@ type MockResponse = { status: number; body: unknown };
 
 function createMockContext(
   params: { address?: string },
+  session?: unknown,
 ): {
   ctx: Parameters<typeof getEscrowSummaryHandler>[0];
   getResponse: () => MockResponse;
@@ -41,7 +42,7 @@ function createMockContext(
       get body() { return responseBody; },
       set body(b: unknown) { responseBody = b; },
     },
-    state: {},
+    state: { session: session ?? {} },
   };
 
   return {
@@ -75,7 +76,10 @@ Deno.test("escrow summary - returns correct count and total for held escrows", a
     mode: "self",
   });
 
-  const { ctx, getResponse } = createMockContext({ address: receiverAddress });
+  const { ctx, getResponse } = createMockContext(
+    { address: receiverAddress },
+    { sub: receiverAddress },
+  );
 
   await getEscrowSummaryHandler(ctx);
   const res = getResponse();
@@ -96,7 +100,11 @@ Deno.test("escrow summary - returns 0 for address with no escrows", async () => 
   await ensureInitialized();
   await resetDb();
 
-  const { ctx, getResponse } = createMockContext({ address: testAddress() });
+  const addr = testAddress();
+  const { ctx, getResponse } = createMockContext(
+    { address: addr },
+    { sub: addr },
+  );
 
   await getEscrowSummaryHandler(ctx);
   const res = getResponse();
@@ -133,7 +141,10 @@ Deno.test("escrow summary - excludes claimed escrows from count", async () => {
     status: PayEscrowStatus.CLAIMED,
   });
 
-  const { ctx, getResponse } = createMockContext({ address: receiverAddress });
+  const { ctx, getResponse } = createMockContext(
+    { address: receiverAddress },
+    { sub: receiverAddress },
+  );
 
   await getEscrowSummaryHandler(ctx);
   const res = getResponse();

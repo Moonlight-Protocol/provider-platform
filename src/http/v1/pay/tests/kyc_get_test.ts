@@ -63,7 +63,7 @@ Deno.test("kyc get - returns VERIFIED status for verified address", async () => 
   const address = testAddress();
   await createTestKyc(address, PayKycStatus.VERIFIED);
 
-  const { ctx, getResponse } = createMockContext({ address });
+  const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
   await getKycHandler(ctx);
   const res = getResponse();
@@ -83,7 +83,7 @@ Deno.test("kyc get - returns PENDING status for pending address", async () => {
   const address = testAddress();
   await createTestKyc(address, PayKycStatus.PENDING);
 
-  const { ctx, getResponse } = createMockContext({ address });
+  const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
   await getKycHandler(ctx);
   const res = getResponse();
@@ -103,7 +103,7 @@ Deno.test("kyc get - returns NONE for address with no KYC record", async () => {
   await resetDb();
 
   const address = testAddress();
-  const { ctx, getResponse } = createMockContext({ address });
+  const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
   await getKycHandler(ctx);
   const res = getResponse();
