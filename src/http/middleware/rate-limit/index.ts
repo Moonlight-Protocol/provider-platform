@@ -28,10 +28,10 @@ export function createRateLimitMiddleware(
 
       if (entry.count > limit) {
         LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
-        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT());
+        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT() as unknown as Error);
       }
     } catch (error) {
-      const warningError = new E.FAILED_TO_DETECT_IP(error);
+      const warningError = new E.FAILED_TO_DETECT_IP(error) as E.FAILED_TO_DETECT_IP & Error;
       LOG.error(warningError.message, warningError);
 
       // Fallback when IP detection fails
@@ -55,7 +55,7 @@ export function createRateLimitMiddleware(
 
       if (entry.count > limit) {
         LOG.warn(`[RateLimit] Rate limit exceeded for IP: ${clientIP}`);
-        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT());
+        return await PIPE_APIError(ctx).run(new E.EXCEEDED_LIMIT() as unknown as Error);
       }
     }
 

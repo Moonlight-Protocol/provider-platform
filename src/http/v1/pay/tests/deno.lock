@@ -9,16 +9,11 @@
     "jsr:@noble/hashes@^1.6.1": "1.8.0",
     "jsr:@oak/commons@1": "1.0.1",
     "jsr:@oak/oak@^17.1.4": "17.2.0",
-    "jsr:@olli/kvdex@^3.1.4": "3.4.2",
     "jsr:@std/assert@*": "1.0.19",
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/bytes@1": "1.0.6",
-    "jsr:@std/bytes@^1.0.4": "1.0.6",
-    "jsr:@std/cli@1.0.12": "1.0.12",
-    "jsr:@std/collections@^1.0.9": "1.1.6",
     "jsr:@std/collections@^1.1.3": "1.1.6",
     "jsr:@std/crypto@1": "1.0.5",
-    "jsr:@std/dotenv@0.225.6": "0.225.6",
     "jsr:@std/dotenv@~0.225.6": "0.225.6",
     "jsr:@std/encoding@0.224.0": "0.224.0",
     "jsr:@std/encoding@1": "1.0.10",
@@ -28,23 +23,21 @@
     "jsr:@std/media-types@1": "1.1.0",
     "jsr:@std/path@1": "1.1.4",
     "jsr:@std/toml@^1.0.11": "1.0.11",
-    "jsr:@std/ulid@1": "1.0.0",
     "jsr:@zaubrik/djwt@^3.0.2": "3.0.2",
     "npm:@drizzle-team/brocli@0.11": "0.11.0",
+    "npm:@electric-sql/pglite@~0.2.17": "0.2.17",
     "npm:@opentelemetry/api@^1.9.0": "1.9.0",
     "npm:@stellar/stellar-sdk@14.6.1": "14.6.1",
     "npm:@stellar/stellar-sdk@^14.6.1": "14.6.1",
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@^6.0.3": "6.0.3",
     "npm:chalk@^5.3.0": "5.6.2",
-    "npm:drizzle-kit@*": "0.31.9_esbuild@0.25.12",
     "npm:drizzle-kit@~0.31.6": "0.31.9_esbuild@0.25.12",
-    "npm:drizzle-orm@~0.44.7": "0.44.7_@opentelemetry+api@1.9.0_postgres@3.4.8",
+    "npm:drizzle-orm@~0.44.7": "0.44.7_@electric-sql+pglite@0.2.17_@opentelemetry+api@1.9.0_postgres@3.4.8",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:postgres@^3.4.7": "3.4.8",
     "npm:tslib@2.5.0": "2.5.0",
-    "npm:zod@3.24.2": "3.24.2",
-    "npm:zod@^3.24.0": "3.24.2"
+    "npm:zod@3.24.2": "3.24.2"
   },
   "jsr": {
     "@colibri/core@0.16.1": {
@@ -75,7 +68,7 @@
       "integrity": "889ff210f0b4292591721be07244ecb1b5c118742f5273c70cf30d7cd4184d0c",
       "dependencies": [
         "jsr:@std/assert@1",
-        "jsr:@std/bytes@1",
+        "jsr:@std/bytes",
         "jsr:@std/crypto",
         "jsr:@std/encoding@1",
         "jsr:@std/http",
@@ -87,21 +80,11 @@
       "dependencies": [
         "jsr:@oak/commons",
         "jsr:@std/assert@1",
-        "jsr:@std/bytes@1",
+        "jsr:@std/bytes",
         "jsr:@std/http",
         "jsr:@std/media-types",
         "jsr:@std/path",
         "npm:path-to-regexp"
-      ]
-    },
-    "@olli/kvdex@3.4.2": {
-      "integrity": "ab830819efc3a6e7024f865e0743f381dc8b57f63f0a3e590fe1e24ef17847a7",
-      "dependencies": [
-        "jsr:@std/bytes@^1.0.4",
-        "jsr:@std/cli",
-        "jsr:@std/collections@^1.0.9",
-        "jsr:@std/ulid",
-        "npm:zod@^3.24.0"
       ]
     },
     "@std/assert@1.0.19": {
@@ -112,9 +95,6 @@
     },
     "@std/bytes@1.0.6": {
       "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
-    },
-    "@std/cli@1.0.12": {
-      "integrity": "e5cfb7814d189da174ecd7a34fbbd63f3513e24a1b307feb2fcd5da47a070d90"
     },
     "@std/collections@1.1.6": {
       "integrity": "b458160ce65ea5ad35da05d0a5cbee4b583677c8b443a10d7beb0c4ac63f2baa"
@@ -152,11 +132,8 @@
     "@std/toml@1.0.11": {
       "integrity": "e084988b872ca4bad6aedfb7350f6eeed0e8ba88e9ee5e1590621c5b5bb8f715",
       "dependencies": [
-        "jsr:@std/collections@^1.1.3"
+        "jsr:@std/collections"
       ]
-    },
-    "@std/ulid@1.0.0": {
-      "integrity": "d41c3d27a907714413649fee864b7cde8d42ee68437d22b79d5de4f81d808780"
     },
     "@zaubrik/djwt@3.0.2": {
       "integrity": "8070adaa49cd9e5d2b8ae82fd461132c966ef2f8ff8378db4a4da8df4f17c664",
@@ -171,6 +148,9 @@
     },
     "@drizzle-team/brocli@0.11.0": {
       "integrity": "sha512-hD3pekGiPg0WPCCGAZmusBBJsDqGUR66Y452YgQsZOnkdQ7ViEPKuyP4huUGEZQefp8g34RRodXYmJ2TbCH+tg=="
+    },
+    "@electric-sql/pglite@0.2.17": {
+      "integrity": "sha512-qEpKRT2oUaWDH6tjRxLHjdzMqRUGYDnGZlKrnL4dJ77JVMcP2Hpo3NYnOSPKdZdeec57B6QPprCUFg0picx5Pw=="
     },
     "@esbuild-kit/core-utils@3.3.2": {
       "integrity": "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==",
@@ -575,13 +555,15 @@
       ],
       "bin": true
     },
-    "drizzle-orm@0.44.7_@opentelemetry+api@1.9.0_postgres@3.4.8": {
+    "drizzle-orm@0.44.7_@electric-sql+pglite@0.2.17_@opentelemetry+api@1.9.0_postgres@3.4.8": {
       "integrity": "sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==",
       "dependencies": [
+        "@electric-sql/pglite",
         "@opentelemetry/api",
         "postgres"
       ],
       "optionalPeers": [
+        "@electric-sql/pglite",
         "@opentelemetry/api",
         "postgres"
       ]
@@ -921,6 +903,7 @@
       "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",
+      "npm:@electric-sql/pglite@~0.2.17",
       "npm:@opentelemetry/api@^1.9.0",
       "npm:@stellar/stellar-sdk@14.6.1",
       "npm:asn1js@3.0.5",

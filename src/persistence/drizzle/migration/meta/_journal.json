@@ -43,6 +43,13 @@
       "when": 1773768794516,
       "tag": "0005_young_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773949728927,
+      "tag": "0006_pay_tables",
+      "breakpoints": true
     }
   ]
 }
