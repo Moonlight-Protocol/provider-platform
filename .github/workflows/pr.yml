@@ -5,6 +5,15 @@ on:
     branches: [dev]
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/
+
   build:
     runs-on: ubuntu-latest
     permissions:
