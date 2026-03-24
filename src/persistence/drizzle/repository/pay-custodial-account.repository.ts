@@ -29,4 +29,18 @@ export class PayCustodialAccountRepository extends BaseRepository<
       .limit(1);
     return result;
   }
+
+  async findByDepositAddress(address: string): Promise<PayCustodialAccount | undefined> {
+    const [result] = await this.db
+      .select()
+      .from(payCustodialAccount)
+      .where(
+        and(
+          eq(payCustodialAccount.depositAddress, address),
+          isNull(payCustodialAccount.deletedAt),
+        )
+      )
+      .limit(1);
+    return result;
+  }
 }

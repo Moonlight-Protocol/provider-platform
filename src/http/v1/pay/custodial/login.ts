@@ -1,42 +1,12 @@
 import { type Context, Status } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayCustodialAccountRepository } from "@/persistence/drizzle/repository/pay-custodial-account.repository.ts";
+import { PayCustodialStatus } from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
 import { LOG } from "@/config/logger.ts";
+import { verifyPassword } from "@/http/v1/pay/custodial/crypto.ts";
 
 const accountRepo = new PayCustodialAccountRepository(drizzleClient);
-
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  // Use Web Crypto for password verification (PBKDF2)
-  const [salt, stored] = hash.split(":");
-  if (!salt || !stored) return false;
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: new Uint8Array(hexToBytes(salt)).buffer, iterations: 100000, hash: "SHA-256" },
-    key,
-    256,
-  );
-  return bytesToHex(new Uint8Array(derived)) === stored;
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 export const postCustodialLoginHandler = async (ctx: Context) => {
   try {
@@ -56,6 +26,12 @@ export const postCustodialLoginHandler = async (ctx: Context) => {
       return;
     }
 
+    if (account.status === PayCustodialStatus.SUSPENDED) {
+      ctx.response.status = Status.Forbidden;
+      ctx.response.body = { message: "Account suspended" };
+      return;
+    }
+
     const valid = await verifyPassword(password, account.passwordHash);
     if (!valid) {
       ctx.response.status = Status.Unauthorized;
@@ -63,7 +39,7 @@ export const postCustodialLoginHandler = async (ctx: Context) => {
       return;
     }
 
-    const token = await generateJwt(account.id, crypto.randomUUID());
+    const token = await generateJwt(account.id, crypto.randomUUID(), { type: "custodial" });
 
     LOG.info("Custodial login successful", { username });
 

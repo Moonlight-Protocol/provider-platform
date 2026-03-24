@@ -1,39 +1,17 @@
 import { type Context, Status } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayCustodialAccountRepository } from "@/persistence/drizzle/repository/pay-custodial-account.repository.ts";
+import { Keypair } from "stellar-sdk";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
 import { LOG } from "@/config/logger.ts";
+import { hashPassword } from "@/http/v1/pay/custodial/crypto.ts";
 
 const accountRepo = new PayCustodialAccountRepository(drizzleClient);
 
-async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt.buffer, iterations: 100000, hash: "SHA-256" },
-    key,
-    256,
-  );
-  return `${bytesToHex(salt)}:${bytesToHex(new Uint8Array(derived))}`;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 function generateDepositAddress(): string {
-  // Generate a random Stellar-format address for deposit purposes.
-  // In production, this would derive from the PP's key hierarchy.
-  // For now, use a deterministic placeholder.
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const hex = bytesToHex(bytes).toUpperCase();
-  return `G${hex.slice(0, 55)}`;
+  // Generate a valid Stellar keypair and use the public key as deposit address.
+  const keypair = Keypair.random();
+  return keypair.publicKey();
 }
 
 export const postCustodialRegisterHandler = async (ctx: Context) => {
@@ -61,26 +39,26 @@ export const postCustodialRegisterHandler = async (ctx: Context) => {
 
     const existing = await accountRepo.findByUsername(username);
     if (existing) {
-      ctx.response.status = Status.Conflict;
-      ctx.response.body = { message: "Username already taken" };
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "Registration failed" };
       return;
     }
 
-    const passwordHash = await hashPassword(password);
+    const passwordHashValue = await hashPassword(password);
     const depositAddress = generateDepositAddress();
     const accountId = crypto.randomUUID();
 
     await accountRepo.create({
       id: accountId,
       username,
-      passwordHash,
+      passwordHash: passwordHashValue,
       depositAddress,
       balance: 0n,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    const token = await generateJwt(accountId, crypto.randomUUID());
+    const token = await generateJwt(accountId, crypto.randomUUID(), { type: "custodial" });
 
     LOG.info("Custodial account registered", { username });
 

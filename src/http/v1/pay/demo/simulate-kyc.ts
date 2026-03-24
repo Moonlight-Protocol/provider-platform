@@ -2,6 +2,8 @@ import { type Context, Status } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayKycRepository } from "@/persistence/drizzle/repository/pay-kyc.repository.ts";
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
+import { claimEscrowForAddress } from "@/core/service/pay/escrow.service.ts";
+import { LOG } from "@/config/logger.ts";
 
 const kycRepo = new PayKycRepository(drizzleClient);
 
@@ -16,6 +18,7 @@ export const postSimulateKycHandler = async (ctx: Context) => {
       return;
     }
 
+    // Set KYC to VERIFIED
     const existing = await kycRepo.findByAddress(address);
     if (existing) {
       await kycRepo.update(existing.id, {
@@ -36,12 +39,28 @@ export const postSimulateKycHandler = async (ctx: Context) => {
       });
     }
 
+    // Claim any held escrow for this address
+    const escrowResult = await claimEscrowForAddress(address);
+
+    LOG.info("KYC simulated + escrow claimed", {
+      address,
+      escrowClaimed: escrowResult.claimed,
+      escrowAmount: escrowResult.totalAmount.toString(),
+    });
+
     ctx.response.status = Status.OK;
     ctx.response.body = {
       message: "KYC simulated",
-      data: { status: "VERIFIED" },
+      data: {
+        status: "VERIFIED",
+        escrowClaimed: escrowResult.claimed,
+        escrowAmount: escrowResult.totalAmount.toString(),
+      },
     };
-  } catch {
+  } catch (error) {
+    LOG.warn("Simulate KYC failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "Invalid request body" };
   }
