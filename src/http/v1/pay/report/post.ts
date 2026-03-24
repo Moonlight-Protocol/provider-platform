@@ -12,9 +12,9 @@ export const postReportHandler = async (ctx: Context) => {
     const body = await ctx.request.body.json();
     const { description, steps, debug } = body;
 
-    if (!description) {
+    if (!description || typeof description !== "string") {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "description is required" };
+      ctx.response.body = { message: "description is required and must be a string" };
       return;
     }
 
@@ -22,8 +22,8 @@ export const postReportHandler = async (ctx: Context) => {
       typeof v === "string" ? v.slice(0, max) : undefined;
 
     LOG.info("Error report received", {
-      description: description.slice(0, 500),
-      steps: steps?.slice(0, 500),
+      description: truncate(description, 500),
+      steps: truncate(steps, 500),
       userAgent: truncate(debug?.userAgent, 500),
       url: truncate(debug?.url, 500),
       timestamp: truncate(debug?.timestamp, 100),
