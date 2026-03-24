@@ -18,12 +18,15 @@ export const postReportHandler = async (ctx: Context) => {
       return;
     }
 
+    const truncate = (v: unknown, max: number) =>
+      typeof v === "string" ? v.slice(0, max) : undefined;
+
     LOG.info("Error report received", {
       description: description.slice(0, 500),
       steps: steps?.slice(0, 500),
-      userAgent: debug?.userAgent,
-      url: debug?.url,
-      timestamp: debug?.timestamp,
+      userAgent: truncate(debug?.userAgent, 500),
+      url: truncate(debug?.url, 500),
+      timestamp: truncate(debug?.timestamp, 100),
     });
 
     ctx.response.status = Status.OK;

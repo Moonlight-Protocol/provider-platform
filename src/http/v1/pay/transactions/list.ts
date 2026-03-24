@@ -36,7 +36,9 @@ export const listTransactionsHandler = async (ctx: Context) => {
       status: status ?? undefined,
     });
 
-    const total = await txRepo.countByAccountId(accountId);
+    const total = await txRepo.countByAccountId(accountId, {
+      status: status ?? undefined,
+    });
 
     ctx.response.status = Status.OK;
     ctx.response.body = {

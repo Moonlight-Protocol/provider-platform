@@ -9,7 +9,14 @@ import { hashPassword } from "@/http/v1/pay/custodial/crypto.ts";
 const accountRepo = new PayCustodialAccountRepository(drizzleClient);
 
 function generateDepositAddress(): string {
-  // Generate a valid Stellar keypair and use the public key as deposit address.
+  // Generate a valid Stellar public key as deposit address identifier.
+  // NOTE: The secret key is intentionally discarded. In the current custodial model,
+  // deposits are processed via the PP's OpEx/treasury account, not by signing
+  // transactions from this address. This address is an identifier within the
+  // privacy channel, not a funded on-chain account.
+  // TODO: When implementing production ramp deposits, switch to memo-based routing
+  // through the OpEx address (like Stellar custodial services), or store the
+  // encrypted secret key if direct address funding is required.
   const keypair = Keypair.random();
   return keypair.publicKey();
 }

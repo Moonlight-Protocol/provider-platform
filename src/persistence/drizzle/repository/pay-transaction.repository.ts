@@ -38,16 +38,22 @@ export class PayTransactionRepository extends BaseRepository<
       .offset(opts?.offset ?? 0);
   }
 
-  async countByAccountId(accountId: string): Promise<number> {
+  async countByAccountId(
+    accountId: string,
+    opts?: { status?: PayTransactionStatus },
+  ): Promise<number> {
+    const conditions = [
+      eq(payTransaction.accountId, accountId),
+      isNull(payTransaction.deletedAt),
+    ];
+    if (opts?.status) {
+      conditions.push(eq(payTransaction.status, opts.status));
+    }
+
     const [result] = await this.db
       .select({ count: count() })
       .from(payTransaction)
-      .where(
-        and(
-          eq(payTransaction.accountId, accountId),
-          isNull(payTransaction.deletedAt),
-        )
-      );
+      .where(and(...conditions));
     return result?.count ?? 0;
   }
 }

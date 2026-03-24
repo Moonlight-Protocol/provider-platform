@@ -26,16 +26,17 @@ export const postCustodialLoginHandler = async (ctx: Context) => {
       return;
     }
 
-    if (account.status === PayCustodialStatus.SUSPENDED) {
-      ctx.response.status = Status.Forbidden;
-      ctx.response.body = { message: "Account suspended" };
-      return;
-    }
-
     const valid = await verifyPassword(password, account.passwordHash);
     if (!valid) {
       ctx.response.status = Status.Unauthorized;
       ctx.response.body = { message: "Invalid credentials" };
+      return;
+    }
+
+    // Check suspended AFTER password verification to avoid leaking account status
+    if (account.status === PayCustodialStatus.SUSPENDED) {
+      ctx.response.status = Status.Forbidden;
+      ctx.response.body = { message: "Account suspended" };
       return;
     }
 
