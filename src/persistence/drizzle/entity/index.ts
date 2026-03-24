@@ -12,4 +12,5 @@ export * from "@/persistence/drizzle/entity/mempool-metric.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
+export * from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
 

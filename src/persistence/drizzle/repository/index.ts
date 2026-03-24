@@ -11,4 +11,5 @@ export * from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 export * from "@/persistence/drizzle/repository/pay-kyc.repository.ts";
 export * from "@/persistence/drizzle/repository/pay-custodial-account.repository.ts";
 export * from "@/persistence/drizzle/repository/pay-transaction.repository.ts";
+export * from "@/persistence/drizzle/repository/pay-escrow.repository.ts";
 
