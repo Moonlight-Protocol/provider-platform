@@ -2,7 +2,7 @@ name: Auto Tag
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
     paths:
       - "deno.json"
 
