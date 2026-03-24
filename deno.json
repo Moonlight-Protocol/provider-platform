@@ -1,6 +1,6 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
@@ -20,6 +20,8 @@
   "imports": {
     "@/": "./src/",
     "@colibri/core": "jsr:@colibri/core@^0.16.1",
+    "@stellar/stellar-sdk": "npm:@stellar/stellar-sdk@14.6.1",
+    "@stellar/stellar-sdk/contract": "npm:@stellar/stellar-sdk@14.6.1/contract",
     "@drizzle-team/brocli": "npm:@drizzle-team/brocli@^0.11.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
     "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.7.0",
@@ -28,7 +30,14 @@
     "drizzle-kit": "npm:drizzle-kit@^0.31.6",
     "drizzle-orm": "npm:drizzle-orm@^0.44.7",
     "postgres": "npm:postgres@^3.4.7",
-    "stellar-sdk": "npm:@stellar/stellar-sdk@14.2.0",
+    "@noble/curves": "jsr:@noble/curves@^1.8.0",
+    "@noble/curves/p256": "jsr:@noble/curves@^1.8.0/p256",
+    "@noble/curves/abstract/modular": "jsr:@noble/curves@^1.8.0/abstract/modular",
+    "@noble/hashes": "jsr:@noble/hashes@^1.6.1",
+    "@noble/hashes/sha256": "jsr:@noble/hashes@^1.6.1/sha256",
+    "@noble/hashes/hkdf": "jsr:@noble/hashes@^1.6.1/hkdf",
+    "tslib": "npm:tslib@2.5.0",
+    "stellar-sdk": "npm:@stellar/stellar-sdk@14.6.1",
     "buffer": "npm:buffer@^6.0.3",
     "asn1js": "npm:asn1js@3.0.5",
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
