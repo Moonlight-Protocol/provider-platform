@@ -22,7 +22,7 @@ export class SessionRepository extends BaseRepository<
       .from(session)
       .where(
         and(
-          eq(session.userId, userId),
+          eq(session.accountId, userId),
           isNull(session.deletedAt)
         )
       );

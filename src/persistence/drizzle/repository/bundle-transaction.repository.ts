@@ -50,9 +50,9 @@ export class BundleTransactionRepository extends BaseRepository<
   }
 
   /**
-   * Override findById to handle composite primary key
+   * Finds a record by composite primary key.
    */
-  async findById(bundleId: string, transactionId: string) {
+  async findByCompositeId(bundleId: string, transactionId: string) {
     const [result] = await this.db
       .select()
       .from(bundleTransaction)
@@ -68,9 +68,9 @@ export class BundleTransactionRepository extends BaseRepository<
   }
 
   /**
-   * Override delete to handle composite primary key
+   * Soft deletes a record by composite primary key.
    */
-  async delete(bundleId: string, transactionId: string): Promise<void> {
+  async deleteByCompositeId(bundleId: string, transactionId: string): Promise<void> {
     await this.db
       .update(bundleTransaction)
       .set({
