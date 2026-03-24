@@ -9,6 +9,7 @@ import {
   CHANNEL_ASSET,
   NETWORK_CONFIG,
   NETWORK_RPC_SERVER,
+  PORT,
 } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -33,6 +34,13 @@ export const postDemoDepositHandler = async (ctx: Context) => {
     if (!publicKey || !amount) {
       ctx.response.status = Status.BadRequest;
       ctx.response.body = { message: "publicKey and amount are required" };
+      return;
+    }
+
+    // Validate amount is a valid positive integer string (consistent with send endpoints)
+    if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "amount must be a valid positive integer string" };
       return;
     }
 
@@ -83,9 +91,9 @@ export const postDemoDepositHandler = async (ctx: Context) => {
       operationCount: operationsMLXDR.length,
     });
 
-    // Submit to the bundle endpoint internally by forwarding the request
-    // We reuse the existing bundle pipeline by making an internal fetch
-    const bundleUrl = `${ctx.request.url.origin}/api/v1/bundle`;
+    // Submit to the bundle endpoint internally — use localhost to avoid
+    // reverse proxy / load balancer issues with ctx.request.url.origin
+    const bundleUrl = `http://127.0.0.1:${PORT}/api/v1/bundle`;
     const authorization = ctx.request.headers.get("authorization");
 
     const bundleResponse = await fetch(bundleUrl, {

@@ -20,6 +20,14 @@ import { LOG } from "@/config/logger.ts";
  */
 export const postSelfBalanceHandler = async (ctx: Context) => {
   const session = ctx.state.session as JwtSessionData;
+
+  // Reject custodial JWTs — this endpoint is for self-custodial (SEP-10) users only
+  if (session.type === "custodial") {
+    ctx.response.status = Status.Forbidden;
+    ctx.response.body = { message: "This endpoint is for self-custodial users only" };
+    return;
+  }
+
   const _accountId = session.sub;
 
   try {

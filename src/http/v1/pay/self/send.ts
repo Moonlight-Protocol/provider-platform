@@ -50,6 +50,14 @@ export const postSelfSendHandler = async (ctx: Context) => {
     }
 
     const session = ctx.state.session as JwtSessionData;
+
+    // Reject custodial JWTs — this endpoint is for self-custodial (SEP-10) users only
+    if (session.type === "custodial") {
+      ctx.response.status = Status.Forbidden;
+      ctx.response.body = { message: "This endpoint is for self-custodial users only" };
+      return;
+    }
+
     const accountId = session.sub;
 
     // Check receiver KYC status
