@@ -284,6 +284,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
           status: BundleStatus.PENDING,
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
+          retryCount: 0,
           updatedAt: new Date(),
           updatedBy: userSession.accountId,
         });
