@@ -26,7 +26,13 @@ export const MEMPOOL_CHEAP_OP_WEIGHT = Number(requireEnv("MEMPOOL_CHEAP_OP_WEIGH
 export const MEMPOOL_EXECUTOR_INTERVAL_MS = Number(requireEnv("MEMPOOL_EXECUTOR_INTERVAL_MS"));
 export const MEMPOOL_VERIFIER_INTERVAL_MS = Number(requireEnv("MEMPOOL_VERIFIER_INTERVAL_MS"));
 export const MEMPOOL_TTL_CHECK_INTERVAL_MS = Number(requireEnv("MEMPOOL_TTL_CHECK_INTERVAL_MS"));
-export const MEMPOOL_MAX_RETRY_ATTEMPTS = Number(requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS"));
+const _rawMaxRetry = Number(requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS"));
+if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMaxRetry < 1) {
+  throw new Error(
+    `MEMPOOL_MAX_RETRY_ATTEMPTS must be a positive integer, got: "${requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS")}"`
+  );
+}
+export const MEMPOOL_MAX_RETRY_ATTEMPTS = _rawMaxRetry;
 
 // Moonlight
 export const CHANNEL_CONTRACT_ID = requireContractId("CHANNEL_CONTRACT_ID");

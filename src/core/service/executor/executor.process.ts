@@ -15,6 +15,7 @@ import {
   TransactionRepository,
   BundleTransactionRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 const EXECUTOR_CONFIG = {
@@ -32,14 +33,6 @@ function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength)}…(truncated)`;
 }
 
-function safeJsonStringify(value: unknown): string | undefined {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Gets transaction expiration from latest ledger
  */
@@ -52,6 +45,22 @@ type SimulationFailureContext = {
   simulationResponse?: string;
   failedTxXdr?: string;
 };
+
+type ExecutionFailureContext = {
+  phase: string;
+  simulation?: SimulationFailureContext;
+};
+
+class ExecutionError extends Error {
+  readonly failureContext: ExecutionFailureContext;
+
+  constructor(cause: Error, failureContext: ExecutionFailureContext) {
+    super(cause.message);
+    this.name = "ExecutionError";
+    this.stack = cause.stack;
+    this.failureContext = failureContext;
+  }
+}
 
 /**
  * Submits transaction to channel contract
@@ -84,10 +93,7 @@ function submitTransactionToNetwork(
       LOG.error("Transaction submission failed", { error: errorMessage });
       span.addEvent("submission_failed", { "error.message": errorMessage });
       const baseError = error instanceof Error ? error : new Error(errorMessage);
-      const failureContext: {
-        phase: string;
-        simulation?: SimulationFailureContext;
-      } = {
+      const failureContext: ExecutionFailureContext = {
         phase: "submitTransactionToNetwork",
       };
 
@@ -118,9 +124,7 @@ function submitTransactionToNetwork(
         };
       }
 
-      // Attach extra context to the thrown error so the caller can persist it.
-      (baseError as { failureContext?: typeof failureContext }).failureContext = failureContext;
-      throw baseError;
+      throw new ExecutionError(baseError, failureContext);
     }
   });
 }
@@ -325,10 +329,9 @@ export class Executor {
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorInstance = error instanceof Error ? error : new Error(errorMessage);
 
-        const failureContext =
-          (errorInstance as Error & {
-            failureContext?: { phase: string; simulation?: SimulationFailureContext };
-          }).failureContext;
+        const failureContext = error instanceof ExecutionError
+          ? error.failureContext
+          : undefined;
 
         const lastFailureReasonPayload = {
           occurredAt: new Date().toISOString(),

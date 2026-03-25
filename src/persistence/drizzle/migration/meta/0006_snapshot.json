@@ -363,6 +363,19 @@
           "primaryKey": false,
           "notNull": true
         },
+        "retry_count": {
+          "name": "retry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_failure_reason": {
+          "name": "last_failure_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1408,7 +1421,8 @@
         "PENDING",
         "PROCESSING",
         "EXPIRED",
-        "COMPLETED"
+        "COMPLETED",
+        "FAILED"
       ]
     },
     "public.transaction_status": {

@@ -51,7 +51,7 @@ async function parseOperationsFromBundle(
 /**
  * Creates a SlotBundle from an OperationsBundle entity
  */
-async function createSlotBundleFromEntity(
+export async function createSlotBundleFromEntity(
   bundle: OperationsBundle
 ): Promise<SlotBundle> {
   const operations = await parseOperationsFromBundle(bundle.operationsMLXDR);
