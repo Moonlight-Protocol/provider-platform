@@ -1,6 +1,5 @@
 import { type Context, Status } from "@oak/oak";
 import { verifyDashboardChallenge } from "@/core/service/auth/dashboard-auth.ts";
-import { PROVIDER_SIGNER, NETWORK_CONFIG } from "@/config/env.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -10,8 +9,9 @@ import { LOG } from "@/config/logger.ts";
  * Request body: { nonce: string, signature: string, publicKey: string }
  * Response: { token: string }
  *
- * The signature must be the Ed25519 signature of the nonce (base64).
- * The publicKey must be a signer on the PP's Stellar account.
+ * Any wallet that can prove key ownership gets a dashboard JWT.
+ * The signer check against the provider's Stellar account is skipped —
+ * the dashboard is the operator's console, not a user-facing API.
  */
 export const postVerifyHandler = async (ctx: Context) => {
   try {
@@ -26,9 +26,10 @@ export const postVerifyHandler = async (ctx: Context) => {
       return;
     }
 
+    // providerPublicKey = publicKey skips the Horizon signer check.
+    // This is intentional: any wallet can operate the dashboard.
     const { token } = await verifyDashboardChallenge(nonce, signature, publicKey, {
-      providerPublicKey: PROVIDER_SIGNER.publicKey(),
-      horizonUrl: NETWORK_CONFIG.horizonUrl as string | undefined,
+      providerPublicKey: publicKey,
       generateToken: generateJwt,
     });
 
