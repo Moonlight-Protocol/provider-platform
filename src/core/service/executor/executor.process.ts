@@ -1,6 +1,5 @@
 import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS } from "@/config/env.ts";
@@ -17,6 +16,10 @@ import {
 } from "@/persistence/drizzle/repository/index.ts";
 import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
 import { withSpan } from "@/core/tracing.ts";
+import {
+  handleExecutionFailure as _handleExecutionFailure,
+  buildRetryBundles,
+} from "@/core/service/executor/executor-failure.helpers.ts";
 
 const EXECUTOR_CONFIG = {
   INTERVAL_MS: MEMPOOL_EXECUTOR_INTERVAL_MS,
@@ -160,67 +163,18 @@ async function createTransactionRecord(
 }
 
 /**
- * Handles execution failure by updating bundle statuses
+ * Handles execution failure by updating bundle statuses.
+ * Delegates to the injectable helper so the logic can be unit-tested
+ * independently of module-level singletons.
  */
 function handleExecutionFailure(
   error: Error,
   bundleIds: string[],
-  lastFailureReason: string
-): Promise<Array<{ bundleId: string; nextRetryCount: number; lastFailureReason: string }>> {
-  return withSpan("Executor.handleExecutionFailure", async (span) => {
-    const errorMessage = error.message || "Unknown error";
-    span.addEvent("handling_failure", { "error.message": errorMessage, "bundles.count": bundleIds.length });
-    LOG.error("Execution failed", { error: errorMessage, bundleIds });
-
-    const bundlesToRetry: Array<{
-      bundleId: string;
-      nextRetryCount: number;
-      lastFailureReason: string;
-    }> = [];
-
-    for (const bundleId of bundleIds) {
-      try {
-        const bundle = await operationsBundleRepository.findById(bundleId);
-        if (!bundle) {
-          LOG.warn(`Bundle ${bundleId} not found while handling execution failure`);
-          continue;
-        }
-
-        const nextRetryCount = (bundle.retryCount ?? 0) + 1;
-        const hasReachedMaxAttempts = nextRetryCount >= EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS;
-
-        if (hasReachedMaxAttempts) {
-          await operationsBundleRepository.update(bundleId, {
-            status: BundleStatus.FAILED,
-            retryCount: nextRetryCount,
-            lastFailureReason,
-            updatedAt: new Date(),
-          });
-          LOG.warn("Bundle moved to dead-letter after max retry attempts reached", {
-            bundleId,
-            retryCount: nextRetryCount,
-          });
-        } else {
-          await operationsBundleRepository.update(bundleId, {
-            status: BundleStatus.PENDING,
-            retryCount: nextRetryCount,
-            lastFailureReason,
-            updatedAt: new Date(),
-          });
-          span.addEvent("bundle_reset_to_pending", { "bundle.id": bundleId });
-
-          bundlesToRetry.push({
-            bundleId,
-            nextRetryCount,
-            lastFailureReason,
-          });
-        }
-      } catch (updateError) {
-        span.addEvent("bundle_reset_failed", { "bundle.id": bundleId });
-        LOG.error(`Failed to update bundle ${bundleId} status`, { error: updateError });
-      }
-    }
-    return bundlesToRetry;
+  lastFailureReason: string,
+) {
+  return _handleExecutionFailure(error, bundleIds, lastFailureReason, {
+    operationsBundleRepository,
+    maxRetryAttempts: EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS,
   });
 }
 
@@ -365,25 +319,12 @@ export class Executor {
           const bundlesToRetryMeta = await handleExecutionFailure(
             errorInstance,
             bundleIds,
-            lastFailureReason
-          );
-
-          const metaByBundleId = new Map(
-            bundlesToRetryMeta.map((m) => [m.bundleId, m] as const)
+            lastFailureReason,
           );
 
           // Reuse the in-memory slot bundle objects, but update retryCount/lastFailureReason
           // based on the decision computed from the database.
-          const bundlesToRetry = slot
-            .getBundles()
-            .filter((b) => metaByBundleId.has(b.bundleId));
-
-          for (const bundle of bundlesToRetry) {
-            const meta = metaByBundleId.get(bundle.bundleId);
-            if (!meta) continue;
-            bundle.retryCount = meta.nextRetryCount;
-            bundle.lastFailureReason = meta.lastFailureReason;
-          }
+          const bundlesToRetry = buildRetryBundles(slot, bundlesToRetryMeta);
 
           if (bundlesToRetry.length > 0) {
             await mempool.reAddBundles(bundlesToRetry);

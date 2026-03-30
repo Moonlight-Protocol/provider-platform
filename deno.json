@@ -1,14 +1,14 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
     "serve": "deno run --allow-all --unstable-kv src/main.ts",
-    "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate",
-    "db:migrate": "deno -A --node-modules-dir npm:drizzle-kit migrate",
-    "db:push": "deno -A --node-modules-dir npm:drizzle-kit push",
-    "db:studio": "deno -A --node-modules-dir npm:drizzle-kit studio",
+    "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",
+    "db:migrate": "deno run --env -A --node-modules-dir npm:drizzle-kit migrate",
+    "db:push": "deno run --env -A --node-modules-dir npm:drizzle-kit push",
+    "db:studio": "deno run --env -A --node-modules-dir npm:drizzle-kit studio",
     "generate": "deno task drizzle-kit generate",
     "migrate": "deno task drizzle-kit migrate",
     "drizzle-kit": "deno run --env -A --node-modules-dir npm:drizzle-kit"
