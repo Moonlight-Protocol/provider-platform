@@ -1,10 +1,11 @@
 import { selectNetwork } from "@/config/network.ts";
-import { requireEnv } from "@/utils/env/loadEnv.ts";
+import { requireEnv, loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 import { requireSecretKey } from "@/utils/env/requireSecretKey.ts";
 import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
-import { requireContractId } from "@/utils/env/requireContractId.ts";
+
+import { LOG } from "@/config/logger.ts";
 import { Server } from "stellar-sdk/rpc";
 
 // Every required variable is retrieved via requireEnv.
@@ -34,9 +35,14 @@ if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMax
 }
 export const MEMPOOL_MAX_RETRY_ATTEMPTS = _rawMaxRetry;
 
-// Moonlight
-export const CHANNEL_CONTRACT_ID = requireContractId("CHANNEL_CONTRACT_ID");
-export const CHANNEL_AUTH_ID = requireContractId("CHANNEL_AUTH_ID");
+// Moonlight (optional for fresh instances — populated after joining a council)
+export let CHANNEL_CONTRACT_ID = loadOptionalEnv("CHANNEL_CONTRACT_ID") ?? "";
+export let CHANNEL_AUTH_ID = loadOptionalEnv("CHANNEL_AUTH_ID") ?? "";
+
+export function setChannelConfig(channelAuthId: string, channelContractId: string): void {
+  CHANNEL_AUTH_ID = channelAuthId;
+  CHANNEL_CONTRACT_ID = channelContractId;
+}
 
 // ACCOUNTS
 export const OPEX_SK = requireSecretKey("OPEX_SECRET");
