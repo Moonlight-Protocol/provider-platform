@@ -1,14 +1,14 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
     "serve": "deno run --allow-all --unstable-kv src/main.ts",
-    "db:generate": "deno -A --node-modules-dir npm:drizzle-kit generate",
-    "db:migrate": "deno -A --node-modules-dir npm:drizzle-kit migrate",
-    "db:push": "deno -A --node-modules-dir npm:drizzle-kit push",
-    "db:studio": "deno -A --node-modules-dir npm:drizzle-kit studio",
+    "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",
+    "db:migrate": "deno run --env -A --node-modules-dir npm:drizzle-kit migrate",
+    "db:push": "deno run --env -A --node-modules-dir npm:drizzle-kit push",
+    "db:studio": "deno run --env -A --node-modules-dir npm:drizzle-kit studio",
     "generate": "deno task drizzle-kit generate",
     "migrate": "deno task drizzle-kit migrate",
     "drizzle-kit": "deno run --env -A --node-modules-dir npm:drizzle-kit"
@@ -22,7 +22,7 @@
     "@colibri/core": "jsr:@colibri/core@^0.16.1",
     "@drizzle-team/brocli": "npm:@drizzle-team/brocli@^0.11.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
-    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.6.2",
+    "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.7.0",
     "@std/dotenv": "jsr:@std/dotenv@^0.225.6",
     "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
     "drizzle-kit": "npm:drizzle-kit@^0.31.6",

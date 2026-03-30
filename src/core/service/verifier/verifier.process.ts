@@ -1,6 +1,5 @@
 import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import {
   MEMPOOL_MAX_RETRY_ATTEMPTS,
@@ -13,10 +12,13 @@ import {
   BundleTransactionRepository,
   OperationsBundleRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import { createSlotBundleFromEntity } from "@/core/service/mempool/mempool.process.ts";
-import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
 import { withSpan } from "@/core/tracing.ts";
+import {
+  handleVerificationFailure as _handleVerificationFailure,
+} from "@/core/service/verifier/verifier-failure.helpers.ts";
 
 const VERIFIER_CONFIG = {
   INTERVAL_MS: MEMPOOL_VERIFIER_INTERVAL_MS,
@@ -42,90 +44,22 @@ async function updateTransactionStatus(
 const VERIFIER_MAX_RETRY_ATTEMPTS = MEMPOOL_MAX_RETRY_ATTEMPTS;
 
 /**
- * Handles verification failure by updating transaction and bundles,
- * then re-queuing retryable bundles into the in-memory mempool.
+ * Handles verification failure.
+ * Delegates to the injectable helper so the logic can be unit-tested
+ * independently of module-level singletons.
  */
-async function handleVerificationFailure(
+function handleVerificationFailure(
   txId: string,
   reason: string,
-  bundleIds: string[]
+  bundleIds: string[],
 ): Promise<void> {
-  LOG.warn("Transaction verification failed", { txId, reason, bundleIds });
-
-  // Update transaction status to FAILED
-  await updateTransactionStatus(txId, TransactionStatus.FAILED);
-
-  const retryableBundleIds: string[] = [];
-
-  for (const bundleId of bundleIds) {
-    try {
-      const bundle = await operationsBundleRepository.findById(bundleId);
-      if (!bundle) {
-        LOG.warn(`Bundle ${bundleId} not found while handling verification failure`);
-        continue;
-      }
-
-      const nextRetryCount = (bundle.retryCount ?? 0) + 1;
-      const hasReachedMaxAttempts = nextRetryCount >= VERIFIER_MAX_RETRY_ATTEMPTS;
-
-      const lastFailureReason = safeJsonStringify({
-        occurredAt: new Date().toISOString(),
-        phase: "verification",
-        error: {
-          message: reason,
-        },
-        txId,
-        bundleId,
-      }) ?? reason;
-
-      await operationsBundleRepository.update(bundleId, {
-        status: hasReachedMaxAttempts ? BundleStatus.FAILED : BundleStatus.PENDING,
-        retryCount: nextRetryCount,
-        lastFailureReason,
-        updatedAt: new Date(),
-      });
-
-      if (!hasReachedMaxAttempts) {
-        retryableBundleIds.push(bundleId);
-      } else {
-        LOG.warn("Bundle moved to dead-letter after max verification retry attempts reached", {
-          bundleId,
-          retryCount: nextRetryCount,
-        });
-      }
-    } catch (error) {
-      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
-    }
-  }
-
-  if (retryableBundleIds.length === 0) {
-    return;
-  }
-
-  // Re-add retryable bundles to the in-memory mempool so they are processed
-  // without waiting for the next process restart.
-  const slotBundles = (
-    await Promise.all(
-      retryableBundleIds.map(async (bundleId) => {
-        try {
-          const updated = await operationsBundleRepository.findById(bundleId);
-          if (!updated) return null;
-          return await createSlotBundleFromEntity(updated);
-        } catch (error) {
-          LOG.error(`Failed to build SlotBundle for retry of bundle ${bundleId}`, { error });
-          return null;
-        }
-      })
-    )
-  ).filter((b): b is NonNullable<typeof b> => b !== null);
-
-  if (slotBundles.length > 0) {
-    const mempool = getMempool();
-    await mempool.reAddBundles(slotBundles);
-    LOG.info("Bundles re-added to mempool after verification failure", {
-      bundleIds: slotBundles.map((b) => b.bundleId),
-    });
-  }
+  return _handleVerificationFailure(txId, reason, bundleIds, {
+    operationsBundleRepository,
+    updateTxStatus: (id, status) => updateTransactionStatus(id, status),
+    createSlotBundleFn: createSlotBundleFromEntity,
+    reAddBundlesFn: (bundles) => getMempool().reAddBundles(bundles),
+    maxRetryAttempts: VERIFIER_MAX_RETRY_ATTEMPTS,
+  });
 }
 
 /**
