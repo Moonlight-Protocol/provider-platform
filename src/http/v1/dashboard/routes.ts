@@ -6,6 +6,7 @@ import { getMempoolHandler } from "./mempool.ts";
 import { getOperationsHandler } from "./operations.ts";
 import { getTreasuryHandler } from "./treasury.ts";
 import { getAuditExportHandler } from "./audit-export.ts";
+import { discoverCouncilHandler, joinCouncilHandler, getMembershipHandler } from "./council.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
 
@@ -21,5 +22,10 @@ dashboardRouter.get("/dashboard/mempool", jwtMiddleware, getMempoolHandler);
 dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler);
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
 dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
+
+// --- Council (UC2) ---
+dashboardRouter.post("/dashboard/council/discover", jwtMiddleware, discoverCouncilHandler);
+dashboardRouter.post("/dashboard/council/join", jwtMiddleware, joinCouncilHandler);
+dashboardRouter.get("/dashboard/council/membership", jwtMiddleware, getMembershipHandler);
 
 export default dashboardRouter;
