@@ -126,7 +126,7 @@ Deno.test("custodial login - non-existent username returns 401", async () => {
 // Suspended account returns 403
 // ---------------------------------------------------------------------------
 
-Deno.test("custodial login - suspended account returns 403", async () => {
+Deno.test("custodial login - suspended account returns 401 (same as invalid credentials)", async () => {
   await ensureInitialized();
   await resetDb();
 
@@ -144,8 +144,10 @@ Deno.test("custodial login - suspended account returns 403", async () => {
   await postCustodialLoginHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 403);
-  assertEquals((res.body as { message: string }).message, "Account suspended");
+  // Suspended accounts get the same response as invalid credentials
+  // to avoid confirming the password is correct
+  assertEquals(res.status, 401);
+  assertEquals((res.body as { message: string }).message, "Invalid credentials");
 });
 
 // ---------------------------------------------------------------------------

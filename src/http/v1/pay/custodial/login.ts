@@ -33,10 +33,12 @@ export const postCustodialLoginHandler = async (ctx: Context) => {
       return;
     }
 
-    // Check suspended AFTER password verification to avoid leaking account status
+    // Suspended check after password verification — return same generic message
+    // to avoid confirming the password is correct for a suspended account
     if (account.status === PayCustodialStatus.SUSPENDED) {
-      ctx.response.status = Status.Forbidden;
-      ctx.response.body = { message: "Account suspended" };
+      LOG.warn("Login attempt on suspended account", { username });
+      ctx.response.status = Status.Unauthorized;
+      ctx.response.body = { message: "Invalid credentials" };
       return;
     }
 

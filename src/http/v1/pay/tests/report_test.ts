@@ -96,7 +96,7 @@ Deno.test("report post - missing description returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required");
+  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
 });
 
 Deno.test("report post - empty body returns 400", async () => {
@@ -106,7 +106,7 @@ Deno.test("report post - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required");
+  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
 });
 
 Deno.test("report post - empty string description returns 400", async () => {
@@ -118,7 +118,7 @@ Deno.test("report post - empty string description returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required");
+  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
 });
 
 // ---------------------------------------------------------------------------

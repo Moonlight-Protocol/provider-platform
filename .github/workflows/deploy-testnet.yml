@@ -3,7 +3,7 @@ name: Deploy to Testnet
 on:
   push:
     branches:
-      - dev
+      - main
 
 concurrency:
   group: deploy-testnet
