@@ -1,6 +1,6 @@
 import { load } from "@std/dotenv";
 
-const env = await load({ allowEmptyValues: true }); // Reads from .env file
+const env = await load(); // Reads from .env file
 
 export const requireEnv = (key: string): string => {
   const value = env[key as keyof typeof env];
