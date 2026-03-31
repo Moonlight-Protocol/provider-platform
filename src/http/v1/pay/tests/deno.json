@@ -1,24 +1,18 @@
 {
-  "name": "@moonlight-protocol/provider-platform",
-  "version": "0.5.6",
-  "license": "MIT",
-  "exports": "./src/main.ts",
-  "tasks": {
-    "serve": "deno run --allow-all --unstable-kv src/main.ts",
-    "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",
-    "db:migrate": "deno run --env -A --node-modules-dir npm:drizzle-kit migrate",
-    "db:push": "deno run --env -A --node-modules-dir npm:drizzle-kit push",
-    "db:studio": "deno run --env -A --node-modules-dir npm:drizzle-kit studio",
-    "generate": "deno task drizzle-kit generate",
-    "migrate": "deno task drizzle-kit migrate",
-    "drizzle-kit": "deno run --env -A --node-modules-dir npm:drizzle-kit"
-  },
   "compilerOptions": {
     "strict": true
   },
   "nodeModulesDir": "auto",
   "imports": {
-    "@/": "./src/",
+    "@/": "../../../../../src/",
+
+    "@/persistence/drizzle/config.ts": "./pglite_db.ts",
+    "@/config/logger.ts": "./mock_logger.ts",
+    "@/core/service/auth/generate-jwt.ts": "./mock_jwt.ts",
+    "@/core/service/pay/channel.service.ts": "./mock_channel_service.ts",
+
+    "@electric-sql/pglite": "npm:@electric-sql/pglite@^0.2.17",
+
     "@colibri/core": "jsr:@colibri/core@^0.16.1",
     "@stellar/stellar-sdk": "npm:@stellar/stellar-sdk@14.6.1",
     "@stellar/stellar-sdk/contract": "npm:@stellar/stellar-sdk@14.6.1/contract",
@@ -29,6 +23,9 @@
     "@zaubrik/djwt": "jsr:@zaubrik/djwt@^3.0.2",
     "drizzle-kit": "npm:drizzle-kit@^0.31.6",
     "drizzle-orm": "npm:drizzle-orm@^0.44.7",
+    "drizzle-orm/pg-core": "npm:drizzle-orm@^0.44.7/pg-core",
+    "drizzle-orm/pglite": "npm:drizzle-orm@^0.44.7/pglite",
+    "drizzle-orm/postgres-js": "npm:drizzle-orm@^0.44.7/postgres-js",
     "postgres": "npm:postgres@^3.4.7",
     "@noble/curves": "jsr:@noble/curves@^1.8.0",
     "@noble/curves/p256": "jsr:@noble/curves@^1.8.0/p256",
@@ -38,6 +35,7 @@
     "@noble/hashes/hkdf": "jsr:@noble/hashes@^1.6.1/hkdf",
     "tslib": "npm:tslib@2.5.0",
     "stellar-sdk": "npm:@stellar/stellar-sdk@14.6.1",
+    "stellar-sdk/rpc": "npm:@stellar/stellar-sdk@14.6.1/rpc",
     "buffer": "npm:buffer@^6.0.3",
     "asn1js": "npm:asn1js@3.0.5",
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
@@ -45,11 +43,5 @@
     "zod": "npm:zod@3.24.2",
     "chalk": "npm:chalk@^5.3.0",
     "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0"
-  },
-  "deploy": {
-    "project": "159af174-b645-4039-be9c-493de4886f26",
-    "exclude": ["**/node_modules"],
-    "include": [],
-    "entrypoint": "src/main.ts"
   }
 }
