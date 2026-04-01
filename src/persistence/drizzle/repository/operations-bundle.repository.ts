@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, desc, count, gte, lte } from "drizzle-orm";
+import { eq, and, or, isNull, desc, count, gte, lte, inArray, lt } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -118,6 +118,24 @@ export class OperationsBundleRepository extends BaseRepository<
    * Finds bundles by creator account ID, optionally filtered by status
    * Results are ordered by createdAt descending (most recent first)
    */
+  /**
+   * Bulk-expires bundles matching the given statuses that were created before `olderThan`.
+   * Returns the number of rows updated.
+   */
+  async expireOlderThan(olderThan: Date, statuses: BundleStatus[]): Promise<number> {
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
+      .where(
+        and(
+          isNull(operationsBundle.deletedAt),
+          inArray(operationsBundle.status, statuses),
+          lt(operationsBundle.createdAt, olderThan)
+        )
+      );
+    return (result as unknown as { rowCount?: number }).rowCount ?? 0;
+  }
+
   async findByCreatedBy(
     accountId: string,
     status?: BundleStatus

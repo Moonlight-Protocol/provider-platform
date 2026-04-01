@@ -8,6 +8,7 @@ import { getTreasuryHandler } from "./treasury.ts";
 import { getAuditExportHandler } from "./audit-export.ts";
 import { discoverCouncilHandler, joinCouncilHandler, getMembershipHandler, syncMembershipHandler } from "./council.ts";
 import { registerPpHandler, listPpsHandler, deletePpHandler } from "./pp.ts";
+import { postExpireBundlesHandler } from "./bundle-admin.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
 
@@ -23,6 +24,7 @@ dashboardRouter.get("/dashboard/mempool", jwtMiddleware, getMempoolHandler);
 dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler);
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
 dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
+dashboardRouter.post("/dashboard/bundles/expire", jwtMiddleware, postExpireBundlesHandler);
 
 // --- PP management ---
 dashboardRouter.post("/dashboard/pp/register", jwtMiddleware, registerPpHandler);
