@@ -1,5 +1,5 @@
 import { selectNetwork } from "@/config/network.ts";
-import { requireEnv } from "@/utils/env/loadEnv.ts";
+import { requireEnv, loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 import { requireSecretKey } from "@/utils/env/requireSecretKey.ts";
 import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
@@ -26,6 +26,9 @@ export const MEMPOOL_CHEAP_OP_WEIGHT = Number(requireEnv("MEMPOOL_CHEAP_OP_WEIGH
 export const MEMPOOL_EXECUTOR_INTERVAL_MS = Number(requireEnv("MEMPOOL_EXECUTOR_INTERVAL_MS"));
 export const MEMPOOL_VERIFIER_INTERVAL_MS = Number(requireEnv("MEMPOOL_VERIFIER_INTERVAL_MS"));
 export const MEMPOOL_TTL_CHECK_INTERVAL_MS = Number(requireEnv("MEMPOOL_TTL_CHECK_INTERVAL_MS"));
+// 0 = disabled; set e.g. 86400000 (24h) to auto-expire stale bundles on startup
+export const MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS =
+  Number(loadOptionalEnv("MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS") ?? "0");
 const _rawMaxRetry = Number(requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS"));
 if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMaxRetry < 1) {
   throw new Error(
