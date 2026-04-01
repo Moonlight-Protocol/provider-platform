@@ -27,8 +27,13 @@ export const MEMPOOL_EXECUTOR_INTERVAL_MS = Number(requireEnv("MEMPOOL_EXECUTOR_
 export const MEMPOOL_VERIFIER_INTERVAL_MS = Number(requireEnv("MEMPOOL_VERIFIER_INTERVAL_MS"));
 export const MEMPOOL_TTL_CHECK_INTERVAL_MS = Number(requireEnv("MEMPOOL_TTL_CHECK_INTERVAL_MS"));
 // 0 = disabled; set e.g. 86400000 (24h) to auto-expire stale bundles on startup
-export const MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS =
-  Number(loadOptionalEnv("MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS") ?? "0");
+const _rawStartupAge = Number(loadOptionalEnv("MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS") ?? "0");
+if (!Number.isFinite(_rawStartupAge) || _rawStartupAge < 0) {
+  throw new Error(
+    `MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS must be a non-negative number, got: "${loadOptionalEnv("MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS")}"`
+  );
+}
+export const MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS = _rawStartupAge;
 const _rawMaxRetry = Number(requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS"));
 if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMaxRetry < 1) {
   throw new Error(

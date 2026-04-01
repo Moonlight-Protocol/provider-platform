@@ -115,14 +115,10 @@ export class OperationsBundleRepository extends BaseRepository<
   }
 
   /**
-   * Finds bundles by creator account ID, optionally filtered by status
-   * Results are ordered by createdAt descending (most recent first)
-   */
-  /**
    * Bulk-expires bundles matching the given statuses that were created before `olderThan`.
-   * Returns the number of rows updated.
+   * Returns the IDs of the rows that were actually updated.
    */
-  async expireOlderThan(olderThan: Date, statuses: BundleStatus[]): Promise<number> {
+  async expireOlderThan(olderThan: Date, statuses: BundleStatus[]): Promise<string[]> {
     const result = await this.db
       .update(operationsBundle)
       .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
@@ -130,12 +126,38 @@ export class OperationsBundleRepository extends BaseRepository<
         and(
           isNull(operationsBundle.deletedAt),
           inArray(operationsBundle.status, statuses),
-          lt(operationsBundle.createdAt, olderThan)
+          lt(operationsBundle.createdAt, olderThan),
         )
-      );
-    return (result as unknown as { rowCount?: number }).rowCount ?? 0;
+      )
+      .returning({ id: operationsBundle.id });
+    return result.map((r) => r.id);
   }
 
+  /**
+   * Atomically expires bundles by explicit IDs, but only if their current status
+   * is one of `activeStatuses`. Rows already in a terminal state are skipped.
+   * Returns the IDs of the rows that were actually updated.
+   */
+  async expireByIds(ids: string[], activeStatuses: BundleStatus[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
+      .where(
+        and(
+          isNull(operationsBundle.deletedAt),
+          inArray(operationsBundle.id, ids),
+          inArray(operationsBundle.status, activeStatuses),
+        )
+      )
+      .returning({ id: operationsBundle.id });
+    return result.map((r) => r.id);
+  }
+
+  /**
+   * Finds bundles by creator account ID, optionally filtered by status.
+   * Results are ordered by createdAt descending (most recent first).
+   */
   async findByCreatedBy(
     accountId: string,
     status?: BundleStatus
