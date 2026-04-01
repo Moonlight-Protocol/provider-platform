@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "jsr:@std/assert";
 import { Keypair } from "stellar-sdk";
+import { Buffer } from "buffer";
 import {
   createDashboardChallenge,
   verifyDashboardChallenge,

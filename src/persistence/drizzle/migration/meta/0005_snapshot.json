@@ -1,6 +1,6 @@
 {
-  "id": "927b9be9-79fb-420b-a6b9-4822a13fce56",
-  "prevId": "6d5184df-921c-406c-852c-1346f4f185f8",
+  "id": "0b55d112-369f-4672-81fd-6f3e28716771",
+  "prevId": "55eb3a90-5a4b-4200-a1b5-6e2d0fe2fb3c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -362,6 +362,19 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
+        },
+        "retry_count": {
+          "name": "retry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_failure_reason": {
+          "name": "last_failure_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -892,7 +905,8 @@
         "PENDING",
         "PROCESSING",
         "EXPIRED",
-        "COMPLETED"
+        "COMPLETED",
+        "FAILED"
       ]
     },
     "public.transaction_status": {

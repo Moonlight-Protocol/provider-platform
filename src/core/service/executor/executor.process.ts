@@ -1,9 +1,8 @@
 import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { MEMPOOL_EXECUTOR_INTERVAL_MS } from "@/config/env.ts";
+import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS } from "@/config/env.ts";
 import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { TX_CONFIG, NETWORK_RPC_SERVER, PROVIDER_SIGNER } from "@/config/env.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
@@ -15,16 +14,27 @@ import {
   TransactionRepository,
   BundleTransactionRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
 import { withSpan } from "@/core/tracing.ts";
+import {
+  handleExecutionFailure as _handleExecutionFailure,
+  buildRetryBundles,
+} from "@/core/service/executor/executor-failure.helpers.ts";
 
 const EXECUTOR_CONFIG = {
   INTERVAL_MS: MEMPOOL_EXECUTOR_INTERVAL_MS,
   TRANSACTION_EXPIRATION_OFFSET: 1000,
+  MAX_RETRY_ATTEMPTS: MEMPOOL_MAX_RETRY_ATTEMPTS,
 } as const;
 
 const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
 const transactionRepository = new TransactionRepository();
 const bundleTransactionRepository = new BundleTransactionRepository();
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}…(truncated)`;
+}
 
 /**
  * Gets transaction expiration from latest ledger
@@ -34,10 +44,31 @@ async function getTransactionExpiration(): Promise<number> {
   return latestLedger.sequence + EXECUTOR_CONFIG.TRANSACTION_EXPIRATION_OFFSET;
 }
 
+type SimulationFailureContext = {
+  simulationResponse?: string;
+  failedTxXdr?: string;
+};
+
+type ExecutionFailureContext = {
+  phase: string;
+  simulation?: SimulationFailureContext;
+};
+
+class ExecutionError extends Error {
+  readonly failureContext: ExecutionFailureContext;
+
+  constructor(cause: Error, failureContext: ExecutionFailureContext) {
+    super(cause.message);
+    this.name = "ExecutionError";
+    this.stack = cause.stack;
+    this.failureContext = failureContext;
+  }
+}
+
 /**
  * Submits transaction to channel contract
  */
-async function submitTransactionToNetwork(
+function submitTransactionToNetwork(
   txBuilder: MoonlightTransactionBuilder,
   expiration: number
 ): Promise<string> {
@@ -57,26 +88,46 @@ async function submitTransactionToNetwork(
         },
         config: TX_CONFIG,
       });
-
+      
       span.addEvent("transaction_submitted", { "tx.hash": hash.toString() });
       return hash.toString();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      span.addEvent("submission_failed", { "error.message": errorMessage });
       LOG.error("Transaction submission failed", { error: errorMessage });
+      span.addEvent("submission_failed", { "error.message": errorMessage });
+      const baseError = error instanceof Error ? error : new Error(errorMessage);
+      const failureContext: ExecutionFailureContext = {
+        phase: "submitTransactionToNetwork",
+      };
+
       const simError = error as SIM_ERRORS.SIMULATION_FAILED;
       if (simError?.meta?.data) {
         const simResponse = simError.meta.data.simulationResponse ?? simError.meta.data;
         LOG.error("Simulation details", {
           simError: JSON.stringify(simResponse, null, 2),
         });
+
         if (simError.meta.data.input?.transaction) {
           LOG.error("Failed transaction XDR", {
-            xdr: simError.meta.data.input.transaction.toXDR()
+            xdr: simError.meta.data.input.transaction.toXDR(),
           });
         }
+
+        const failedTxXdr = simError.meta.data.input?.transaction
+          ? truncate(simError.meta.data.input.transaction.toXDR(), 2000)
+          : undefined;
+
+        const simulationResponseJson = safeJsonStringify(simResponse);
+
+        failureContext.simulation = {
+          simulationResponse: simulationResponseJson
+            ? truncate(simulationResponseJson, 4000)
+            : undefined,
+          failedTxXdr,
+        };
       }
-      throw error;
+
+      throw new ExecutionError(baseError, failureContext);
     }
   });
 }
@@ -112,30 +163,18 @@ async function createTransactionRecord(
 }
 
 /**
- * Handles execution failure by updating bundle statuses
+ * Handles execution failure by updating bundle statuses.
+ * Delegates to the injectable helper so the logic can be unit-tested
+ * independently of module-level singletons.
  */
-async function handleExecutionFailure(
+function handleExecutionFailure(
   error: Error,
-  bundleIds: string[]
-): Promise<void> {
-  return withSpan("Executor.handleExecutionFailure", async (span) => {
-    const errorMessage = error.message || "Unknown error";
-    span.addEvent("handling_failure", { "error.message": errorMessage, "bundles.count": bundleIds.length });
-    LOG.error("Execution failed", { error: errorMessage, bundleIds });
-
-    // Update bundles back to PENDING status for retry
-    for (const bundleId of bundleIds) {
-      try {
-        await operationsBundleRepository.update(bundleId, {
-          status: BundleStatus.PENDING,
-          updatedAt: new Date(),
-        });
-        span.addEvent("bundle_reset_to_pending", { "bundle.id": bundleId });
-      } catch (updateError) {
-        span.addEvent("bundle_reset_failed", { "bundle.id": bundleId });
-        LOG.error(`Failed to update bundle ${bundleId} status`, { error: updateError });
-      }
-    }
+  bundleIds: string[],
+  lastFailureReason: string,
+) {
+  return _handleExecutionFailure(error, bundleIds, lastFailureReason, {
+    operationsBundleRepository,
+    maxRetryAttempts: EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS,
   });
 }
 
@@ -186,10 +225,9 @@ export class Executor {
   /**
    * Executes the next slot from the mempool
    */
-  async executeNext(): Promise<void> {
+  executeNext(): Promise<void> {
     if (this.isProcessing) {
-      LOG.debug("Executor already processing a slot, skipping");
-      return;
+      return Promise.resolve();
     }
 
     return withSpan("Executor.executeNext", async (span) => {
@@ -212,64 +250,88 @@ export class Executor {
         span.addEvent("executing_slot", {
           "slot.bundleCount": slot.getBundleCount(),
           "slot.weight": slot.getTotalWeight(),
-        });
-
-        LOG.debug("Executing slot", {
-          bundleCount: slot.getBundleCount(),
-          weight: slot.getTotalWeight(),
           bundleIds,
         });
 
-        span.addEvent("building_transaction");
+        // Build transaction from slot
         const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot);
+        
+        // Use bundleIds from build result to ensure consistency
         bundleIds = buildBundleIds;
 
-        span.addEvent("getting_expiration");
+        // Get transaction expiration
         const expiration = await getTransactionExpiration();
 
-        LOG.info("Transaction", { txBuilder: txBuilder.buildXDR().toXDR() });
-
-        span.addEvent("submitting_to_network");
+        // Submit transaction to network
         const transactionHash = await submitTransactionToNetwork(txBuilder, expiration);
 
-        span.addEvent("transaction_submitted", {
-          "tx.hash": transactionHash,
-          "bundles.count": bundleIds.length,
-        });
-
-        LOG.info("Transaction submitted successfully", {
+        LOG.info("Transaction submitted successfully", { 
           transactionHash,
           bundleCount: bundleIds.length,
-          bundleIds,
+          bundleIds 
         });
 
-        span.addEvent("creating_transaction_record");
+        // Create transaction record and link bundles
         await createTransactionRecord(transactionHash, bundleIds);
 
-        span.addEvent("slot_executed_successfully");
-        LOG.info("Slot executed successfully", {
+        LOG.info("Slot executed successfully", { 
           transactionHash,
-          bundleCount: bundleIds.length,
+          bundleCount: bundleIds.length 
         });
+
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        span.addEvent("execution_failed", { "error.message": errorMessage });
-        LOG.error("Slot execution failed", {
-          error: errorMessage,
+        const errorInstance = error instanceof Error ? error : new Error(errorMessage);
+
+        const failureContext = error instanceof ExecutionError
+          ? error.failureContext
+          : undefined;
+
+        const lastFailureReasonPayload = {
+          occurredAt: new Date().toISOString(),
+          phase: failureContext?.phase ?? "slotExecution",
+          error: {
+            name: errorInstance.name,
+            message: errorInstance.message,
+            stack: errorInstance.stack ? truncate(errorInstance.stack, 4000) : undefined,
+          },
+          slot: slot
+            ? {
+                bundleCount: slot.getBundleCount(),
+                totalWeight: slot.getTotalWeight(),
+              }
+            : undefined,
           bundleIds,
+          simulation: failureContext?.simulation,
+        };
+
+        const lastFailureReason = safeJsonStringify(lastFailureReasonPayload) ??
+          truncate(errorMessage, 2000);
+
+        LOG.error("Slot execution failed", { 
+          error: errorMessage,
+          bundleIds 
         });
 
+        // Handle failure: re-add bundles to mempool (only those still elegible) and update status
         if (slot && !slot.isEmpty() && bundleIds.length > 0) {
-          span.addEvent("re_adding_bundles_to_mempool");
-          const bundles = slot.getBundles();
-          await mempool.reAddBundles(bundles);
-
-          await handleExecutionFailure(
-            error instanceof Error ? error : new Error(errorMessage),
+          // Update bundle statuses and retry counters
+          const bundlesToRetryMeta = await handleExecutionFailure(
+            errorInstance,
             bundleIds,
+            lastFailureReason,
           );
 
-          LOG.info("Bundles re-added to mempool for retry", { bundleIds });
+          // Reuse the in-memory slot bundle objects, but update retryCount/lastFailureReason
+          // based on the decision computed from the database.
+          const bundlesToRetry = buildRetryBundles(slot, bundlesToRetryMeta);
+
+          if (bundlesToRetry.length > 0) {
+            await mempool.reAddBundles(bundlesToRetry);
+            LOG.info("Bundles re-added to mempool for retry", {
+              bundleIds: bundlesToRetry.map((b) => b.bundleId),
+            });
+          }
         } else {
           LOG.error("Execution error with no slot or bundles to re-add", {
             error: errorMessage,
@@ -281,5 +343,6 @@ export class Executor {
         this.isProcessing = false;
       }
     });
+
   }
 }

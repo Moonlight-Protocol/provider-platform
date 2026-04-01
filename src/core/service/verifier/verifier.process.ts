@@ -1,15 +1,24 @@
 import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
-import { MEMPOOL_VERIFIER_INTERVAL_MS, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import {
+  MEMPOOL_MAX_RETRY_ATTEMPTS,
+  MEMPOOL_VERIFIER_INTERVAL_MS,
+  NETWORK_RPC_SERVER,
+} from "@/config/env.ts";
 import { verifyTransactionOnNetwork } from "@/core/service/verifier/verifier.service.ts";
 import {
   TransactionRepository,
   BundleTransactionRepository,
   OperationsBundleRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import { getMempool } from "@/core/mempool/index.ts";
+import { createSlotBundleFromEntity } from "@/core/service/mempool/mempool.process.ts";
 import { withSpan } from "@/core/tracing.ts";
+import {
+  handleVerificationFailure as _handleVerificationFailure,
+} from "@/core/service/verifier/verifier-failure.helpers.ts";
 
 const VERIFIER_CONFIG = {
   INTERVAL_MS: MEMPOOL_VERIFIER_INTERVAL_MS,
@@ -32,40 +41,25 @@ async function updateTransactionStatus(
   });
 }
 
-/**
- * Updates bundles status based on transaction verification result
- */
-async function updateBundlesStatus(
-  bundleIds: string[],
-  status: BundleStatus
-): Promise<void> {
-  for (const bundleId of bundleIds) {
-    try {
-      await operationsBundleRepository.update(bundleId, {
-        status,
-        updatedAt: new Date(),
-      });
-    } catch (error) {
-      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
-    }
-  }
-}
+const VERIFIER_MAX_RETRY_ATTEMPTS = MEMPOOL_MAX_RETRY_ATTEMPTS;
 
 /**
- * Handles verification failure by updating transaction and bundles
+ * Handles verification failure.
+ * Delegates to the injectable helper so the logic can be unit-tested
+ * independently of module-level singletons.
  */
-async function handleVerificationFailure(
+function handleVerificationFailure(
   txId: string,
   reason: string,
-  bundleIds: string[]
+  bundleIds: string[],
 ): Promise<void> {
-  LOG.warn("Transaction verification failed", { txId, reason, bundleIds });
-
-  // Update transaction status to FAILED
-  await updateTransactionStatus(txId, TransactionStatus.FAILED);
-
-  // Update bundles back to PENDING for potential retry
-  await updateBundlesStatus(bundleIds, BundleStatus.PENDING);
+  return _handleVerificationFailure(txId, reason, bundleIds, {
+    operationsBundleRepository,
+    updateTxStatus: (id, status) => updateTransactionStatus(id, status),
+    createSlotBundleFn: createSlotBundleFromEntity,
+    reAddBundlesFn: (bundles) => getMempool().reAddBundles(bundles),
+    maxRetryAttempts: VERIFIER_MAX_RETRY_ATTEMPTS,
+  });
 }
 
 /**
@@ -80,8 +74,16 @@ async function handleVerificationSuccess(
   // Update transaction status to VERIFIED
   await updateTransactionStatus(txId, TransactionStatus.VERIFIED);
 
-  // Update bundles to COMPLETED
-  await updateBundlesStatus(bundleIds, BundleStatus.COMPLETED);
+  for (const bundleId of bundleIds) {
+    try {
+      await operationsBundleRepository.update(bundleId, {
+        status: BundleStatus.COMPLETED,
+        updatedAt: new Date(),
+      });
+    } catch (error) {
+      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
+    }
+  }
 }
 
 /**
@@ -96,7 +98,6 @@ export class Verifier {
    */
   start(): void {
     if (this.isRunning) {
-      LOG.warn("Verifier is already running");
       return;
     }
 

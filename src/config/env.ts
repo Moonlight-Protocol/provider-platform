@@ -5,7 +5,6 @@ import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
 import { requireContractId } from "@/utils/env/requireContractId.ts";
-import { LOG } from "@/config/logger.ts";
 import { Server } from "stellar-sdk/rpc";
 
 // Every required variable is retrieved via requireEnv.
@@ -27,6 +26,13 @@ export const MEMPOOL_CHEAP_OP_WEIGHT = Number(requireEnv("MEMPOOL_CHEAP_OP_WEIGH
 export const MEMPOOL_EXECUTOR_INTERVAL_MS = Number(requireEnv("MEMPOOL_EXECUTOR_INTERVAL_MS"));
 export const MEMPOOL_VERIFIER_INTERVAL_MS = Number(requireEnv("MEMPOOL_VERIFIER_INTERVAL_MS"));
 export const MEMPOOL_TTL_CHECK_INTERVAL_MS = Number(requireEnv("MEMPOOL_TTL_CHECK_INTERVAL_MS"));
+const _rawMaxRetry = Number(requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS"));
+if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMaxRetry < 1) {
+  throw new Error(
+    `MEMPOOL_MAX_RETRY_ATTEMPTS must be a positive integer, got: "${requireEnv("MEMPOOL_MAX_RETRY_ATTEMPTS")}"`
+  );
+}
+export const MEMPOOL_MAX_RETRY_ATTEMPTS = _rawMaxRetry;
 
 // Moonlight
 export const CHANNEL_CONTRACT_ID = requireContractId("CHANNEL_CONTRACT_ID");
@@ -54,5 +60,3 @@ export const TX_CONFIG: TransactionConfig = {
   timeout: 30,
   signers: [OPEX_SIGNER],
 };
-
-LOG.debug("Loaded ENV variables: ", { PORT: Number(PORT), MODE: MODE });
