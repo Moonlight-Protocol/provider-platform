@@ -584,6 +584,27 @@
         "undici-types"
       ]
     },
+    "@stellar/stellar-sdk@14.6.1": {
+      "integrity": "sha512-A1rQWDLdUasXkMXnYSuhgep+3ZZzyuXJKdt5/KAIc0gkmSp906HTvUpbT4pu+bVr41tu0+J4Ugz9J4BQAGGytg==",
+      "dependencies": [
+        "@stellar/stellar-base",
+        "axios",
+        "bignumber.js",
+        "commander",
+        "eventsource",
+        "feaxios",
+        "randombytes",
+        "toml",
+        "urijs"
+      ],
+      "bin": true
+    },
+    "@types/node@24.2.0": {
+      "integrity": "sha512-3xyG3pMCq3oYCNg7/ZP+E1ooTaGB4cG8JWRsqqOYQdbWNY4zbaV0Ennrd7stjiJEFZCaybcIgpTjJWHRfBSIDw==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
     "asn1js@3.0.5": {
       "integrity": "sha512-FVnvrKJwpt9LP2lAMl8qZswRNm3T4q9CON+bxldk2iwk3FFpuwhx2FfinyitizWHsVYyaY+y5JzDR0rCMV5yTQ==",
       "dependencies": [

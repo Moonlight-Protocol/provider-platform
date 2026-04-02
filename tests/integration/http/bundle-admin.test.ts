@@ -40,7 +40,7 @@ async function setup() {
 }
 
 Deno.test({
-  name: "bundle-admin setup",
+  name: "bundle-admin suite setup",
   async fn() {
     await ensureInitialized();
   },
@@ -144,4 +144,59 @@ Deno.test("returns 400 when explicit ids exceed limit", async () => {
   const response = await requestJson(app, { bundleIds: ids });
 
   assertEquals(response.status, 400);
+});
+
+// --- Repository-level coverage (shared with handler logic) ---
+
+async function repoOnlySetup() {
+  await ensureInitialized();
+  await resetDb();
+  return getBundleRepo();
+}
+
+Deno.test("expireOlderThan respects batch limit (truncation semantics per call)", async () => {
+  const repo = await repoOnlySetup();
+  const oldTime = new Date(Date.now() - 120_000);
+
+  for (let i = 0; i < 5; i++) {
+    await seedBundle({ status: BundleStatus.PENDING, createdAt: oldTime });
+  }
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const LIMIT = 3;
+  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING, BundleStatus.PROCESSING], LIMIT);
+
+  assertEquals(expired.length, LIMIT);
+});
+
+Deno.test("expireByIds second call is no-op for already expired", async () => {
+  const repo = await repoOnlySetup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.PENDING });
+
+  const ACTIVE_STATUSES = [BundleStatus.PENDING, BundleStatus.PROCESSING];
+  const first = await repo.expireByIds([id], ACTIVE_STATUSES);
+  assertEquals(first.length, 1);
+
+  const second = await repo.expireByIds([id], ACTIVE_STATUSES);
+  assertEquals(second.length, 0);
+});
+
+Deno.test("updateStatusIfActive rejects transition after bundle was expired", async () => {
+  const repo = await repoOnlySetup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.PENDING });
+
+  const expired = await repo.expireByIds([id], [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+  assertEquals(expired.length, 1);
+
+  const updated = await repo.updateStatusIfActive(
+    id,
+    BundleStatus.PROCESSING,
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+  assertEquals(updated, false);
+
+  const found = await repo.findById(id);
+  assertEquals(found?.status, BundleStatus.EXPIRED);
 });
