@@ -198,3 +198,213 @@ Deno.test("lastFailureReason – JSON structure round-trips through the DB", asy
   assertEquals(parsed.error.message, "network timeout");
   assertNotEquals(parsed.bundleIds, undefined);
 });
+
+// ---------------------------------------------------------------------------
+// expireOlderThan
+// ---------------------------------------------------------------------------
+
+Deno.test("expireOlderThan – expires only bundles older than cutoff with matching statuses", async () => {
+  const repo = await setup();
+  const oldTime = new Date(Date.now() - 120_000);
+  const recentTime = new Date(Date.now() - 5_000);
+
+  const oldPending = testBundleId();
+  const oldProcessing = testBundleId();
+  const recentPending = testBundleId();
+  const oldCompleted = testBundleId();
+
+  await seedBundle({ id: oldPending, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({ id: oldProcessing, status: BundleStatus.PROCESSING, createdAt: oldTime });
+  await seedBundle({ id: recentPending, status: BundleStatus.PENDING, createdAt: recentTime });
+  await seedBundle({ id: oldCompleted, status: BundleStatus.COMPLETED, createdAt: oldTime });
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+
+  assertEquals(expired.length, 2);
+  assertEquals(expired.includes(oldPending), true);
+  assertEquals(expired.includes(oldProcessing), true);
+  assertEquals(expired.includes(recentPending), false);
+  assertEquals(expired.includes(oldCompleted), false);
+
+  const found = await repo.findById(oldPending);
+  assertExists(found);
+  assertEquals(found.status, BundleStatus.EXPIRED);
+});
+
+Deno.test("expireOlderThan – with limit restricts number of expired rows", async () => {
+  const repo = await setup();
+  const oldTime = new Date(Date.now() - 120_000);
+
+  const ids: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const id = testBundleId();
+    ids.push(id);
+    await seedBundle({ id, status: BundleStatus.PENDING, createdAt: oldTime });
+  }
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING], 3);
+
+  assertEquals(expired.length, 3);
+  for (const id of expired) {
+    assertEquals(ids.includes(id), true);
+  }
+});
+
+Deno.test("expireOlderThan – returns empty array when nothing matches", async () => {
+  const repo = await setup();
+  const recentTime = new Date(Date.now() - 5_000);
+  await seedBundle({ status: BundleStatus.PENDING, createdAt: recentTime });
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING]);
+
+  assertEquals(expired.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// expireByIds
+// ---------------------------------------------------------------------------
+
+Deno.test("expireByIds – expires only active bundles from the given list", async () => {
+  const repo = await setup();
+  const pendingId = testBundleId();
+  const processingId = testBundleId();
+  const failedId = testBundleId();
+
+  await seedBundle({ id: pendingId, status: BundleStatus.PENDING });
+  await seedBundle({ id: processingId, status: BundleStatus.PROCESSING });
+  await seedBundle({ id: failedId, status: BundleStatus.FAILED });
+
+  const expired = await repo.expireByIds(
+    [pendingId, processingId, failedId],
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+
+  assertEquals(expired.length, 2);
+  assertEquals(expired.includes(pendingId), true);
+  assertEquals(expired.includes(processingId), true);
+  assertEquals(expired.includes(failedId), false);
+});
+
+Deno.test("expireByIds – returns empty for empty input", async () => {
+  await setup();
+  const repo = getBundleRepo();
+  const expired = await repo.expireByIds([], [BundleStatus.PENDING]);
+  assertEquals(expired.length, 0);
+});
+
+Deno.test("expireByIds – skips already-expired bundles", async () => {
+  const repo = await setup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.EXPIRED });
+
+  const expired = await repo.expireByIds([id], [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+  assertEquals(expired.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// findByStatusAndDateRange
+// ---------------------------------------------------------------------------
+
+Deno.test("findByStatusAndDateRange – filters by date range and status", async () => {
+  const repo = await setup();
+  const oldTime = new Date(Date.now() - 120_000);
+  const recentTime = new Date(Date.now() - 5_000);
+
+  const oldId = testBundleId();
+  const recentId = testBundleId();
+
+  await seedBundle({ id: oldId, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({ id: recentId, status: BundleStatus.PENDING, createdAt: recentTime });
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const results = await repo.findByStatusAndDateRange(BundleStatus.PENDING, undefined, cutoff);
+  const ids = results.map((r) => r.id);
+
+  assertEquals(ids.includes(oldId), true);
+  assertEquals(ids.includes(recentId), false);
+});
+
+Deno.test("findByStatusAndDateRange – respects limit", async () => {
+  const repo = await setup();
+  for (let i = 0; i < 5; i++) {
+    await seedBundle({ status: BundleStatus.PENDING });
+  }
+
+  const results = await repo.findByStatusAndDateRange(BundleStatus.PENDING, undefined, undefined, 3);
+  assertEquals(results.length, 3);
+});
+
+// ---------------------------------------------------------------------------
+// updateStatusIfActive
+// ---------------------------------------------------------------------------
+
+Deno.test("updateStatusIfActive – succeeds when status is active", async () => {
+  const repo = await setup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.PENDING });
+
+  const updated = await repo.updateStatusIfActive(
+    id,
+    BundleStatus.PROCESSING,
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+
+  assertEquals(updated, true);
+  const found = await repo.findById(id);
+  assertExists(found);
+  assertEquals(found.status, BundleStatus.PROCESSING);
+});
+
+Deno.test("updateStatusIfActive – fails when status is terminal (EXPIRED)", async () => {
+  const repo = await setup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.EXPIRED });
+
+  const updated = await repo.updateStatusIfActive(
+    id,
+    BundleStatus.PROCESSING,
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+
+  assertEquals(updated, false);
+  const found = await repo.findById(id);
+  assertExists(found);
+  assertEquals(found.status, BundleStatus.EXPIRED);
+});
+
+Deno.test("updateStatusIfActive – fails when status is terminal (FAILED)", async () => {
+  const repo = await setup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.FAILED });
+
+  const updated = await repo.updateStatusIfActive(
+    id,
+    BundleStatus.PROCESSING,
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+
+  assertEquals(updated, false);
+  const found = await repo.findById(id);
+  assertExists(found);
+  assertEquals(found.status, BundleStatus.FAILED);
+});
+
+Deno.test("updateStatusIfActive – fails when status is terminal (COMPLETED)", async () => {
+  const repo = await setup();
+  const id = testBundleId();
+  await seedBundle({ id, status: BundleStatus.COMPLETED });
+
+  const updated = await repo.updateStatusIfActive(
+    id,
+    BundleStatus.PROCESSING,
+    [BundleStatus.PENDING, BundleStatus.PROCESSING],
+  );
+
+  assertEquals(updated, false);
+  const found = await repo.findById(id);
+  assertExists(found);
+  assertEquals(found.status, BundleStatus.COMPLETED);
+});
