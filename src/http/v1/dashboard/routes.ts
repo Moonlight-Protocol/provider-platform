@@ -22,6 +22,6 @@ dashboardRouter.get("/dashboard/mempool", jwtMiddleware, getMempoolHandler);
 dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler);
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
 dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
-dashboardRouter.post("/dashboard/bundles/expire", jwtMiddleware, postExpireBundlesHandler);
+dashboardRouter.post("/dashboard/bundles/expire", lowRateLimitMiddleware, jwtMiddleware, postExpireBundlesHandler);
 
 export default dashboardRouter;

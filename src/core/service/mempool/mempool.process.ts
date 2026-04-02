@@ -293,10 +293,18 @@ export class Mempool {
       }
 
       span.addEvent("updating_status_to_processing");
-      await operationsBundleRepository.update(bundleData.bundleId, {
-        status: BundleStatus.PROCESSING,
-        updatedAt: new Date(),
-      });
+      const updated = await operationsBundleRepository.updateStatusIfActive(
+        bundleData.bundleId,
+        BundleStatus.PROCESSING,
+        [BundleStatus.PENDING, BundleStatus.PROCESSING],
+      );
+
+      if (!updated) {
+        span.addEvent("bundle_status_not_active");
+        LOG.warn(`Bundle ${bundleData.bundleId} was concurrently moved to a terminal status, removing from mempool`);
+        this.purgeBundles([bundleData.bundleId]);
+        return;
+      }
     });
   }
 

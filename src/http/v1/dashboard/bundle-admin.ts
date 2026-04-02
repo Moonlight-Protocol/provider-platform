@@ -36,7 +36,7 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
 
   const { olderThanMs, bundleIds } = body;
 
-  const hasAgeFilter = typeof olderThanMs === "number" && olderThanMs > 0;
+  const hasAgeFilter = typeof olderThanMs === "number" && Number.isFinite(olderThanMs) && olderThanMs > 0;
   const hasIdFilter = Array.isArray(bundleIds) && bundleIds.length > 0;
 
   if (!hasAgeFilter && !hasIdFilter) {
@@ -44,6 +44,12 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
     ctx.response.body = {
       message: "Provide at least one of: olderThanMs (positive number) or bundleIds (non-empty array)",
     };
+    return;
+  }
+
+  if (hasIdFilter && !bundleIds!.every((id) => typeof id === "string" && id.length > 0)) {
+    ctx.response.status = Status.BadRequest;
+    ctx.response.body = { message: "All bundleIds must be non-empty strings" };
     return;
   }
 
@@ -59,33 +65,16 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
   let ageExpiredIds: string[] = [];
   let truncated = false;
 
-  // 1. Age-filter path: single atomic UPDATE, no pre-read, no TOCTOU
+  // 1. Age-filter path: single atomic UPDATE via expireOlderThan (no pre-read, no TOCTOU)
   if (hasAgeFilter) {
     const cutoff = new Date(Date.now() - olderThanMs!);
-    const stale = await bundleRepo.findByStatusAndDateRange(
-      BundleStatus.PENDING,
-      undefined,
-      cutoff,
-      AGE_FILTER_LIMIT,
-    );
-    const staleProcessing = await bundleRepo.findByStatusAndDateRange(
-      BundleStatus.PROCESSING,
-      undefined,
-      cutoff,
-      AGE_FILTER_LIMIT,
-    );
-    const staleIds = [...stale, ...staleProcessing].map((b) => b.id);
+    ageExpiredIds = await bundleRepo.expireOlderThan(cutoff, ACTIVE_STATUSES, AGE_FILTER_LIMIT);
 
-    if (staleIds.length > 0) {
-      // Evict from in-memory mempool before writing to DB so that a crash
-      // between the two leaves the bundle still PENDING in DB (recoverable
-      // on restart via initialize()), rather than EXPIRED in DB but live in
-      // the mempool (unrecoverable without a restart).
-      getMempool().purgeBundles(staleIds);
-      ageExpiredIds = await bundleRepo.expireByIds(staleIds, ACTIVE_STATUSES);
+    if (ageExpiredIds.length > 0) {
+      getMempool().purgeBundles(ageExpiredIds);
     }
 
-    if (stale.length === AGE_FILTER_LIMIT || staleProcessing.length === AGE_FILTER_LIMIT) {
+    if (ageExpiredIds.length >= AGE_FILTER_LIMIT) {
       truncated = true;
     }
   }
