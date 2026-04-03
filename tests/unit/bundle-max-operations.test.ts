@@ -1,29 +1,30 @@
 import { assertEquals, assertInstanceOf } from "jsr:@std/assert";
-import { z } from "zod";
 import { PlatformError } from "@/error/index.ts";
 import {
   TOO_MANY_OPERATIONS,
   BUNDLE_ERROR_CODES,
 } from "@/core/service/bundle/bundle.errors.ts";
+import { bundleRequestSchema } from "@/http/v1/bundle/bundle.schemas.ts";
 
 // ---------------------------------------------------------------------------
 // Schema validation: operationsMLXDR .min(1).max(MAX)
 //
-// Both post.ts and post.schema.ts use the same Zod pattern:
-//   z.array(z.string()).min(1).max(BUNDLE_MAX_OPERATIONS)
-//
-// We replicate the schema with a known MAX to test boundary behaviour
-// without importing env.ts (which eagerly validates all production env vars).
+// Uses the same bundleRequestSchema factory that post.ts uses in production.
+// We pass a known MAX so boundary tests are deterministic without needing
+// env.ts (which eagerly validates all production env vars).
 // ---------------------------------------------------------------------------
 
 const TEST_MAX = 20;
-
-const operationsSchema = z.object({
-  operationsMLXDR: z.array(z.string()).min(1).max(TEST_MAX),
-});
+const operationsSchema = bundleRequestSchema(TEST_MAX);
+/** Minimal valid channel id so schema tests exercise operations bounds, not channel field. */
+const TEST_CHANNEL_CONTRACT_ID = "Ctest123456789012345678901234567890";
 
 function ops(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `op-${i}`);
+}
+
+function bundleBody(partial: { operationsMLXDR: string[] }) {
+  return { channelContractId: TEST_CHANNEL_CONTRACT_ID, ...partial };
 }
 
 // ---------------------------------------------------------------------------
@@ -31,12 +32,12 @@ function ops(n: number): string[] {
 // ---------------------------------------------------------------------------
 
 Deno.test("schema – rejects empty operationsMLXDR array", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: [] });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: [] }));
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – accepts single operation", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: ["op-0"] });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ["op-0"] }));
   assertEquals(result.success, true);
 });
 
@@ -45,22 +46,22 @@ Deno.test("schema – accepts single operation", () => {
 // ---------------------------------------------------------------------------
 
 Deno.test("schema – accepts exactly MAX operations", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: ops(TEST_MAX) });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX) }));
   assertEquals(result.success, true);
 });
 
 Deno.test("schema – rejects MAX + 1 operations", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: ops(TEST_MAX + 1) });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }));
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – rejects significantly over MAX operations", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: ops(TEST_MAX * 5) });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX * 5) }));
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – error message references the maximum", () => {
-  const result = operationsSchema.safeParse({ operationsMLXDR: ops(TEST_MAX + 1) });
+  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }));
   assertEquals(result.success, false);
   if (!result.success) {
     const issue = result.error.issues[0];
@@ -109,8 +110,7 @@ Deno.test("TOO_MANY_OPERATIONS – details include both counts", () => {
 // ---------------------------------------------------------------------------
 // Env validation logic: BUNDLE_MAX_OPERATIONS parsing guard
 //
-// Mirrors the inline-guard pattern used in bundle-admin.test.ts.
-// The production code in env.ts does:
+// Mirrors the inline-guard in env.ts:
 //   if (!Number.isFinite(v) || !Number.isInteger(v) || v < 1) throw ...
 // ---------------------------------------------------------------------------
 

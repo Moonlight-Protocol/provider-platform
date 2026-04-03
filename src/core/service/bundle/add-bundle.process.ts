@@ -260,10 +260,10 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
       // 3. Parse and classify operations
       span.addEvent("parsing_and_classifying_operations");
-      const operations = await parseOperations(operationsMLXDR);
-      if (operations.length > BUNDLE_MAX_OPERATIONS) {
-        logAndThrow(new E.TOO_MANY_OPERATIONS(operations.length, BUNDLE_MAX_OPERATIONS));
+      if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
+        logAndThrow(new E.TOO_MANY_OPERATIONS(operationsMLXDR.length, BUNDLE_MAX_OPERATIONS));
       }
+      const operations = await parseOperations(operationsMLXDR);
       const classified = classifyOperations(operations);
       validateSpendOperations(classified.spend);
 
