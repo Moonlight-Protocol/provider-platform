@@ -109,6 +109,7 @@ export type SeedBundleOpts = {
   fee?: bigint;
   ttl?: Date;
   operationsMLXDR?: string[];
+  createdAt?: Date;
 };
 
 /**
@@ -129,7 +130,7 @@ export async function seedBundle(opts: SeedBundleOpts = {}) {
       fee: opts.fee ?? BigInt(100),
       ttl: opts.ttl ?? new Date(now.getTime() + 60_000),
       operationsMLXDR: opts.operationsMLXDR ?? [],
-      createdAt: now,
+      createdAt: opts.createdAt ?? now,
       updatedAt: now,
     })
     .returning();

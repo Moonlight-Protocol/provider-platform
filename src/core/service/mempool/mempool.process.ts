@@ -7,6 +7,7 @@ import {
   MEMPOOL_SLOT_CAPACITY,
   MEMPOOL_EXPENSIVE_OP_WEIGHT,
   MEMPOOL_CHEAP_OP_WEIGHT,
+  MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS,
 } from "@/config/env.ts";
 import {
   calculateBundleWeight,
@@ -223,6 +224,16 @@ export class Mempool {
    */
   async initialize(): Promise<void> {
     LOG.info("Initializing mempool from database...");
+
+    if (MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS > 0) {
+      const cutoff = new Date(Date.now() - MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS);
+      const expiredIds = await operationsBundleRepository.expireOlderThan(cutoff, [
+        BundleStatus.PENDING,
+        BundleStatus.PROCESSING,
+      ]);
+      LOG.info(`Startup expiry: marked ${expiredIds.length} stale bundle(s) as EXPIRED (older than ${MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS}ms)`);
+    }
+
     const bundles = await loadPendingBundlesFromDB();
 
     // Create slots and distribute bundles
@@ -282,10 +293,18 @@ export class Mempool {
       }
 
       span.addEvent("updating_status_to_processing");
-      await operationsBundleRepository.update(bundleData.bundleId, {
-        status: BundleStatus.PROCESSING,
-        updatedAt: new Date(),
-      });
+      const updated = await operationsBundleRepository.updateStatusIfActive(
+        bundleData.bundleId,
+        BundleStatus.PROCESSING,
+        [BundleStatus.PENDING, BundleStatus.PROCESSING],
+      );
+
+      if (!updated) {
+        span.addEvent("bundle_status_not_active");
+        LOG.warn(`Bundle ${bundleData.bundleId} was concurrently moved to a terminal status, removing from mempool`);
+        this.purgeBundles([bundleData.bundleId]);
+        return;
+      }
     });
   }
 
@@ -371,6 +390,33 @@ export class Mempool {
         LOG.info(`Bundle ${bundleId} expired and marked as EXPIRED`);
       }
     });
+  }
+
+  /**
+   * Evicts a set of bundles from in-memory slots by their IDs.
+   * Does not touch the database — callers are responsible for updating DB status.
+   * Returns the number of bundles that were actually found and removed.
+   */
+  purgeBundles(bundleIds: string[]): number {
+    if (bundleIds.length === 0) return 0;
+
+    const idSet = new Set(bundleIds);
+    let removed = 0;
+
+    for (let i = this.slots.length - 1; i >= 0; i--) {
+      const slot = this.slots[i];
+      for (const bundle of slot.getBundles()) {
+        if (idSet.has(bundle.bundleId)) {
+          this.removeBundleFromSlot(slot, bundle.bundleId);
+          removed++;
+        }
+      }
+      if (slot.isEmpty()) {
+        this.slots.splice(i, 1);
+      }
+    }
+
+    return removed;
   }
 
   /**

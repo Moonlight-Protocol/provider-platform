@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, desc, count, gte, lte } from "drizzle-orm";
+import { eq, and, or, isNull, desc, count, gte, lte, inArray, lt } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -115,8 +115,90 @@ export class OperationsBundleRepository extends BaseRepository<
   }
 
   /**
-   * Finds bundles by creator account ID, optionally filtered by status
-   * Results are ordered by createdAt descending (most recent first)
+   * Bulk-expires bundles matching the given statuses that were created before `olderThan`.
+   * When `limit` is provided the update is bounded via a subquery so at most `limit` rows
+   * are affected in a single atomic statement.
+   * Returns the IDs of the rows that were actually updated.
+   */
+  async expireOlderThan(olderThan: Date, statuses: BundleStatus[], limit?: number): Promise<string[]> {
+    const baseConditions = and(
+      isNull(operationsBundle.deletedAt),
+      inArray(operationsBundle.status, statuses),
+      lt(operationsBundle.createdAt, olderThan),
+    );
+
+    if (limit != null) {
+      const subquery = this.db
+        .select({ id: operationsBundle.id })
+        .from(operationsBundle)
+        .where(baseConditions)
+        .limit(limit);
+
+      const result = await this.db
+        .update(operationsBundle)
+        .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
+        .where(inArray(operationsBundle.id, subquery))
+        .returning({ id: operationsBundle.id });
+      return result.map((r) => r.id);
+    }
+
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
+      .where(baseConditions)
+      .returning({ id: operationsBundle.id });
+    return result.map((r) => r.id);
+  }
+
+  /**
+   * Atomically expires bundles by explicit IDs, but only if their current status
+   * is one of `activeStatuses`. Rows already in a terminal state are skipped.
+   * Returns the IDs of the rows that were actually updated.
+   */
+  async expireByIds(ids: string[], activeStatuses: BundleStatus[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ status: BundleStatus.EXPIRED, updatedAt: new Date() })
+      .where(
+        and(
+          isNull(operationsBundle.deletedAt),
+          inArray(operationsBundle.id, ids),
+          inArray(operationsBundle.status, activeStatuses),
+        )
+      )
+      .returning({ id: operationsBundle.id });
+    return result.map((r) => r.id);
+  }
+
+  /**
+   * Atomically updates a bundle's status, but only if its current status is one of
+   * `activeStatuses`. Prevents resurrecting bundles that were concurrently moved to
+   * a terminal state (EXPIRED / FAILED / COMPLETED).
+   * Returns `true` if the row was updated, `false` if skipped.
+   */
+  async updateStatusIfActive(
+    id: string,
+    newStatus: BundleStatus,
+    activeStatuses: BundleStatus[],
+  ): Promise<boolean> {
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ status: newStatus, updatedAt: new Date() })
+      .where(
+        and(
+          eq(operationsBundle.id, id),
+          isNull(operationsBundle.deletedAt),
+          inArray(operationsBundle.status, activeStatuses),
+        )
+      )
+      .returning({ id: operationsBundle.id });
+    return result.length > 0;
+  }
+
+  /**
+   * Finds bundles by creator account ID, optionally filtered by status.
+   * Results are ordered by createdAt descending (most recent first).
    */
   async findByCreatedBy(
     accountId: string,
