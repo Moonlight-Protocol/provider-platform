@@ -4,9 +4,11 @@ import stellarRouter from "@/http/v1/stellar/routes.ts";
 import bundleRouter from "@/http/v1/bundle/routes.ts";
 import dashboardRouter from "@/http/v1/dashboard/routes.ts";
 import payRouter from "@/http/v1/pay/routes.ts";
+import healthRouter from "@/http/v1/health/routes.ts";
 
 const apiRouter = new Router();
 
+apiRouter.use("/api/v1", healthRouter.routes(), healthRouter.allowedMethods());
 apiRouter.use("/api/v1", stellarRouter.routes(), stellarRouter.allowedMethods());
 apiRouter.use("/api/v1", dashboardRouter.routes(), dashboardRouter.allowedMethods());
 apiRouter.use("/api/v1", payRouter.routes(), payRouter.allowedMethods());
