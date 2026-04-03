@@ -68,6 +68,7 @@ primary_region = 'ams'
 
 [deploy]
   strategy = "bluegreen"
+  release_command = "deno run -A --node-modules-dir npm:drizzle-kit migrate"
 
 [[vm]]
   memory = '1gb'
