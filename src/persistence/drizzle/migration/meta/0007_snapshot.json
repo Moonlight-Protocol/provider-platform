@@ -1,6 +1,6 @@
 {
-  "id": "18b82a11-0bde-4a11-96bb-ac4b15718b18",
-  "prevId": "927b9be9-79fb-420b-a6b9-4822a13fce56",
+  "id": "a3f8c912-7b4e-4d1a-9c5f-8e2d6f0a1b3c",
+  "prevId": "18b82a11-0bde-4a11-96bb-ac4b15718b18",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -392,6 +392,19 @@
         "deleted_at": {
           "name": "deleted_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retry_count": {
+          "name": "retry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "last_failure_reason": {
+          "name": "last_failure_reason",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -1408,7 +1421,8 @@
         "PENDING",
         "PROCESSING",
         "EXPIRED",
-        "COMPLETED"
+        "COMPLETED",
+        "FAILED"
       ]
     },
     "public.transaction_status": {

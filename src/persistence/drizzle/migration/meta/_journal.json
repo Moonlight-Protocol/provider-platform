@@ -40,15 +40,8 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1773837563684,
-      "tag": "0005_add_retry_fail_reason_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1774033000000,
-      "tag": "0006_create_mempool_metrics_if_missing",
+      "when": 1773768794516,
+      "tag": "0005_young_kabuki",
       "breakpoints": true
     },
     {
@@ -56,6 +49,13 @@
       "version": "7",
       "when": 1773949728927,
       "tag": "0006_pay_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774033000000,
+      "tag": "0007_add_retry_fail_reason_fields",
       "breakpoints": true
     }
   ]
