@@ -20,7 +20,7 @@ import {
   calculatePriorityScore,
   fetchUtxoBalances,
 } from "@/core/service/bundle/bundle.service.ts";
-import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT } from "@/config/env.ts";
+import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT, BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
 import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
@@ -261,6 +261,9 @@ export const P_AddOperationsBundle = ProcessEngine.create(
       // 3. Parse and classify operations
       span.addEvent("parsing_and_classifying_operations");
       const operations = await parseOperations(operationsMLXDR);
+      if (operations.length > BUNDLE_MAX_OPERATIONS) {
+        logAndThrow(new E.TOO_MANY_OPERATIONS(operations.length, BUNDLE_MAX_OPERATIONS));
+      }
       const classified = classifyOperations(operations);
       validateSpendOperations(classified.spend);
 

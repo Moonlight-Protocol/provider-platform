@@ -1,10 +1,6 @@
 import { selectNetwork } from "@/config/network.ts";
 import { requireEnv, loadOptionalEnv } from "@/utils/env/loadEnv.ts";
-import { requireSecretKey } from "@/utils/env/requireSecretKey.ts";
-import { requirePublicKey } from "@/utils/env/requirePublicKey.ts";
-import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
-import { LOG } from "@/config/logger.ts";
 import { Server } from "stellar-sdk/rpc";
 
 export const DATABASE_URL = requireEnv("DATABASE_URL");
@@ -47,6 +43,15 @@ if (!Number.isFinite(_rawMaxRetry) || !Number.isInteger(_rawMaxRetry) || _rawMax
   );
 }
 export const MEMPOOL_MAX_RETRY_ATTEMPTS = _rawMaxRetry;
+
+// Bundle limits
+const _rawMaxOps = Number(requireEnv("BUNDLE_MAX_OPERATIONS"));
+if (!Number.isFinite(_rawMaxOps) || !Number.isInteger(_rawMaxOps) || _rawMaxOps < 1) {
+  throw new Error(
+    `BUNDLE_MAX_OPERATIONS must be a positive integer, got: "${requireEnv("BUNDLE_MAX_OPERATIONS")}"`
+  );
+}
+export const BUNDLE_MAX_OPERATIONS = _rawMaxOps;
 
 // Event watcher
 export const EVENT_WATCHER_INTERVAL_MS = Number(Deno.env.get("EVENT_WATCHER_INTERVAL_MS") ?? "30000");

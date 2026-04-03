@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { baseSuccessResponseSchema } from "@/http/default-schemas.ts";
+import { BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
 
 export const postBundleSchema = z.object({
-  operationsMLXDR: z.array(z.string()).min(1),
+  operationsMLXDR: z.array(z.string()).min(1).max(BUNDLE_MAX_OPERATIONS),
 });
 
 export type PostBundlePayload = z.infer<typeof postBundleSchema>;

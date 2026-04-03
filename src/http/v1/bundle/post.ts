@@ -4,9 +4,10 @@ import { P_AddOperationsBundle } from "@/core/service/bundle/add-bundle.process.
 import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
 import { LOG } from "@/config/logger.ts";
+import { BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
 
 export const requestSchema = z.object({
-  operationsMLXDR: z.array(z.string()).min(1),
+  operationsMLXDR: z.array(z.string()).min(1).max(BUNDLE_MAX_OPERATIONS),
   channelContractId: z.string().min(1),
 });
 
