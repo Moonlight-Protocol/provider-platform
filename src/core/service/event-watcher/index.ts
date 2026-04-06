@@ -177,7 +177,7 @@ export async function startEventWatcher(): Promise<void> {
 }
 
 export async function stopEventWatcher(): Promise<void> {
-  for (const [id, watcher] of activeWatchers) {
+  for (const [, watcher] of activeWatchers) {
     try {
       await watcher.stop();
     } catch { /* best effort */ }

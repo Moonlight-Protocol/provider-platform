@@ -9,6 +9,7 @@ import { LOG } from "@/config/logger.ts";
 
 /** Reject URLs targeting internal/private network addresses. Skipped in development mode. */
 function isInternalUrl(url: URL): boolean {
+  // Intentionally skip SSRF protection in dev mode so developers can target localhost services
   if (MODE === "development") return false;
   // Only allow http: and https: protocols
   if (url.protocol !== "http:" && url.protocol !== "https:") return true;
@@ -244,11 +245,26 @@ export const joinCouncilHandler = async (ctx: Context) => {
     }
 
     // Relay the pre-signed envelope to the council-platform
-    const res = await fetch(`${baseUrl}/api/v1/public/provider/join-request`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(signedEnvelope),
-    });
+    const joinController = new AbortController();
+    const joinTimeoutId = setTimeout(() => joinController.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/api/v1/public/provider/join-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(signedEnvelope),
+        signal: joinController.signal,
+      });
+    } catch (err) {
+      clearTimeout(joinTimeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        ctx.response.status = Status.GatewayTimeout;
+        ctx.response.body = { message: "Council join request timed out" };
+        return;
+      }
+      throw err;
+    }
+    clearTimeout(joinTimeoutId);
 
     if (res.status === 409) {
       ctx.response.status = Status.Conflict;

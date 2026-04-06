@@ -2,6 +2,7 @@ import { type Context, Status } from "@oak/oak";
 import { Buffer } from "buffer";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
 import { queryBalances, MAX_UTXO_SLOTS } from "@/core/service/pay/channel.service.ts";
+import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { LOG } from "@/config/logger.ts";
 
 /**
@@ -61,7 +62,6 @@ export const postSelfBalanceHandler = async (ctx: Context) => {
       (hexKey: string) => new Uint8Array(Buffer.from(hexKey, "hex")),
     );
 
-    const { resolveChannelContext } = await import("@/core/service/executor/channel-resolver.ts");
     const channelCtx = await resolveChannelContext(channelContractId);
     const balances = await queryBalances(utxoPublicKeys, channelCtx.channelClient);
 

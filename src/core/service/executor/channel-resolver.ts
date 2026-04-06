@@ -29,7 +29,8 @@ const membershipRepo = new CouncilMembershipRepository(drizzleClient);
  * decrypt its key, and build the channel client + tx config.
  */
 export async function resolveChannelContext(channelContractId: string): Promise<ChannelContext> {
-  // Find the active membership that has this channel
+  // N+1: listActive() then one query per PP for its active membership.
+  // Acceptable for now since PP count is small; could be optimized with a join.
   const pps = await ppRepo.listActive();
 
   for (const pp of pps) {

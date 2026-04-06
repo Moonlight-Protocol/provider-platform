@@ -161,6 +161,13 @@ export const deletePpHandler = async (ctx: Context) => {
     }
 
     removeProviderAddress(publicKey);
+
+    // Delete council memberships for this PP
+    const memberships = await membershipRepo.listAllForPp(publicKey);
+    for (const m of memberships) {
+      await membershipRepo.delete(m.id);
+    }
+
     await ppRepo.hardDelete(pp.id);
 
     LOG.info("PP deleted", { publicKey });

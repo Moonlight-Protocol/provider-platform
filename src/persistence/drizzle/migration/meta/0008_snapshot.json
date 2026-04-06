@@ -1592,7 +1592,8 @@
         "PENDING",
         "PROCESSING",
         "EXPIRED",
-        "COMPLETED"
+        "COMPLETED",
+        "FAILED"
       ]
     },
     "public.transaction_status": {
