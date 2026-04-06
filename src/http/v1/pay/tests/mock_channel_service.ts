@@ -23,6 +23,7 @@ export function _resetMockBalances(): void {
 
 export async function queryBalances(
   publicKeys: Uint8Array[],
+  _channelClient?: unknown,
 ): Promise<bigint[]> {
   if (_mockBalances !== null) {
     return _mockBalances;

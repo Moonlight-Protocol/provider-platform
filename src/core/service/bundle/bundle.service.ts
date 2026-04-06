@@ -1,9 +1,8 @@
 import { Buffer } from "buffer";
-import type { MoonlightOperation } from "@moonlight/moonlight-sdk";
+import type { MoonlightOperation, PrivacyChannel } from "@moonlight/moonlight-sdk";
 import { sha256Hash, type OperationTypes, ChannelReadMethods, type UTXOPublicKey } from "@moonlight/moonlight-sdk";
 import type { ClassifiedOperations, FeeCalculation, OperationAmounts } from "@/core/service/bundle/bundle.types.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
-import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 
 /**
  * Classifies operations by type
@@ -29,13 +28,14 @@ export function classifyOperations(
  * @returns Array of balances corresponding to each UTXO (in bigint)
  */
 export async function fetchUtxoBalances(
-  utxoPublicKeys: UTXOPublicKey[]
+  utxoPublicKeys: UTXOPublicKey[],
+  channelClient: PrivacyChannel,
 ): Promise<bigint[]> {
   if (utxoPublicKeys.length === 0) {
     return [];
   }
 
-  const result = await CHANNEL_CLIENT.read({
+  const result = await channelClient.read({
     method: ChannelReadMethods.utxo_balances,
     methodArgs: {
       utxos: utxoPublicKeys.map((u) => Buffer.from(u)),
@@ -53,9 +53,10 @@ export async function fetchUtxoBalances(
  * @returns Balance of the UTXO (in bigint)
  */
 export async function fetchUtxoBalance(
-  utxoPublicKey: UTXOPublicKey
+  utxoPublicKey: UTXOPublicKey,
+  channelClient: PrivacyChannel,
 ): Promise<bigint> {
-  const balances = await fetchUtxoBalances([utxoPublicKey]);
+  const balances = await fetchUtxoBalances([utxoPublicKey], channelClient);
   return balances[0] || BigInt(0);
 }
 
@@ -83,11 +84,12 @@ export function calculateOperationsTotal<T extends MoonlightOperation>(
  * @returns Breakdown of amounts by operation type
  */
 export async function calculateOperationAmounts(
-  classified: ClassifiedOperations
+  classified: ClassifiedOperations,
+  channelClient: PrivacyChannel,
 ): Promise<OperationAmounts> {
   // Fetch spend operation amounts from the network
   const spendUtxos = classified.spend.map((op) => op.getUtxo());
-  const spendBalances = await fetchUtxoBalances(spendUtxos);
+  const spendBalances = await fetchUtxoBalances(spendUtxos, channelClient);
   
   const totalSpendAmount = spendBalances.reduce(
     (acc, balance) => acc + balance,

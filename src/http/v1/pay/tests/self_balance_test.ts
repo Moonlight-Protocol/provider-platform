@@ -75,7 +75,7 @@ Deno.test("self balance - returns balances for given public keys", async () => {
   const pk2 = dummyHexPubKey();
 
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: [pk1, pk2] },
+    { publicKeys: [pk1, pk2], channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -110,7 +110,7 @@ Deno.test("self balance - returns zero balances for empty UTXOs", async () => {
   const pk2 = dummyHexPubKey();
 
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: [pk1, pk2] },
+    { publicKeys: [pk1, pk2], channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -132,7 +132,7 @@ Deno.test("self balance - returns zero balances for empty UTXOs", async () => {
 
 Deno.test("self balance - empty publicKeys array returns 400", async () => {
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: [] },
+    { publicKeys: [], channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -152,7 +152,7 @@ Deno.test("self balance - empty publicKeys array returns 400", async () => {
 
 Deno.test("self balance - non-array publicKeys returns 400", async () => {
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: "not-an-array" },
+    { publicKeys: "not-an-array", channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -172,7 +172,7 @@ Deno.test("self balance - non-array publicKeys returns 400", async () => {
 
 Deno.test("self balance - missing publicKeys returns 400", async () => {
   const { ctx, getResponse } = createMockContext(
-    {},
+    { channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -194,7 +194,7 @@ Deno.test("self balance - exceeding MAX_UTXO_SLOTS returns 400", async () => {
   const keys = Array.from({ length: 301 }, () => dummyHexPubKey());
 
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: keys },
+    { publicKeys: keys, channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 
@@ -218,7 +218,7 @@ Deno.test("self balance - single public key works", async () => {
   const pk = dummyHexPubKey();
 
   const { ctx, getResponse } = createMockContext(
-    { publicKeys: [pk] },
+    { publicKeys: [pk], channelContractId: "CTEST" },
     selfCustodialSession(testAddress()),
   );
 

@@ -6,7 +6,8 @@ import { getMempoolHandler } from "./mempool.ts";
 import { getOperationsHandler } from "./operations.ts";
 import { getTreasuryHandler } from "./treasury.ts";
 import { getAuditExportHandler } from "./audit-export.ts";
-import { discoverCouncilHandler, joinCouncilHandler, getMembershipHandler } from "./council.ts";
+import { discoverCouncilHandler, joinCouncilHandler, getMembershipHandler, syncMembershipHandler } from "./council.ts";
+import { registerPpHandler, listPpsHandler, deletePpHandler } from "./pp.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
 
@@ -23,9 +24,15 @@ dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
 dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
 
+// --- PP management ---
+dashboardRouter.post("/dashboard/pp/register", jwtMiddleware, registerPpHandler);
+dashboardRouter.get("/dashboard/pp/list", jwtMiddleware, listPpsHandler);
+dashboardRouter.post("/dashboard/pp/delete", jwtMiddleware, deletePpHandler);
+
 // --- Council (UC2) ---
 dashboardRouter.post("/dashboard/council/discover", jwtMiddleware, discoverCouncilHandler);
 dashboardRouter.post("/dashboard/council/join", jwtMiddleware, joinCouncilHandler);
 dashboardRouter.get("/dashboard/council/membership", jwtMiddleware, getMembershipHandler);
+dashboardRouter.post("/dashboard/council/membership", jwtMiddleware, syncMembershipHandler);
 
 export default dashboardRouter;

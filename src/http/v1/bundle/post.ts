@@ -7,6 +7,7 @@ import { LOG } from "@/config/logger.ts";
 
 export const requestSchema = z.object({
   operationsMLXDR: z.array(z.string()).min(1),
+  channelContractId: z.string().min(1),
 });
 
 export const responseSchema = z.object({

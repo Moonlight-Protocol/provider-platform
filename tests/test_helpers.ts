@@ -53,6 +53,7 @@ const MIGRATION_FILES = [
   "0004_add_failed_status_to_transaction.sql",
   "0005_add_retry_fail_reason_fields.sql",
   "0006_create_mempool_metrics_if_missing.sql",
+  "0007_add_channel_contract_id_to_bundles.sql",
 ];
 
 async function runMigrations(pg: PGlite): Promise<void> {

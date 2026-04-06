@@ -1,10 +1,9 @@
 import { Router } from "@oak/oak";
-import { configPushHandler } from "./config-push.ts";
-import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
+
+// Callback endpoints (config-push, status-update) removed.
+// PP now determines its own state via on-chain queries and
+// the council's public membership-status endpoint.
 
 const councilRouter = new Router();
-
-// Public endpoint — authenticated via signed payload, not JWT
-councilRouter.post("/council/config-push", lowRateLimitMiddleware, configPushHandler);
 
 export default councilRouter;

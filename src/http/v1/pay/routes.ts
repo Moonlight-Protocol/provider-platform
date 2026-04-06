@@ -11,7 +11,6 @@ import { postCustodialSendHandler } from "@/http/v1/pay/custodial/send.ts";
 import { postCustodialLoginHandler } from "@/http/v1/pay/custodial/login.ts";
 import { postCustodialRegisterHandler } from "@/http/v1/pay/custodial/register.ts";
 import { postSimulateKycHandler } from "@/http/v1/pay/demo/simulate-kyc.ts";
-import { postDemoDepositHandler } from "@/http/v1/pay/demo/deposit.ts";
 import { getEscrowSummaryHandler } from "@/http/v1/pay/escrow/summary.ts";
 import { postReportHandler } from "@/http/v1/pay/report/post.ts";
 import { LOG } from "@/config/logger.ts";
@@ -39,7 +38,6 @@ const networkEnv = loadOptionalEnv("NETWORK") ?? "";
 const demoEnabled = loadOptionalEnv("PAY_DEMO_ENABLED") === "true";
 if (networkEnv === "local" || networkEnv === "standalone" || demoEnabled) {
   payRouter.post("/pay/demo/simulate-kyc", lowRateLimitMiddleware, jwtMiddleware, postSimulateKycHandler);
-  payRouter.post("/pay/demo/deposit", lowRateLimitMiddleware, jwtMiddleware, postDemoDepositHandler);
   LOG.info("Pay demo routes enabled", { network: networkEnv, demoEnabled });
 } else {
   LOG.info("Pay demo routes disabled (non-local network)", { network: networkEnv });

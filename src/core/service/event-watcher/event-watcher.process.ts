@@ -1,15 +1,12 @@
 import { LOG } from "@/config/logger.ts";
-import { CHANNEL_AUTH_ID, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import { NETWORK_RPC_SERVER } from "@/config/env.ts";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
 import type { ChannelAuthEvent, EventWatcherConfig } from "./event-watcher.types.ts";
 import { withSpan } from "@/core/tracing.ts";
 
-const DEFAULT_CONFIG: EventWatcherConfig = {
-  contractId: CHANNEL_AUTH_ID,
-  intervalMs: 30_000, // Poll every 30 seconds
-};
-
-const CURSOR_KV_KEY = ["event-watcher", "lastLedger"];
+function cursorKvKey(contractId: string): Deno.KvKey {
+  return ["event-watcher", contractId, "lastLedger"];
+}
 
 export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
 
@@ -34,8 +31,8 @@ export class EventWatcher {
   private handlers: EventHandler[] = [];
   private kv: Deno.Kv | null = null;
 
-  constructor(config?: Partial<EventWatcherConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+  constructor(config: { contractId: string; intervalMs?: number }) {
+    this.config = { contractId: config.contractId, intervalMs: config.intervalMs ?? 30_000 };
   }
 
   /**
@@ -61,7 +58,7 @@ export class EventWatcher {
     this.kv = await Deno.openKv("./.data/memory-kvdb.db");
 
     // Restore cursor from KV, or fall back to current network ledger
-    const stored = await this.kv.get<number>(CURSOR_KV_KEY);
+    const stored = await this.kv.get<number>(cursorKvKey(this.config.contractId));
     if (stored.value !== null) {
       this.lastLedger = stored.value;
       LOG.info("EventWatcher restored cursor from KV", {
@@ -152,7 +149,7 @@ export class EventWatcher {
 
         // Persist cursor to KV
         if (this.kv) {
-          await this.kv.set(CURSOR_KV_KEY, this.lastLedger);
+          await this.kv.set(cursorKvKey(this.config.contractId), this.lastLedger);
         }
       } catch (error) {
         span.addEvent("poll_error", {

@@ -2,9 +2,8 @@ import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS } from "@/config/env.ts";
-import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
-import { TX_CONFIG, NETWORK_RPC_SERVER, PROVIDER_SIGNER } from "@/config/env.ts";
+import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
 import type { SIM_ERRORS } from "@colibri/core";
 import { buildTransactionFromSlot } from "@/core/service/executor/executor.service.ts";
@@ -66,27 +65,30 @@ class ExecutionError extends Error {
 }
 
 /**
- * Submits transaction to channel contract
+ * Submits transaction to channel contract using the resolved PP context.
  */
 function submitTransactionToNetwork(
   txBuilder: MoonlightTransactionBuilder,
-  expiration: number
+  expiration: number,
+  channelContractId: string,
 ): Promise<string> {
   return withSpan("Executor.submitTransactionToNetwork", async (span) => {
+    const { signer, channelClient, txConfig } = await resolveChannelContext(channelContractId);
+
     span.addEvent("signing_with_provider");
-    await txBuilder.signWithProvider(PROVIDER_SIGNER, expiration);
+    await txBuilder.signWithProvider(signer, expiration);
 
     try {
       const authEntries = txBuilder.getSignedAuthEntries();
 
       span.addEvent("invoking_channel_contract");
-      const { hash } = await CHANNEL_CLIENT.invokeRaw({
+      const { hash } = await channelClient.invokeRaw({
         operationArgs: {
           function: ChannelInvokeMethods.transact,
           args: [txBuilder.buildXDR()],
           auth: [...authEntries],
         },
-        config: TX_CONFIG,
+        config: txConfig,
       });
       
       span.addEvent("transaction_submitted", { "tx.hash": hash.toString() });
@@ -253,9 +255,16 @@ export class Executor {
           bundleIds,
         });
 
-        // Build transaction from slot
-        const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot);
-        
+        // Resolve channel context from the first bundle in the slot
+        const slotBundles = slot.getBundles();
+        const channelContractId = slotBundles[0]?.channelContractId;
+        if (!channelContractId) throw new Error("Bundle missing channelContractId");
+
+        const channelCtx = await resolveChannelContext(channelContractId);
+
+        // Build transaction from slot using the resolved context
+        const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot, channelCtx);
+
         // Use bundleIds from build result to ensure consistency
         bundleIds = buildBundleIds;
 
@@ -263,7 +272,7 @@ export class Executor {
         const expiration = await getTransactionExpiration();
 
         // Submit transaction to network
-        const transactionHash = await submitTransactionToNetwork(txBuilder, expiration);
+        const transactionHash = await submitTransactionToNetwork(txBuilder, expiration, channelContractId);
 
         LOG.info("Transaction submitted successfully", { 
           transactionHash,

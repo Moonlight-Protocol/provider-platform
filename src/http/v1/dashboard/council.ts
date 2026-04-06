@@ -1,14 +1,52 @@
 import { type Context, Status } from "@oak/oak";
-import { Keypair } from "stellar-sdk";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
 import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
-import { signPayload } from "@/core/crypto/signed-payload.ts";
-import { PROVIDER_SK, PORT } from "@/config/env.ts";
+import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
+import { addCouncilWatcher, addProviderAddress } from "@/core/service/event-watcher/index.ts";
+import { MODE } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
+/** Reject URLs targeting internal/private network addresses. Skipped in development mode. */
+function isInternalUrl(url: URL): boolean {
+  if (MODE === "development") return false;
+  // Only allow http: and https: protocols
+  if (url.protocol !== "http:" && url.protocol !== "https:") return true;
+
+  const host = url.hostname.toLowerCase().replace(/\[|\]/g, "");
+
+  // Reject hostnames without a dot (e.g. "localhost", single-label names)
+  if (!host.includes(".")) return true;
+
+  // Reject numeric-only hostnames (decimal/hex IP bypass attempts)
+  if (/^\d+$/.test(host) || /^0x[\da-f]+$/i.test(host)) return true;
+
+  // IPv6 checks
+  if (host === "::1" || host.startsWith("::ffff:") || host.startsWith("fe80:")) return true;
+
+  // Explicit localhost and zero address
+  if (host === "0.0.0.0") return true;
+
+  // Internal domain suffixes
+  if (host.endsWith(".local") || host.endsWith(".internal")) return true;
+
+  // AWS metadata endpoint
+  if (host === "169.254.169.254") return true;
+
+  // Private IPv4 ranges
+  if (/^127\./.test(host)) return true;
+  if (/^10\./.test(host)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+  if (/^192\.168\./.test(host)) return true;
+
+  // IPv6-mapped IPv4 (e.g. ::ffff:127.0.0.1 in dotted form)
+  if (/^::ffff:\d+\.\d+\.\d+\.\d+$/.test(host)) return true;
+
+  return false;
+}
+
 const membershipRepo = new CouncilMembershipRepository(drizzleClient);
-const providerKeypair = Keypair.fromSecret(PROVIDER_SK);
+const ppRepo = new PpRepository(drizzleClient);
 
 /**
  * POST /dashboard/council/discover
@@ -37,9 +75,43 @@ export const discoverCouncilHandler = async (ctx: Context) => {
       ctx.response.body = { message: "councilUrl must be a valid HTTP(S) URL" };
       return;
     }
+
+    if (isInternalUrl(parsed)) {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "councilUrl must not target internal addresses" };
+      return;
+    }
+
+    // Parse the URL to extract the base and optional council ID
     const councilId = parsed.searchParams.get("council");
     const baseUrl = `${parsed.origin}`;
-    const res = await fetch(`${baseUrl}/api/v1/public/council`);
+    const councilQs = councilId ? `?councilId=${encodeURIComponent(councilId)}` : "";
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/api/v1/public/council${councilQs}`, {
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        ctx.response.status = Status.GatewayTimeout;
+        ctx.response.body = { message: "Council request timed out" };
+        return;
+      }
+      throw err;
+    }
+    clearTimeout(timeoutId);
+
+    const contentLength = parseInt(res.headers.get("Content-Length") ?? "0", 10);
+    if (contentLength > 1_048_576) {
+      await res.body?.cancel();
+      ctx.response.status = Status.BadGateway;
+      ctx.response.body = { message: "Council response too large" };
+      return;
+    }
 
     if (!res.ok) {
       ctx.response.status = Status.BadGateway;
@@ -85,11 +157,12 @@ export const discoverCouncilHandler = async (ctx: Context) => {
 /**
  * POST /dashboard/council/join
  * Submits a signed join request to the council-platform.
+ * Requires ppPublicKey to identify which PP is joining.
  */
 export const joinCouncilHandler = async (ctx: Context) => {
   try {
     const body = await ctx.request.body.json();
-    const { councilUrl, label, contactEmail, jurisdictions } = body;
+    const { councilUrl, councilId: bodyCouncilId, councilName, councilPublicKey, ppPublicKey, label, contactEmail, jurisdictions } = body;
 
     if (!councilUrl || typeof councilUrl !== "string") {
       ctx.response.status = Status.BadRequest;
@@ -97,41 +170,84 @@ export const joinCouncilHandler = async (ctx: Context) => {
       return;
     }
 
-    // Check if already joined or pending
-    const existing = await membershipRepo.findByCouncilUrl(councilUrl.replace(/\/+$/, ""));
-    if (existing) {
-      ctx.response.status = Status.Conflict;
-      ctx.response.body = {
-        message: `Already ${existing.status.toLowerCase()} for this council`,
-        data: { status: existing.status },
-      };
+    if (!ppPublicKey || typeof ppPublicKey !== "string") {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "ppPublicKey is required" };
+      return;
+    }
+
+    // SSRF protection
+    try {
+      const parsedUrl = new URL(councilUrl);
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "councilUrl must be a valid HTTP(S) URL" };
+        return;
+      }
+      if (isInternalUrl(parsedUrl)) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "councilUrl must not target internal addresses" };
+        return;
+      }
+    } catch {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "councilUrl must be a valid URL" };
+      return;
+    }
+
+    // Verify PP is registered and owned by this user
+    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    if (!pp) {
+      ctx.response.status = Status.NotFound;
+      ctx.response.body = { message: "PP not registered. Register it first." };
       return;
     }
 
     const baseUrl = councilUrl.replace(/\/+$/, "");
 
-    // Build the callback endpoint for config push
-    const rawProto = ctx.request.headers.get("x-forwarded-proto") || ctx.request.url.protocol.replace(":", "");
-    const requestProto = rawProto === "https" ? "https" : "http";
-    const requestHost = ctx.request.url.hostname;
-    const callbackEndpoint = `${requestProto}://${requestHost}:${PORT}`;
+    // Check if this PP already has a membership for this council
+    const existing = await membershipRepo.findByCouncilUrlAndPp(baseUrl, ppPublicKey);
+    if (existing) {
+      ctx.response.status = Status.Conflict;
+      ctx.response.body = {
+        message: `This PP is already ${existing.status.toLowerCase()} for this council`,
+        data: { status: existing.status },
+      };
+      return;
+    }
 
-    // Build and sign the join request payload
-    const joinPayload = {
-      publicKey: providerKeypair.publicKey(),
-      label: label?.trim() ?? null,
-      contactEmail: contactEmail?.trim() ?? null,
-      jurisdictions: jurisdictions ?? null,
-      callbackEndpoint,
-    };
+    if (!bodyCouncilId || typeof bodyCouncilId !== "string") {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "councilId is required" };
+      return;
+    }
+    const councilId = bodyCouncilId;
 
-    const signed = await signPayload(joinPayload, PROVIDER_SK);
+    // The client must provide a pre-signed join request envelope
+    const { signedEnvelope } = body;
+    if (!signedEnvelope || !signedEnvelope.payload || !signedEnvelope.signature || !signedEnvelope.publicKey) {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "signedEnvelope is required (payload, signature, publicKey, timestamp)" };
+      return;
+    }
 
-    // Submit to council-platform
+    // Verify the envelope's publicKey matches the claimed ppPublicKey
+    if (signedEnvelope.publicKey !== ppPublicKey) {
+      LOG.warn("Join request publicKey mismatch", {
+        envelopePublicKey: signedEnvelope.publicKey,
+        ppPublicKey,
+      });
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "signedEnvelope publicKey does not match ppPublicKey" };
+      return;
+    }
+
+    // Relay the pre-signed envelope to the council-platform
     const res = await fetch(`${baseUrl}/api/v1/public/provider/join-request`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(signed),
+      body: JSON.stringify(signedEnvelope),
     });
 
     if (res.status === 409) {
@@ -141,33 +257,35 @@ export const joinCouncilHandler = async (ctx: Context) => {
     }
 
     if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
+      await res.body?.cancel();
       ctx.response.status = Status.BadGateway;
-      ctx.response.body = { message: errBody.message || `Council rejected request: HTTP ${res.status}` };
+      ctx.response.body = { message: "Council rejected the request" };
       return;
     }
 
     const { data: responseData } = await res.json();
 
-    // Fetch council info for storage
-    const councilRes = await fetch(`${baseUrl}/api/v1/public/council`);
-    const councilData = councilRes.ok ? (await councilRes.json()).data : null;
-
-    // Create membership record
+    // Create membership record scoped to this PP
     await membershipRepo.create({
       id: crypto.randomUUID(),
       councilUrl: baseUrl,
-      councilName: councilData?.council?.name ?? null,
-      councilPublicKey: councilData?.council?.councilPublicKey ?? "",
-      channelAuthId: councilData?.council?.channelAuthId ?? "",
+      councilName: councilName ?? null,
+      councilPublicKey: councilPublicKey ?? "",
+      channelAuthId: councilId,
       status: CouncilMembershipStatus.PENDING,
       joinRequestId: responseData?.id ?? null,
+      ppPublicKey,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
+    // Start watching this council's Channel Auth contract for provider_added/removed events
+    addCouncilWatcher(councilId);
+    addProviderAddress(ppPublicKey);
+
     LOG.info("Join request submitted to council", {
       councilUrl: baseUrl,
+      ppPublicKey,
       joinRequestId: responseData?.id,
     });
 
@@ -190,11 +308,29 @@ export const joinCouncilHandler = async (ctx: Context) => {
 
 /**
  * GET /dashboard/council/membership
- * Returns the current council membership status and config.
+ * Returns council membership for a specific PP.
+ * Query: ?ppPublicKey=G...
  */
 export const getMembershipHandler = async (ctx: Context) => {
   try {
-    const membership = await membershipRepo.getCurrent();
+    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+
+    if (!ppPublicKey) {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "ppPublicKey query parameter is required" };
+      return;
+    }
+
+    // Verify PP ownership
+    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    if (!pp) {
+      ctx.response.status = Status.NotFound;
+      ctx.response.body = { message: "Provider not found" };
+      return;
+    }
+
+    const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
 
     if (!membership) {
       ctx.response.status = Status.OK;
@@ -215,8 +351,9 @@ export const getMembershipHandler = async (ctx: Context) => {
         councilPublicKey: membership.councilPublicKey,
         channelAuthId: membership.channelAuthId,
         status: membership.status,
-        config: membership.configJson ? JSON.parse(membership.configJson) : null,
+        config: membership.configJson ? (() => { try { return JSON.parse(membership.configJson); } catch { return null; } })() : null,
         joinRequestId: membership.joinRequestId,
+        ppPublicKey: membership.ppPublicKey,
         createdAt: membership.createdAt.toISOString(),
       },
     };
@@ -226,5 +363,108 @@ export const getMembershipHandler = async (ctx: Context) => {
     });
     ctx.response.status = Status.InternalServerError;
     ctx.response.body = { message: "Failed to retrieve membership" };
+  }
+};
+
+/**
+ * POST /dashboard/council/membership
+ * Syncs a PP's membership status by querying the council's public endpoint.
+ * Updates the local DB if the status has changed.
+ * Body: { ppPublicKey: string }
+ */
+export const syncMembershipHandler = async (ctx: Context) => {
+  try {
+    const body = await ctx.request.body.json();
+    const { ppPublicKey } = body;
+
+    if (!ppPublicKey || typeof ppPublicKey !== "string") {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "ppPublicKey is required" };
+      return;
+    }
+
+    // Verify PP ownership
+    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    if (!pp) {
+      ctx.response.status = Status.NotFound;
+      ctx.response.body = { message: "Provider not found" };
+      return;
+    }
+
+    const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
+    if (!membership) {
+      ctx.response.status = Status.OK;
+      ctx.response.body = { message: "No membership", data: { status: null } };
+      return;
+    }
+
+    // Query the council's public membership-status endpoint
+    const { councilUrl, channelAuthId } = membership;
+    let remoteStatus: number | null = null;
+    let remoteBody: { status?: string } | null = null;
+    try {
+      const res = await fetch(
+        `${councilUrl}/api/v1/public/provider/membership-status?councilId=${encodeURIComponent(channelAuthId)}&publicKey=${encodeURIComponent(ppPublicKey)}`,
+      );
+      remoteStatus = res.status;
+      try {
+        remoteBody = await res.json();
+      } catch { /* body may not be JSON */ }
+    } catch (err) {
+      LOG.warn("Failed to query council membership status", {
+        councilUrl, channelAuthId, ppPublicKey,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    if (remoteStatus === 200 && membership.status !== CouncilMembershipStatus.ACTIVE) {
+      // Fetch config from council
+      let configJson: string | null = membership.configJson;
+      let councilName = membership.councilName;
+      try {
+        const configRes = await fetch(
+          `${councilUrl}/api/v1/public/council?councilId=${encodeURIComponent(channelAuthId)}`,
+        );
+        if (configRes.ok) {
+          const { data } = await configRes.json();
+          configJson = JSON.stringify(data);
+          councilName = data.council?.name ?? councilName;
+        }
+      } catch { /* best effort */ }
+
+      await membershipRepo.update(membership.id, {
+        status: CouncilMembershipStatus.ACTIVE,
+        configJson,
+        councilName,
+      });
+      LOG.info("Membership synced to ACTIVE", { ppPublicKey, channelAuthId });
+
+      ctx.response.status = Status.OK;
+      ctx.response.body = { message: "Membership synced", data: { status: "ACTIVE" } };
+      return;
+    }
+
+    // Only treat as REJECTED if the response body explicitly says so.
+    // HTTP 403 alone could mean rate limit or malformed request.
+    if (remoteBody?.status === "REJECTED" && membership.status !== CouncilMembershipStatus.REJECTED) {
+      await membershipRepo.update(membership.id, {
+        status: CouncilMembershipStatus.REJECTED,
+      });
+      LOG.info("Membership synced to REJECTED", { ppPublicKey, channelAuthId });
+
+      ctx.response.status = Status.OK;
+      ctx.response.body = { message: "Membership synced", data: { status: "REJECTED" } };
+      return;
+    }
+
+    ctx.response.status = Status.OK;
+    ctx.response.body = { message: "Membership unchanged", data: { status: membership.status } };
+  } catch (error) {
+    LOG.error("Failed to sync membership", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    ctx.response.status = Status.InternalServerError;
+    ctx.response.body = { message: "Failed to sync membership" };
   }
 };

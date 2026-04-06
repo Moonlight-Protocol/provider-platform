@@ -1,7 +1,11 @@
 import { type Context, Status } from "@oak/oak";
 import { verifyDashboardChallenge } from "@/core/service/auth/dashboard-auth.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
+import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import { WalletUserRepository } from "@/persistence/drizzle/repository/wallet-user.repository.ts";
 import { LOG } from "@/config/logger.ts";
+
+const walletUserRepo = new WalletUserRepository(drizzleClient);
 
 /**
  * POST /dashboard/auth/verify
@@ -32,6 +36,9 @@ export const postVerifyHandler = async (ctx: Context) => {
       providerPublicKey: publicKey,
       generateToken: generateJwt,
     });
+
+    // Create user record on first sign-in
+    await walletUserRepo.findOrCreate(publicKey);
 
     ctx.response.status = Status.OK;
     ctx.response.body = {

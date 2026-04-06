@@ -6,8 +6,7 @@
  */
 import { Buffer } from "buffer";
 import { LOG } from "@/config/logger.ts";
-import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
-import { ChannelReadMethods, type UTXOPublicKey } from "@moonlight/moonlight-sdk";
+import { ChannelReadMethods, type UTXOPublicKey, type PrivacyChannel } from "@moonlight/moonlight-sdk";
 
 /**
  * Queries on-chain UTXO balances for the given public keys.
@@ -17,13 +16,14 @@ import { ChannelReadMethods, type UTXOPublicKey } from "@moonlight/moonlight-sdk
  */
 export async function queryBalances(
   publicKeys: Uint8Array[],
+  channelClient: PrivacyChannel,
 ): Promise<bigint[]> {
   if (publicKeys.length === 0) {
     return [];
   }
 
   try {
-    const result = await CHANNEL_CLIENT.read({
+    const result = await channelClient.read({
       method: ChannelReadMethods.utxo_balances,
       methodArgs: {
         utxos: publicKeys.map((pk) => Buffer.from(pk)),

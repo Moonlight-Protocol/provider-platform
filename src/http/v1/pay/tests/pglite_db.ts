@@ -166,6 +166,16 @@ const MIGRATIONS = [
   CREATE INDEX "idx_bundles_status_updated" ON "operations_bundles" USING btree ("status","deleted_at","updated_at");
   `,
 
+  // 0005_add_retry_fail_reason_fields.sql
+  `
+  ALTER TYPE "public"."bundle_status" ADD VALUE IF NOT EXISTS 'FAILED';
+  ALTER TABLE "operations_bundles" ADD COLUMN IF NOT EXISTS "retry_count" integer DEFAULT 0 NOT NULL;
+  ALTER TABLE "operations_bundles" ADD COLUMN IF NOT EXISTS "last_failure_reason" text;
+  `,
+
+  // 0005b_add_channel_contract_id.sql
+  `ALTER TABLE "operations_bundles" ADD COLUMN IF NOT EXISTS "channel_contract_id" text;`,
+
   // 0006_pay_tables.sql
   `
   CREATE TYPE "public"."pay_kyc_status" AS ENUM('NONE', 'PENDING', 'VERIFIED');

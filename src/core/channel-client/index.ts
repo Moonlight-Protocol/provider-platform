@@ -1,38 +1,31 @@
-import {
-  CHANNEL_AUTH_ID,
-  CHANNEL_CONTRACT_ID,
-  NETWORK_CONFIG,
-  CHANNEL_ASSET,
-} from "../../config/env.ts";
+import { NETWORK_CONFIG } from "@/config/env.ts";
 import { PrivacyChannel } from "@moonlight/moonlight-sdk";
 
-let _channelClient: PrivacyChannel | null = null;
-let _configuredContractId = "";
+const channelCache = new Map<string, PrivacyChannel>();
 
-export function getChannelClient(): PrivacyChannel {
-  // Invalidate cache if config changed (e.g., after council join)
-  if (_channelClient && _configuredContractId !== CHANNEL_CONTRACT_ID) {
-    _channelClient = null;
-  }
-  if (!_channelClient) {
-    if (!CHANNEL_CONTRACT_ID || !CHANNEL_AUTH_ID) {
-      throw new Error("Channel client not available — no council configured yet");
-    }
-    _channelClient = new PrivacyChannel(
-      NETWORK_CONFIG,
-      CHANNEL_CONTRACT_ID,
-      CHANNEL_AUTH_ID,
-      CHANNEL_ASSET.contractId,
-    );
-    _configuredContractId = CHANNEL_CONTRACT_ID;
-  }
-  return _channelClient;
+/**
+ * Get or create a PrivacyChannel client for a specific channel.
+ * Cached by channelContractId.
+ */
+export function getChannelClient(
+  channelContractId: string,
+  channelAuthId: string,
+  assetContractId: string,
+): PrivacyChannel {
+  const cached = channelCache.get(channelContractId);
+  if (cached) return cached;
+
+  const client = new PrivacyChannel(
+    NETWORK_CONFIG,
+    channelContractId as `C${string}`,
+    channelAuthId as `C${string}`,
+    assetContractId as `C${string}`,
+  );
+  channelCache.set(channelContractId, client);
+  return client;
 }
 
-// Backwards-compatible export for existing code that uses CHANNEL_CLIENT directly.
-// Will throw at access time if channel is not configured.
-export const CHANNEL_CLIENT = new Proxy({} as PrivacyChannel, {
-  get(_target, prop) {
-    return (getChannelClient() as Record<string | symbol, unknown>)[prop];
-  },
-});
+/** Clear the cache (e.g., on config change). */
+export function clearChannelCache(): void {
+  channelCache.clear();
+}
