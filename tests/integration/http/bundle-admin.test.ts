@@ -85,6 +85,46 @@ Deno.test("validation – valid string bundleIds pass", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Validation: body type guard (rejects non-object JSON)
+// ---------------------------------------------------------------------------
+
+Deno.test("validation – array body does not pass the type guard", () => {
+  const raw: unknown = [1, 2, 3];
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, false);
+});
+
+Deno.test("validation – string body does not pass the type guard", () => {
+  const raw: unknown = "hello";
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, false);
+});
+
+Deno.test("validation – null body does not pass the type guard", () => {
+  const raw: unknown = null;
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, false);
+});
+
+Deno.test("validation – number body does not pass the type guard", () => {
+  const raw: unknown = 42;
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, false);
+});
+
+Deno.test("validation – object body passes the type guard", () => {
+  const raw: unknown = { olderThanMs: 60000 };
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, true);
+});
+
+Deno.test("validation – empty object body passes the type guard", () => {
+  const raw: unknown = {};
+  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  assertEquals(isObject, true);
+});
+
+// ---------------------------------------------------------------------------
 // Age-filter path: expireOlderThan (mirrors handler line 68-80)
 // ---------------------------------------------------------------------------
 
@@ -185,6 +225,37 @@ Deno.test("combined path – both filters contribute to total expired count", as
 
   assertEquals(ageExpiredIds.length, 1);
   assertEquals(ageExpiredIds[0], oldBundle);
+  assertEquals(idExpiredIds.length, 1);
+  assertEquals(idExpiredIds[0], recentBundle);
+
+  const total = ageExpiredIds.length + idExpiredIds.length;
+  assertEquals(total, 2);
+});
+
+Deno.test("combined path – overlapping IDs are deduplicated across age and explicit filters", async () => {
+  const repo = await setup();
+  const oldTime = new Date(Date.now() - 120_000);
+  const ACTIVE_STATUSES = [BundleStatus.PENDING, BundleStatus.PROCESSING];
+
+  const oldBundle = testBundleId();
+  const recentBundle = testBundleId();
+
+  await seedBundle({ id: oldBundle, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({ id: recentBundle, status: BundleStatus.PROCESSING });
+
+  const cutoff = new Date(Date.now() - 60_000);
+  const ageExpiredIds = await repo.expireOlderThan(cutoff, ACTIVE_STATUSES, 10_000);
+  assertEquals(ageExpiredIds.length, 1);
+  assertEquals(ageExpiredIds[0], oldBundle);
+
+  // oldBundle is in both filters — dedup logic should exclude it from the explicit-IDs path
+  const bundleIds = [oldBundle, recentBundle];
+  const remainingIds = bundleIds.filter((id) => !new Set(ageExpiredIds).has(id));
+
+  assertEquals(remainingIds.length, 1);
+  assertEquals(remainingIds[0], recentBundle);
+
+  const idExpiredIds = await repo.expireByIds(remainingIds, ACTIVE_STATUSES);
   assertEquals(idExpiredIds.length, 1);
   assertEquals(idExpiredIds[0], recentBundle);
 

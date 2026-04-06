@@ -230,12 +230,18 @@ export class Mempool {
     LOG.info("Initializing mempool from database...");
 
     if (MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS > 0) {
+      const STARTUP_EXPIRY_BATCH_LIMIT = 10_000;
       const cutoff = new Date(Date.now() - MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS);
-      const expiredIds = await operationsBundleRepository.expireOlderThan(cutoff, [
-        BundleStatus.PENDING,
-        BundleStatus.PROCESSING,
-      ]);
-      LOG.info(`Startup expiry: marked ${expiredIds.length} stale bundle(s) as EXPIRED (older than ${MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS}ms)`);
+      let totalExpired = 0;
+      let batch: string[];
+      do {
+        batch = await operationsBundleRepository.expireOlderThan(cutoff, [
+          BundleStatus.PENDING,
+          BundleStatus.PROCESSING,
+        ], STARTUP_EXPIRY_BATCH_LIMIT);
+        totalExpired += batch.length;
+      } while (batch.length >= STARTUP_EXPIRY_BATCH_LIMIT);
+      LOG.info(`Startup expiry: marked ${totalExpired} stale bundle(s) as EXPIRED (older than ${MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS}ms)`);
     }
 
     const bundles = await loadPendingBundlesFromDB();

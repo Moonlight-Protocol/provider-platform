@@ -27,7 +27,12 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
   let body: { olderThanMs?: number; bundleIds?: string[] };
   try {
     const raw = await ctx.request.body.json();
-    body = raw ?? {};
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      ctx.response.status = Status.BadRequest;
+      ctx.response.body = { message: "Body must be a JSON object" };
+      return;
+    }
+    body = raw;
   } catch {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "Invalid JSON body" };
@@ -79,16 +84,23 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
     }
   }
 
-  // 2. Explicit-IDs path: single atomic UPDATE with status guard, no N+1 queries
+  // 2. Explicit-IDs path: DB-first, then mempool-purge (same ordering as age-filter path)
   let idExpiredIds: string[] = [];
   if (hasIdFilter) {
-    // Evict from mempool before persisting for the same crash-safety reason above
-    getMempool().purgeBundles(bundleIds!);
-    idExpiredIds = await bundleRepo.expireByIds(bundleIds!, ACTIVE_STATUSES);
+    const remainingIds = ageExpiredIds.length > 0
+      ? bundleIds!.filter((id) => !new Set(ageExpiredIds).has(id))
+      : bundleIds!;
 
-    const skipped = bundleIds!.length - idExpiredIds.length;
-    if (skipped > 0) {
-      LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
+    if (remainingIds.length > 0) {
+      idExpiredIds = await bundleRepo.expireByIds(remainingIds, ACTIVE_STATUSES);
+      if (idExpiredIds.length > 0) {
+        getMempool().purgeBundles(idExpiredIds);
+      }
+
+      const skipped = remainingIds.length - idExpiredIds.length;
+      if (skipped > 0) {
+        LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
+      }
     }
   }
 

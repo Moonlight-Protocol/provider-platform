@@ -13,6 +13,13 @@ export function createRateLimitMiddleware(
     try {
       const clientIP = ctx.request.ip;
       const now = Date.now();
+
+      if (rateLimitMap.size > 1000) {
+        for (const [ip, entry] of rateLimitMap) {
+          if (now - entry.timestamp > windowMs) rateLimitMap.delete(ip);
+        }
+      }
+
       let entry = rateLimitMap.get(clientIP);
 
       if (!entry || now - entry.timestamp > windowMs) {
