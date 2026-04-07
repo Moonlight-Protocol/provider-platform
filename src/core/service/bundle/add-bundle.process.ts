@@ -8,6 +8,8 @@ import type { requestSchema } from "@/http/v1/bundle/post.ts";
 import type { PostEndpointInput } from "@/http/pipelines/types.ts";
 import type { OperationTypes } from "@moonlight/moonlight-sdk";
 import { MoonlightOperation } from "@moonlight/moonlight-sdk";
+import { getChannelClient } from "@/core/channel-client/index.ts";
+import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import {
   classifyOperations,
   calculateOperationAmounts,
@@ -161,7 +163,8 @@ async function persistCreateOperations(
 async function persistSpendOperations(
   operations: OperationTypes.SpendOperation[],
   bundleId: string,
-  accountId: string
+  accountId: string,
+  channelClient: import("@moonlight/moonlight-sdk").PrivacyChannel,
 ): Promise<void> {
   if (operations.length === 0) {
     return;
@@ -175,7 +178,7 @@ async function persistSpendOperations(
 
     // Fetch all UTXO balances from the network in batch for better performance.
     const utxoPublicKeys = operations.map((op) => op.getUtxo());
-    const balances = await fetchUtxoBalances(utxoPublicKeys);
+    const balances = await fetchUtxoBalances(utxoPublicKeys, channelClient);
 
     for (let i = 0; i < operations.length; i++) {
       const operation = operations[i];
@@ -220,6 +223,7 @@ function createSlotBundle(
 
   return {
     bundleId: bundleEntity.id,
+    channelContractId: bundleEntity.channelContractId ?? "",
     operationsMLXDR: bundleEntity.operationsMLXDR,
     operations: classified,
     fee: bundleEntity.fee,
@@ -237,8 +241,12 @@ function createSlotBundle(
 export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
-      const { operationsMLXDR } = input.body;
+      const { operationsMLXDR, channelContractId } = input.body;
       const sessionData = input.ctx.state.session as JwtSessionData;
+
+      // Resolve channel client for on-chain reads (UTXO balances)
+      const channelCtx = await resolveChannelContext(channelContractId);
+      const channelClient = channelCtx.channelClient;
 
       // 1. Session validation
       span.addEvent("validating_session");
@@ -265,8 +273,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
       // 4. Fee calculation
       span.addEvent("calculating_fee");
-      LOG.info("before calculateOperationAmounts: ", classified);
-      const amounts = await calculateOperationAmounts(classified);
+      const amounts = await calculateOperationAmounts(classified, channelClient);
       LOG.info("amounts: ", amounts);
       const feeCalculation = calculateFee(amounts);
 
@@ -282,6 +289,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         span.addEvent("updating_expired_bundle");
         bundleEntity = await operationsBundleRepository.update(bundleId, {
           status: BundleStatus.PENDING,
+          channelContractId,
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
           retryCount: 0,
@@ -293,6 +301,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         bundleEntity = await operationsBundleRepository.create({
           id: bundleId,
           status: BundleStatus.PENDING,
+          channelContractId,
           ttl: calculateBundleTtl(),
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
@@ -309,7 +318,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
       // 6. Persist UTXOs
       span.addEvent("persisting_utxos");
       await persistCreateOperations(classified.create, bundleEntity.id, userSession.accountId);
-      await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId);
+      await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId, channelClient);
 
       // 7. Create SlotBundle and add to Mempool
       span.addEvent("adding_to_mempool");

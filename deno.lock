@@ -11,7 +11,8 @@
     "jsr:@oak/commons@1": "1.0.1",
     "jsr:@oak/oak@^17.1.4": "17.2.0",
     "jsr:@olli/kvdex@^3.1.4": "3.4.2",
-    "jsr:@std/assert@1": "1.0.16",
+    "jsr:@std/assert@*": "1.0.19",
+    "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/bytes@1": "1.0.6",
     "jsr:@std/bytes@^1.0.4": "1.0.6",
     "jsr:@std/cli@1.0.12": "1.0.12",
@@ -23,7 +24,7 @@
     "jsr:@std/encoding@0.224.0": "0.224.0",
     "jsr:@std/encoding@1": "1.0.10",
     "jsr:@std/encoding@^1.0.10": "1.0.10",
-    "jsr:@std/http@1": "1.0.23",
+    "jsr:@std/http@1": "1.0.25",
     "jsr:@std/internal@^1.0.12": "1.0.12",
     "jsr:@std/media-types@1": "1.1.0",
     "jsr:@std/path@1": "1.1.4",
@@ -31,21 +32,21 @@
     "jsr:@std/ulid@1": "1.0.0",
     "jsr:@zaubrik/djwt@^3.0.2": "3.0.2",
     "npm:@drizzle-team/brocli@0.11": "0.11.0",
-    "npm:@electric-sql/pglite@*": "0.3.14",
+    "npm:@electric-sql/pglite@~0.2.17": "0.2.17",
     "npm:@opentelemetry/api@^1.9.0": "1.9.0",
     "npm:@stellar/stellar-sdk@14.6.1": "14.6.1",
     "npm:@stellar/stellar-sdk@^14.2.0": "14.6.1",
     "npm:@stellar/stellar-sdk@^14.6.1": "14.6.1",
-    "npm:@types/node@*": "24.2.0",
     "npm:asn1js@3.0.5": "3.0.5",
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
     "npm:chalk@^5.3.0": "5.6.2",
     "npm:drizzle-kit@*": "0.31.9_esbuild@0.25.12",
     "npm:drizzle-kit@~0.31.6": "0.31.9_esbuild@0.25.12",
-    "npm:drizzle-orm@~0.44.7": "0.44.7_@opentelemetry+api@1.9.0_postgres@3.4.8_@electric-sql+pglite@0.3.14",
+    "npm:drizzle-orm@~0.44.7": "0.44.7_@electric-sql+pglite@0.2.17_@opentelemetry+api@1.9.0_postgres@3.4.8",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
     "npm:postgres@^3.4.7": "3.4.8",
+    "npm:stellar-sdk@*": "13.3.0",
     "npm:zod@3.24.2": "3.24.2",
     "npm:zod@^3.24.0": "3.24.2"
   },
@@ -88,7 +89,7 @@
     "@oak/commons@1.0.1": {
       "integrity": "889ff210f0b4292591721be07244ecb1b5c118742f5273c70cf30d7cd4184d0c",
       "dependencies": [
-        "jsr:@std/assert",
+        "jsr:@std/assert@1",
         "jsr:@std/bytes@1",
         "jsr:@std/crypto",
         "jsr:@std/encoding@1",
@@ -100,7 +101,7 @@
       "integrity": "938537a92fc7922a46a9984696c65fb189c9baad164416ac3e336768a9ff0cd1",
       "dependencies": [
         "jsr:@oak/commons",
-        "jsr:@std/assert",
+        "jsr:@std/assert@1",
         "jsr:@std/bytes@1",
         "jsr:@std/http",
         "jsr:@std/media-types",
@@ -118,8 +119,11 @@
         "npm:zod@^3.24.0"
       ]
     },
-    "@std/assert@1.0.16": {
-      "integrity": "6a7272ed1eaa77defe76e5ff63ca705d9c495077e2d5fd0126d2b53fc5bd6532"
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
     },
     "@std/bytes@1.0.6": {
       "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
@@ -142,8 +146,8 @@
     "@std/encoding@1.0.10": {
       "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
     },
-    "@std/http@1.0.23": {
-      "integrity": "6634e9e034c589bf35101c1b5ee5bbf052a5987abca20f903e58bdba85c80dee",
+    "@std/http@1.0.25": {
+      "integrity": "577b4252290af1097132812b339fffdd55fb0f4aeb98ff11bdbf67998aa17193",
       "dependencies": [
         "jsr:@std/encoding@^1.0.10"
       ]
@@ -183,8 +187,8 @@
     "@drizzle-team/brocli@0.11.0": {
       "integrity": "sha512-hD3pekGiPg0WPCCGAZmusBBJsDqGUR66Y452YgQsZOnkdQ7ViEPKuyP4huUGEZQefp8g34RRodXYmJ2TbCH+tg=="
     },
-    "@electric-sql/pglite@0.3.14": {
-      "integrity": "sha512-3DB258dhqdsArOI1fIt7cb9RpUOgcDg5hXWVgVHAeqVQ/qxtFy605QKs4gx6mFq3jWsSPqDN8TgSEsqC3OfV9Q=="
+    "@electric-sql/pglite@0.2.17": {
+      "integrity": "sha512-qEpKRT2oUaWDH6tjRxLHjdzMqRUGYDnGZlKrnL4dJ77JVMcP2Hpo3NYnOSPKdZdeec57B6QPprCUFg0picx5Pw=="
     },
     "@esbuild-kit/core-utils@3.3.2": {
       "integrity": "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==",
@@ -457,6 +461,20 @@
     "@stellar/js-xdr@3.1.2": {
       "integrity": "sha512-VVolPL5goVEIsvuGqDc5uiKxV03lzfWdvYg1KikvwheDmTBO68CKDji3bAZ/kppZrx5iTA8z3Ld5yuytcvhvOQ=="
     },
+    "@stellar/stellar-base@13.1.0": {
+      "integrity": "sha512-90EArG+eCCEzDGj3OJNoCtwpWDwxjv+rs/RNPhvg4bulpjN/CSRj+Ys/SalRcfM4/WRC5/qAfjzmJBAuquWhkA==",
+      "dependencies": [
+        "@stellar/js-xdr",
+        "base32.js",
+        "bignumber.js",
+        "buffer",
+        "sha.js",
+        "tweetnacl"
+      ],
+      "optionalDependencies": [
+        "sodium-native"
+      ]
+    },
     "@stellar/stellar-base@14.1.0": {
       "integrity": "sha512-A8kFli6QGy22SRF45IjgPAJfUNGjnI+R7g4DF5NZYVsD1kGf7B4ITyc4OPclLV9tqNI4/lXxafGEw0JEUbHixw==",
       "dependencies": [
@@ -471,7 +489,7 @@
     "@stellar/stellar-sdk@14.6.1": {
       "integrity": "sha512-A1rQWDLdUasXkMXnYSuhgep+3ZZzyuXJKdt5/KAIc0gkmSp906HTvUpbT4pu+bVr41tu0+J4Ugz9J4BQAGGytg==",
       "dependencies": [
-        "@stellar/stellar-base",
+        "@stellar/stellar-base@14.1.0",
         "axios",
         "bignumber.js",
         "commander",
@@ -482,12 +500,6 @@
         "urijs"
       ],
       "bin": true
-    },
-    "@types/node@24.2.0": {
-      "integrity": "sha512-3xyG3pMCq3oYCNg7/ZP+E1ooTaGB4cG8JWRsqqOYQdbWNY4zbaV0Ennrd7stjiJEFZCaybcIgpTjJWHRfBSIDw==",
-      "dependencies": [
-        "undici-types"
-      ]
     },
     "asn1js@3.0.5": {
       "integrity": "sha512-FVnvrKJwpt9LP2lAMl8qZswRNm3T4q9CON+bxldk2iwk3FFpuwhx2FfinyitizWHsVYyaY+y5JzDR0rCMV5yTQ==",
@@ -513,6 +525,22 @@
         "form-data",
         "proxy-from-env"
       ]
+    },
+    "bare-addon-resolve@1.10.0": {
+      "integrity": "sha512-sSd0jieRJlDaODOzj0oe0RjFVC1QI0ZIjGIdPkbrTXsdVVtENg14c+lHHAhHwmWCZ2nQlMhy8jA3Y5LYPc/isA==",
+      "dependencies": [
+        "bare-module-resolve",
+        "bare-semver"
+      ]
+    },
+    "bare-module-resolve@1.12.1": {
+      "integrity": "sha512-hbmAPyFpEq8FoZMd5sFO3u6MC5feluWoGE8YKlA8fCrl6mNtx68Wjg4DTiDJcqRJaovTvOYKfYngoBUnbaT7eg==",
+      "dependencies": [
+        "bare-semver"
+      ]
+    },
+    "bare-semver@1.0.2": {
+      "integrity": "sha512-ESVaN2nzWhcI5tf3Zzcq9aqCZ676VWzqw07eEZ0qxAcEOAFYBa0pWq8sK34OQeHLY3JsfKXZS9mDyzyxGjeLzA=="
     },
     "base32.js@0.1.0": {
       "integrity": "sha512-n3TkB02ixgBOhTvANakDb4xaMXnYUVkNoRFJjQflcqMQhyEKxEHdj3E6N8t8sUQ0mjH/3/JxzlXuz3ul/J90pQ=="
@@ -595,18 +623,7 @@
       ],
       "bin": true
     },
-    "drizzle-orm@0.44.7_@opentelemetry+api@1.9.0_postgres@3.4.8": {
-      "integrity": "sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==",
-      "dependencies": [
-        "@opentelemetry/api",
-        "postgres"
-      ],
-      "optionalPeers": [
-        "@opentelemetry/api",
-        "postgres"
-      ]
-    },
-    "drizzle-orm@0.44.7_@opentelemetry+api@1.9.0_postgres@3.4.8_@electric-sql+pglite@0.3.14": {
+    "drizzle-orm@0.44.7_@electric-sql+pglite@0.2.17_@opentelemetry+api@1.9.0_postgres@3.4.8": {
       "integrity": "sha512-quIpnYznjU9lHshEOAYLoZ9s3jweleHlZIAWR/jX9gAWNg/JhQ1wj0KGRf7/Zm+obRrYd9GjPVJg790QY9N5AQ==",
       "dependencies": [
         "@electric-sql/pglite",
@@ -863,6 +880,12 @@
         "safe-buffer"
       ]
     },
+    "require-addon@1.2.0": {
+      "integrity": "sha512-VNPDZlYgIYQwWp9jMTzljx+k0ZtatKlcvOhktZ/anNPI3dQ9NXk7cq2U4iJ1wd9IrytRnYhyEocFWbkdPb+MYA==",
+      "dependencies": [
+        "bare-addon-resolve"
+      ]
+    },
     "resolve-pkg-maps@1.0.0": {
       "integrity": "sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw=="
     },
@@ -889,6 +912,12 @@
       ],
       "bin": true
     },
+    "sodium-native@4.3.3": {
+      "integrity": "sha512-OnxSlN3uyY8D0EsLHpmm2HOFmKddQVvEMmsakCrXUzSd8kjjbzL413t4ZNF3n0UxSwNgwTyUvkmZHTfuCeiYSw==",
+      "dependencies": [
+        "require-addon"
+      ]
+    },
     "source-map-support@0.5.21": {
       "integrity": "sha512-uBHU3L3czsIyYXKX88fdrGovxdSCoTGDRZ6SYXtSRxLZUzHg5P/66Ht6uoUlHu9EZod+inXhKo3qQgwXUT/y1w==",
       "dependencies": [
@@ -898,6 +927,20 @@
     },
     "source-map@0.6.1": {
       "integrity": "sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g=="
+    },
+    "stellar-sdk@13.3.0": {
+      "integrity": "sha512-jAA3+U7oAUueldoS4kuEhcym+DigElWq9isPxt7tjMrE7kTJ2vvY29waavUb2FSfQIWwGbuwAJTYddy2BeyJsw==",
+      "dependencies": [
+        "@stellar/stellar-base@13.1.0",
+        "axios",
+        "bignumber.js",
+        "eventsource",
+        "feaxios",
+        "randombytes",
+        "toml",
+        "urijs"
+      ],
+      "deprecated": true
     },
     "to-buffer@1.2.2": {
       "integrity": "sha512-db0E3UJjcFhpDhAF4tLo03oli3pwl3dbnzXOUIlRKrp+ldk/VUxzpWYZENsw2SZiuBjHAk7DfB0VU7NKdpb6sw==",
@@ -913,6 +956,9 @@
     "tslib@2.8.1": {
       "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
     },
+    "tweetnacl@1.0.3": {
+      "integrity": "sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw=="
+    },
     "typed-array-buffer@1.0.3": {
       "integrity": "sha512-nAYYwfY3qnzX30IkA6AQZjVbtK6duGontcQm1WSG1MD94YLqK0515GNApXkoxKOWMusVssAHWLh9SeaoefYFGw==",
       "dependencies": [
@@ -920,9 +966,6 @@
         "es-errors",
         "is-typed-array"
       ]
-    },
-    "undici-types@7.10.0": {
-      "integrity": "sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag=="
     },
     "urijs@1.19.11": {
       "integrity": "sha512-HXgFDgDommxn5/bIv0cnQZsPhHDA90NPHD6+c/v21U5+Sx5hoP8+dP9IZXBU1gIfvdRfhG8cel9QNPeionfcCQ=="
@@ -955,6 +998,7 @@
       "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",
+      "npm:@electric-sql/pglite@~0.2.17",
       "npm:@opentelemetry/api@^1.9.0",
       "npm:@stellar/stellar-sdk@14.6.1",
       "npm:asn1js@3.0.5",

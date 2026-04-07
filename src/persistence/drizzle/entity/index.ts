@@ -13,4 +13,6 @@ export * from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 export * from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
-
+export * from "@/persistence/drizzle/entity/council-membership.entity.ts";
+export * from "@/persistence/drizzle/entity/pp.entity.ts";
+export * from "@/persistence/drizzle/entity/wallet-user.entity.ts";

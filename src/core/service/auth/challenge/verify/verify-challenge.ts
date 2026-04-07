@@ -1,6 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import { Transaction, Keypair, type OperationType } from "stellar-sdk";
-import { PROVIDER_ACCOUNT } from "@/core/service/auth/service/service-account.ts";
+import { getProviderAccount } from "@/core/service/auth/service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
 import * as E from "@/core/service/auth/challenge/verify/error.ts";
@@ -81,7 +81,7 @@ export const P_VerifyChallenge = ProcessEngine.create(
 
         for (const sig of tx.signatures) {
           if (
-            PROVIDER_ACCOUNT.verifySignature(
+            getProviderAccount().verifySignature(
               // deno-lint-ignore no-explicit-any
               tx.hash() as any, // Forcing type to Buffer as there seems to be an issue with the lib type inference
               // deno-lint-ignore no-explicit-any

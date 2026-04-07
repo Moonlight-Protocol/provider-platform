@@ -65,6 +65,7 @@ export async function createSlotBundleFromEntity(
 
   return {
     bundleId: bundle.id,
+    channelContractId: bundle.channelContractId ?? "",
     operationsMLXDR: bundle.operationsMLXDR,
     operations: classified,
     fee: bundle.fee,
@@ -96,9 +97,12 @@ export class Slot {
   private bundles: SlotBundle[] = [];
   private currentWeight: number = 0;
   private capacity: number;
+  /** All bundles in a slot must target the same channel. */
+  readonly channelContractId: string;
 
-  constructor(capacity: number) {
+  constructor(capacity: number, channelContractId: string) {
     this.capacity = capacity;
+    this.channelContractId = channelContractId;
   }
 
   /**
@@ -253,9 +257,12 @@ export class Mempool {
       }
 
       let bundleToAdd: SlotBundle | null = bundleData;
+      const channel = bundleData.channelContractId;
 
+      // Only try slots that match this bundle's channel
       for (const slot of this.slots) {
         if (!bundleToAdd) break;
+        if (slot.channelContractId !== channel) continue;
 
         const removed = slot.add(bundleToAdd);
         if (removed === null) {
@@ -268,7 +275,7 @@ export class Mempool {
       }
 
       if (bundleToAdd) {
-        const newSlot = new Slot(this.capacity);
+        const newSlot = new Slot(this.capacity, channel);
         const result = newSlot.add(bundleToAdd);
         if (result === null) {
           this.slots.push(newSlot);

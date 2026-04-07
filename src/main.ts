@@ -16,7 +16,7 @@ async function bootstrap() {
     // Initialize mempool system before starting HTTP server
     await initializeMempoolSystem();
 
-    // Start watching for Channel Auth contract events
+    // Start watching for Channel Auth contract events (loaded from DB)
     await startEventWatcher();
 
     const app = new Application();
@@ -28,14 +28,15 @@ async function bootstrap() {
     app.use(appendResponseHeadersMiddleware);
     app.use(apiVi.routes());
 
-    LOG.info(`🚀 Executer Server running on http://localhost:${PORT}`);
+    LOG.info(`Server running on http://localhost:${PORT}`);
 
     // Setup graceful shutdown
     const shutdown = () => {
       LOG.info("Shutting down server...");
-      stopEventWatcher();
-      shutdownMempoolSystem();
-      Deno.exit(0);
+      Promise.all([
+        stopEventWatcher(),
+        shutdownMempoolSystem(),
+      ]).finally(() => Deno.exit(0));
     };
 
     Deno.addSignalListener("SIGINT", shutdown);
@@ -46,9 +47,10 @@ async function bootstrap() {
     LOG.error("Failed to start server", {
       error: error instanceof Error ? error.message : String(error),
     });
-    stopEventWatcher();
-    shutdownMempoolSystem();
-    Deno.exit(1);
+    Promise.all([
+      stopEventWatcher(),
+      shutdownMempoolSystem(),
+    ]).finally(() => Deno.exit(1));
   }
 }
 

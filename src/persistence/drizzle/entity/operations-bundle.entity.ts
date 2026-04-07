@@ -22,6 +22,7 @@ export const bundleStatusEnum = pgEnum("bundle_status", [
 export const operationsBundle = pgTable("operations_bundles", {
   id: text("id").primaryKey(),
   status: bundleStatusEnum("status").notNull(),
+  channelContractId: text("channel_contract_id"),
   ttl: timestamp("ttl", { withTimezone: true }).notNull(),
   operationsMLXDR: jsonb("operations_mlxdr").$type<string[]>().notNull(),
   fee: bigint("fee", { mode: "bigint" }).notNull(),

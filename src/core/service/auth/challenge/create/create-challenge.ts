@@ -1,6 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import { isTransaction } from "@colibri/core";
-import { PROVIDER_ACCOUNT } from "@/core/service/auth/service/service-account.ts";
+import { getProviderAccount } from "@/core/service/auth/service/service-account.ts";
 import getBase64Nonce from "@/utils/rand/getBase64Nonce.ts";
 import {
   Account,
@@ -97,7 +97,7 @@ const getChallengeTransaction = (
     value: nonceBase64,
   });
 
-  const providerAccount = new Account(PROVIDER_ACCOUNT.publicKey(), "-1");
+  const providerAccount = new Account(getProviderAccount().publicKey(), "-1");
 
   const txBuilder = new TransactionBuilder(providerAccount, {
     timebounds: { minTime: minTime.toString(), maxTime: maxTime.toString() },
@@ -108,7 +108,7 @@ const getChallengeTransaction = (
   txBuilder.addOperation(op);
   const builtTx = txBuilder.build();
 
-  const signedTx = PROVIDER_ACCOUNT.signTransaction(builtTx);
+  const signedTx = getProviderAccount().signTransaction(builtTx);
   const signedTxObj = TransactionBuilder.fromXDR(
     signedTx,
     NETWORK_CONFIG.networkPassphrase

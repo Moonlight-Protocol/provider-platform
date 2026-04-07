@@ -1,10 +1,9 @@
 import { MoonlightOperation, MoonlightTransactionBuilder } from "@moonlight/moonlight-sdk";
 import type { Slot } from "@/core/service/mempool/mempool.process.ts";
 import type { TransactionBuildResult } from "@/core/service/executor/executor.types.ts";
-import { CHANNEL_CLIENT } from "@/core/channel-client/index.ts";
 import { UtxoBasedStellarAccount, UTXOStatus } from "@moonlight/moonlight-sdk";
-import { OPEX_SK } from "@/config/env.ts";
 import { withSpan } from "@/core/tracing.ts";
+import type { ChannelContext } from "@/core/service/executor/channel-resolver.ts";
 
 const EXECUTOR_CONFIG = {
   OPEX_UTXO_BATCH_SIZE: 200,
@@ -12,14 +11,12 @@ const EXECUTOR_CONFIG = {
 } as const;
 
 /**
- * Builds a transaction from a slot containing multiple bundles
- * Aggregates all operations and calculates total fee
- * 
- * @param slot - Slot containing bundles to be sent in transaction
- * @returns Transaction builder ready to be signed and submitted
+ * Builds a transaction from a slot containing multiple bundles.
+ * Uses the resolved channel context for the PP's signer and channel client.
  */
 export async function buildTransactionFromSlot(
-  slot: Slot
+  slot: Slot,
+  ctx: ChannelContext,
 ): Promise<TransactionBuildResult> {
   return withSpan("Executor.buildTransactionFromSlot", async (span) => {
     const bundles = slot.getBundles();
@@ -29,10 +26,10 @@ export async function buildTransactionFromSlot(
     }
 
     span.addEvent("setting_up_tx_builder", { "bundles.count": bundles.length });
-    const txBuilder = MoonlightTransactionBuilder.fromPrivacyChannel(CHANNEL_CLIENT);
+    const txBuilder = MoonlightTransactionBuilder.fromPrivacyChannel(ctx.channelClient);
     const opexHandler = UtxoBasedStellarAccount.fromPrivacyChannel({
-      channelClient: CHANNEL_CLIENT,
-      root: OPEX_SK,
+      channelClient: ctx.channelClient,
+      root: ctx.ppSecretKey as `S${string}`,
       options: {
         batchSize: EXECUTOR_CONFIG.OPEX_UTXO_BATCH_SIZE,
       },

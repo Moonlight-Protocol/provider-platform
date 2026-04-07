@@ -83,6 +83,18 @@ export class ChannelRegistry {
     await this.persist();
   }
 
+  /** Dynamically add a channel to track (e.g., when a PP joins a new council). */
+  addChannel(contractId: string): void {
+    this.configuredChannels.add(contractId);
+    if (!this.channels.has(contractId)) {
+      this.channels.set(contractId, {
+        contractId,
+        state: "active",
+        registeredAtLedger: 0,
+      });
+    }
+  }
+
   /**
    * Handle a Channel Auth event and update registry state.
    */

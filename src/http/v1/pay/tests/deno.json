@@ -10,6 +10,7 @@
     "@/config/logger.ts": "./mock_logger.ts",
     "@/core/service/auth/generate-jwt.ts": "./mock_jwt.ts",
     "@/core/service/pay/channel.service.ts": "./mock_channel_service.ts",
+    "@/core/service/executor/channel-resolver.ts": "./mock_channel_resolver.ts",
 
     "@electric-sql/pglite": "npm:@electric-sql/pglite@^0.2.17",
 

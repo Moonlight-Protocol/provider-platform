@@ -44,6 +44,7 @@ export type WeightConfig = {
  */
 export type SlotBundle = {
   bundleId: string;
+  channelContractId: string;
   operationsMLXDR: string[];
   operations: ClassifiedOperations;
   fee: bigint;

@@ -53,6 +53,7 @@ async function getTxStatus(txId: string): Promise<TransactionStatus | undefined>
 function mockCreateSlotBundle(bundle: OperationsBundle): Promise<SlotBundle> {
   return Promise.resolve({
     bundleId: bundle.id,
+    channelContractId: bundle.channelContractId ?? "",
     operationsMLXDR: bundle.operationsMLXDR,
     operations: { create: [], spend: [], deposit: [], withdraw: [] },
     fee: bundle.fee,
