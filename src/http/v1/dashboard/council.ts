@@ -461,9 +461,14 @@ export const syncMembershipHandler = async (ctx: Context) => {
       return;
     }
 
-    // Only treat as REJECTED if the response body explicitly says so.
-    // HTTP 403 alone could mean rate limit or malformed request.
-    if (remoteBody?.status === "REJECTED" && membership.status !== CouncilMembershipStatus.REJECTED) {
+    // Treat as REJECTED when the council explicitly says so, OR when the
+    // council returns NOT_FOUND (404) for a locally PENDING membership —
+    // the request is no longer pending on their side, so it was rejected.
+    const isExplicitReject = remoteBody?.status === "REJECTED";
+    const isImplicitReject = remoteStatus === 404 && remoteBody?.status === "NOT_FOUND" &&
+      membership.status === CouncilMembershipStatus.PENDING;
+
+    if ((isExplicitReject || isImplicitReject) && membership.status !== CouncilMembershipStatus.REJECTED) {
       await membershipRepo.update(membership.id, {
         status: CouncilMembershipStatus.REJECTED,
       });
