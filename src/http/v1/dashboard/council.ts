@@ -461,9 +461,15 @@ export const syncMembershipHandler = async (ctx: Context) => {
       return;
     }
 
-    // Only treat as REJECTED if the response body explicitly says so.
-    // HTTP 403 alone could mean rate limit or malformed request.
-    if (remoteBody?.status === "REJECTED" && membership.status !== CouncilMembershipStatus.REJECTED) {
+    // Council returns 404 + body { status: "NOT_FOUND" } for both rejected
+    // and never-existed providers — by design, to prevent enumeration of
+    // rejected pubkeys via the public endpoint. We can still distinguish:
+    // if our LOCAL state is PENDING then we know we did submit a join request
+    // (joinRequestId is set) and the council acknowledged it. If the council
+    // now says we don't exist, the only consistent interpretation is that
+    // the request was rejected. Inferring REJECTED from absence + local
+    // PENDING is sound and doesn't require any new endpoints on the council.
+    if (remoteStatus === 404 && membership.status === CouncilMembershipStatus.PENDING) {
       await membershipRepo.update(membership.id, {
         status: CouncilMembershipStatus.REJECTED,
       });
