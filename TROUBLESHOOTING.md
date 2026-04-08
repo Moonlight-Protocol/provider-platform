@@ -31,17 +31,14 @@ curl -s -H "Authorization: Bearer $FLY_API_TOKEN" \
 
 The app requires env vars set both in `fly.toml` (non-sensitive) and Fly secrets (sensitive). If a new env var is added to the code but not to Fly, the app will crash-loop.
 
+The platform only reads **infrastructure and operational** config from the environment. Privacy Provider keys, council references, and contract IDs are NOT env vars — they live in the database and are populated via the dashboard API.
+
 **Required secrets** (set via `fly secrets set`):
-- `DATABASE_URL` — Postgres connection string
-- `PROVIDER_SK` — Provider Stellar secret key
-- `OPEX_SECRET` — Operational expense account secret key
-- `SERVICE_AUTH_SECRET` — JWT signing secret
-- `CHANNEL_ASSET_CONTRACT_ID` — XLM SAC contract address
+- `DATABASE_URL` — Postgres connection string (provisioned by `fly postgres create` and attached)
+- `SERVICE_AUTH_SECRET` — used both for JWT signing AND for at-rest encryption of PP secret keys in the database
 
 **Required env vars** (set in `fly.toml` `[env]`):
-- `CHANNEL_CONTRACT_ID` — Privacy channel contract
-- `CHANNEL_AUTH_ID` — Channel auth contract
-- All other vars in the `[env]` section
+- See the `[env]` block in `fly.toml` for the full list (PORT, MODE, NETWORK, NETWORK_FEE, SERVICE_DOMAIN, CHALLENGE_TTL, SESSION_TTL, MEMPOOL_*).
 
 **Fix**:
 ```bash
@@ -84,22 +81,16 @@ fly machine destroy <machine-id> --force -a moonlight-beta-privacy-provider-a
 
 ### Contract ID Updates
 
-When contracts are redeployed to testnet, the provider-platform needs updated contract IDs:
+Contract IDs are NOT env vars in this platform. With the multi-PP / multi-council architecture, channel routing happens at request time:
 
-```bash
-# After running deploy-testnet/deploy.sh, copy the output and run:
-fly secrets set \
-  CHANNEL_CONTRACT_ID=C... \
-  CHANNEL_AUTH_ID=C... \
-  CHANNEL_ASSET_CONTRACT_ID=C... \
-  -a moonlight-beta-privacy-provider-a
-```
+1. The bundle POST body includes `channelContractId`
+2. `core/service/executor/channel-resolver.ts` looks up which PP serves that channel by walking `payment_providers` and inspecting each PP's `council_memberships.config_json`
+3. The matching PP's encrypted secret key is decrypted and used to sign the bundle
 
-The XLM SAC contract ID is deterministic per network:
-```bash
-stellar contract id asset --asset native --network testnet
-# Testnet: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
-```
+To update contract IDs after a testnet redeploy:
+1. Re-run the council setup flow (council-console → create council with the new channel-auth contract → add the new privacy channel)
+2. Re-register your PP via the provider-console join flow
+3. The new IDs land in the database — no fly secrets to update
 
 ## Logs
 

@@ -92,16 +92,13 @@ deno task serve
 
 ## Deploy (to testnet)
 
-Follow a similar process to local setup, replacing `local` with `testnet`.
-
-To integrate with the existing testnet privacy channel maintained by the Moonlight team (see `fly.toml` for contract addresses), create `provider` and `treasury` accounts, then contact us to get your provider registered with our quorum contract.
-
 We deploy to [fly.io](https://fly.io). The `fly.toml` file is provided as a minimal example.
 
-To deploy to Fly.io: update `fly.toml` with your `OPEX_PUBLIC`, push to GitHub, then deploy from your Fly.io dashboard (branch: `dev`). Set these secrets:
+The platform reads only **infrastructure and operational** config from the environment — never Privacy Provider keys, council references, or contract IDs. Those are stored in the database via the dashboard API (`POST /api/v1/dashboard/pp/register`) and the council join flow (`POST /api/v1/dashboard/council/join`). The encryption key for stored secrets at rest is `SERVICE_AUTH_SECRET`.
 
-- `PROVIDER_SK`: `stellar keys show provider`
-- `OPEX_SECRET`: `stellar keys show treasury`
+To deploy: push to GitHub, then deploy from your Fly.io dashboard (branch: `dev`). Set these secrets:
+
+- `DATABASE_URL`: provisioned by `fly postgres create` and attached
 - `SERVICE_AUTH_SECRET`: generate with `node -e "console.log(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))))"`
 
 After deploying, SSH in and run migrations:
@@ -110,3 +107,5 @@ After deploying, SSH in and run migrations:
 fly console ssh -s
 deno task db:migrate
 ```
+
+Once the platform is up, register a Privacy Provider via the provider-console wallet flow (challenge-response auth → register PP → join a council). The encrypted PP key lands in the `payment_providers` table; council membership lands in `council_memberships`.

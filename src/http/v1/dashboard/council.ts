@@ -461,14 +461,15 @@ export const syncMembershipHandler = async (ctx: Context) => {
       return;
     }
 
-    // Treat as REJECTED when the council explicitly says so, OR when the
-    // council returns NOT_FOUND (404) for a locally PENDING membership —
-    // the request is no longer pending on their side, so it was rejected.
-    const isExplicitReject = remoteBody?.status === "REJECTED";
-    const isImplicitReject = remoteStatus === 404 && remoteBody?.status === "NOT_FOUND" &&
-      membership.status === CouncilMembershipStatus.PENDING;
-
-    if ((isExplicitReject || isImplicitReject) && membership.status !== CouncilMembershipStatus.REJECTED) {
+    // Council returns 404 + body { status: "NOT_FOUND" } for both rejected
+    // and never-existed providers — by design, to prevent enumeration of
+    // rejected pubkeys via the public endpoint. We can still distinguish:
+    // if our LOCAL state is PENDING then we know we did submit a join request
+    // (joinRequestId is set) and the council acknowledged it. If the council
+    // now says we don't exist, the only consistent interpretation is that
+    // the request was rejected. Inferring REJECTED from absence + local
+    // PENDING is sound and doesn't require any new endpoints on the council.
+    if (remoteStatus === 404 && membership.status === CouncilMembershipStatus.PENDING) {
       await membershipRepo.update(membership.id, {
         status: CouncilMembershipStatus.REJECTED,
       });
