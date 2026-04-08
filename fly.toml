@@ -13,26 +13,19 @@ primary_region = 'ams'
   MODE = 'development'
   LOG_LEVEL = 'TRACE' # Valid values: FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 
+  # Rule: only INFRASTRUCTURE + OPERATIONAL config goes here. Privacy
+  # Provider keys, council references, and contract IDs are stored in the
+  # database via the dashboard API and the council join flow — never as env vars.
+
   # DATABASE
   # DATABASE_URL=set by fly.io provisioned postgres
 
-  # STELLAR RELATED
+  # STELLAR
   NETWORK = 'testnet'
   NETWORK_FEE = '1000000000' #stroops
-  CHANNEL_ASSET_CONTRACT_ID='CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'
-  CHANNEL_CONTRACT_ID = 'CDMZSHMT2AIL2UG7XBOHZKXM6FY3MUP75HAXUUSAHLGRQ2VWPGYKPM5T'
-  CHANNEL_AUTH_ID = 'CAF7DFHTPSYIW5543WBXJODZCDI5WF5SSHBXGMPKFOYPFRDVWFDNBGX7'
-  CHANNEL_ASSET_CODE = 'XLM'
-
-  # PROVIDER MANAGEMENT
-  # GAIW4NXJOI5BQMDUPUUT2KNMSYPL3SZY45XCUDYYWM4KEJIXW5MO6DRE
-  # PROVIDER_SK=set in fly.io env secrets
-  OPEX_PUBLIC = 'GAKKWPIJFCWX4HFUBTKOBP2JLWIQTNBS5EYWEK4RLBXO37IWB5SSDZYX'
-  # OPEX_SECRET=set in fly.io env secrets
 
   # SERVICE
   SERVICE_DOMAIN = 'moonlight-beta-privacy-provider-a.fly.dev'
-  SERVICE_FEE = '100' #stroops
   # SERVICE_AUTH_SECRET=set in fly.io env secrets
 
   # AUTH
@@ -64,7 +57,7 @@ primary_region = 'ams'
     timeout = "3s"
     grace_period = "60s"
     method = "GET"
-    path = "/api/v1/stellar/auth?account=GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    path = "/api/v1/health"
 
 [deploy]
   strategy = "bluegreen"
