@@ -8,17 +8,22 @@ export function createRateLimitMiddleware(
   windowMs: number
 ): Middleware {
   const rateLimitMap = new Map<string, { count: number; timestamp: number }>();
+  let lastCleanupAt = 0;
+
+  const pruneExpiredEntries = (now: number) => {
+    if (rateLimitMap.size <= 1000) return;
+    if (now - lastCleanupAt < windowMs) return;
+    for (const [ip, entry] of rateLimitMap) {
+      if (now - entry.timestamp > windowMs) rateLimitMap.delete(ip);
+    }
+    lastCleanupAt = now;
+  };
 
   return async (ctx, next) => {
     try {
       const clientIP = ctx.request.ip;
       const now = Date.now();
-
-      if (rateLimitMap.size > 1000) {
-        for (const [ip, entry] of rateLimitMap) {
-          if (now - entry.timestamp > windowMs) rateLimitMap.delete(ip);
-        }
-      }
+      pruneExpiredEntries(now);
 
       let entry = rateLimitMap.get(clientIP);
 
@@ -47,6 +52,7 @@ export function createRateLimitMiddleware(
         ctx.request.headers.get("x-real-ip") ||
         "unknown";
       const now = Date.now();
+      pruneExpiredEntries(now);
       let entry = rateLimitMap.get(clientIP);
 
       if (!entry || now - entry.timestamp > windowMs) {

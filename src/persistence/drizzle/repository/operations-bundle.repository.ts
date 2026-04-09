@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, desc, count, gte, lte, inArray, lt } from "drizzle-orm";
+import { eq, and, or, isNull, desc, count, gte, lte, inArray, lt, asc } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   operationsBundle,
@@ -132,6 +132,7 @@ export class OperationsBundleRepository extends BaseRepository<
         .select({ id: operationsBundle.id })
         .from(operationsBundle)
         .where(baseConditions)
+        .orderBy(asc(operationsBundle.createdAt))
         .limit(limit);
 
       const result = await this.db

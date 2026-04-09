@@ -25,8 +25,8 @@
     "npm:@drizzle-team/brocli@0.11": "0.11.0",
     "npm:@electric-sql/pglite@0.3": "0.3.14",
     "npm:@opentelemetry/api@^1.9.0": "1.9.0",
-    "npm:@stellar/stellar-sdk@14.2.0": "14.2.0",
-    "npm:@stellar/stellar-sdk@^14.2.0": "14.2.0",
+    "npm:@stellar/stellar-sdk@14.6.1": "14.6.1",
+    "npm:@stellar/stellar-sdk@^14.2.0": "14.6.1",
     "npm:@stellar/stellar-sdk@^14.6.1": "14.6.1",
     "npm:@types/node@*": "24.2.0",
     "npm:asn1js@3.0.5": "3.0.5",
@@ -563,20 +563,6 @@
         "sha.js"
       ]
     },
-    "@stellar/stellar-sdk@14.2.0": {
-      "integrity": "sha512-7nh2ogzLRMhfkIC0fGjn1LHUzk3jqVw8tjAuTt5ADWfL9CSGBL18ILucE9igz2L/RU2AZgeAvhujAnW91Ut/oQ==",
-      "dependencies": [
-        "@stellar/stellar-base",
-        "axios",
-        "bignumber.js",
-        "eventsource",
-        "feaxios",
-        "randombytes",
-        "toml",
-        "urijs"
-      ],
-      "scripts": true
-    },
     "@stellar/stellar-sdk@14.6.1": {
       "integrity": "sha512-A1rQWDLdUasXkMXnYSuhgep+3ZZzyuXJKdt5/KAIc0gkmSp906HTvUpbT4pu+bVr41tu0+J4Ugz9J4BQAGGytg==",
       "dependencies": [
@@ -1086,7 +1072,7 @@
       "npm:@drizzle-team/brocli@0.11",
       "npm:@electric-sql/pglite@0.3",
       "npm:@opentelemetry/api@^1.9.0",
-      "npm:@stellar/stellar-sdk@14.2.0",
+      "npm:@stellar/stellar-sdk@14.6.1",
       "npm:asn1js@3.0.5",
       "npm:buffer@^6.0.3",
       "npm:chalk@^5.3.0",

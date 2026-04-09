@@ -5,7 +5,18 @@ import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.ent
 import { getMempool } from "@/core/mempool/index.ts";
 import { LOG } from "@/config/logger.ts";
 
-const bundleRepo = new OperationsBundleRepository(drizzleClient);
+let testBundleRepoOverride: OperationsBundleRepository | null = null;
+
+function getBundleRepo(): OperationsBundleRepository {
+  return testBundleRepoOverride ?? new OperationsBundleRepository(drizzleClient);
+}
+
+/**
+ * Test-only hook to override repository wiring in integration tests.
+ */
+export function setBundleRepoForTests(repo: OperationsBundleRepository | null) {
+  testBundleRepoOverride = repo;
+}
 
 const ACTIVE_STATUSES = [BundleStatus.PENDING, BundleStatus.PROCESSING];
 
@@ -20,8 +31,7 @@ const MAX_EXPIRE_IDS = 200;
  *   - olderThanMs: expire bundles created more than N milliseconds ago
  *   - bundleIds:   expire a specific list of bundle IDs (max 200)
  *
- * When `olderThanMs` matches more than 10 000 bundles the response includes
- * `truncated: true`; callers should repeat the request until truncated is false.
+ * The age-filter path processes records in 10k batches until completion.
  */
 export const postExpireBundlesHandler = async (ctx: Context) => {
   let body: { olderThanMs?: number; bundleIds?: string[] };
@@ -67,52 +77,45 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
   }
 
   const AGE_FILTER_LIMIT = 10_000;
-  let ageExpiredIds: string[] = [];
-  let truncated = false;
+  let ageExpiredCount = 0;
 
-  // 1. Age-filter path: single atomic UPDATE via expireOlderThan (no pre-read, no TOCTOU)
+  // 1. Age-filter path: bounded atomic UPDATE batches until done
   if (hasAgeFilter) {
     const cutoff = new Date(Date.now() - olderThanMs!);
-    ageExpiredIds = await bundleRepo.expireOlderThan(cutoff, ACTIVE_STATUSES, AGE_FILTER_LIMIT);
-
-    if (ageExpiredIds.length > 0) {
-      getMempool().purgeBundles(ageExpiredIds);
-    }
-
-    if (ageExpiredIds.length >= AGE_FILTER_LIMIT) {
-      truncated = true;
-    }
+    let batch: string[] = [];
+    do {
+      batch = await getBundleRepo().expireOlderThan(cutoff, ACTIVE_STATUSES, AGE_FILTER_LIMIT);
+      ageExpiredCount += batch.length;
+      if (batch.length > 0) {
+        getMempool().purgeBundles(batch);
+      }
+    } while (batch.length >= AGE_FILTER_LIMIT);
   }
 
   // 2. Explicit-IDs path: DB-first, then mempool-purge (same ordering as age-filter path)
-  let idExpiredIds: string[] = [];
+  let idExpiredCount = 0;
   if (hasIdFilter) {
-    const remainingIds = ageExpiredIds.length > 0
-      ? bundleIds!.filter((id) => !new Set(ageExpiredIds).has(id))
-      : bundleIds!;
+    const idExpiredIds = await getBundleRepo().expireByIds(bundleIds!, ACTIVE_STATUSES);
+    idExpiredCount = idExpiredIds.length;
+    if (idExpiredCount > 0) {
+      getMempool().purgeBundles(idExpiredIds);
+    }
 
-    if (remainingIds.length > 0) {
-      idExpiredIds = await bundleRepo.expireByIds(remainingIds, ACTIVE_STATUSES);
-      if (idExpiredIds.length > 0) {
-        getMempool().purgeBundles(idExpiredIds);
-      }
-
-      const skipped = remainingIds.length - idExpiredIds.length;
-      if (skipped > 0) {
-        LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
-      }
+    const skipped = bundleIds!.length - idExpiredCount;
+    if (skipped > 0) {
+      LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
     }
   }
 
-  const totalExpired = ageExpiredIds.length + idExpiredIds.length;
+  const totalExpired = ageExpiredCount + idExpiredCount;
 
   LOG.info(
-    `Admin expire: expired ${totalExpired} bundle(s) (age: ${ageExpiredIds.length}, ids: ${idExpiredIds.length})${truncated ? " [truncated]" : ""}`,
+    `Admin expire: expired ${totalExpired} bundle(s) (age: ${ageExpiredCount}, ids: ${idExpiredCount})`,
   );
 
   ctx.response.status = Status.OK;
   ctx.response.body = {
     message: `Expired ${totalExpired} bundle(s)`,
-    data: { expired: totalExpired, truncated },
+    data: { expired: totalExpired, truncated: false },
   };
 };
