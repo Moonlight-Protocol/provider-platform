@@ -6,6 +6,7 @@
   "tasks": {
     "serve": "deno run --allow-all --unstable-kv src/main.ts",
     "test": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/ && deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
+    "test:integration": "deno test --allow-all --no-check --config tests/deno.json tests/",
     "test:unit": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/",
     "test:pay": "deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
     "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",

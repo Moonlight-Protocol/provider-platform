@@ -1,3 +1,4 @@
+import "../../ensure_test_env.ts";
 import { Application, Router } from "@oak/oak";
 import { assertEquals } from "jsr:@std/assert";
 import { postExpireBundlesHandler, setBundleRepoForTests } from "@/http/v1/dashboard/bundle-admin.ts";
