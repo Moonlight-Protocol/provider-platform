@@ -5,9 +5,8 @@
   "exports": "./src/main.ts",
   "tasks": {
     "serve": "deno run --allow-all --unstable-kv src/main.ts",
-    "test": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/ && deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
-    "test:unit": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/",
-    "test:pay": "deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
+    "test": "deno test --allow-all --no-check src/",
+    "test:unit": "deno test --allow-all --no-check src/",
     "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",
     "db:migrate": "deno run --env -A --node-modules-dir npm:drizzle-kit migrate",
     "db:push": "deno run --env -A --node-modules-dir npm:drizzle-kit push",
@@ -43,9 +42,7 @@
     "@opentelemetry/api": "npm:@opentelemetry/api@^1.9.0",
     "@electric-sql/pglite": "npm:@electric-sql/pglite@^0.2.17"
   },
-  "test": {
-    "exclude": ["src/http/v1/pay/tests/"]
-  },
+  "test": {},
   "deploy": {
     "project": "159af174-b645-4039-be9c-493de4886f26",
     "exclude": ["**/node_modules"],
