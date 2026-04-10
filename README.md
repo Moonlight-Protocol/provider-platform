@@ -109,3 +109,7 @@ deno task db:migrate
 ```
 
 Once the platform is up, register a Privacy Provider via the provider-console wallet flow (challenge-response auth → register PP → join a council). The encrypted PP key lands in the `payment_providers` table; council membership lands in `council_memberships`.
+
+## Dashboard admin note
+
+`POST /api/v1/dashboard/bundles/expire` is a mutating operational endpoint. Today, dashboard JWT issuance intentionally allows any wallet that can complete the challenge flow (it does not enforce an operator allowlist in `verify`). This risk is currently accepted for operator workflows, and stronger authorization hardening is planned as a follow-up.
