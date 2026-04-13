@@ -1,6 +1,6 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
@@ -44,11 +44,15 @@
     "@electric-sql/pglite": "npm:@electric-sql/pglite@^0.2.17"
   },
   "test": {
-    "exclude": ["src/http/v1/pay/tests/"]
+    "exclude": [
+      "src/http/v1/pay/tests/"
+    ]
   },
   "deploy": {
     "project": "159af174-b645-4039-be9c-493de4886f26",
-    "exclude": ["**/node_modules"],
+    "exclude": [
+      "**/node_modules"
+    ],
     "include": [],
     "entrypoint": "src/main.ts"
   }
