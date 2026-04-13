@@ -1,13 +1,10 @@
 import type { Context, Next } from "@oak/oak";
 
-const ALLOWED_ORIGINS = [
-  "https://provider-console.fly.storage.tigris.dev",
-  "https://moonlight-council-console.fly.storage.tigris.dev",
-  "https://moonlight-pay-self.fly.storage.tigris.dev",
-  "https://moonlight-pay-custodial.fly.storage.tigris.dev",
-];
+const envOrigins = Deno.env.get("ALLOWED_ORIGINS");
+const ALLOWED_ORIGINS = envOrigins
+  ? envOrigins.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
 
-// Allow localhost in development
 if (Deno.env.get("MODE") === "development") {
   ALLOWED_ORIGINS.push(
     "http://localhost:3000", "http://localhost:3010", "http://localhost:3020",

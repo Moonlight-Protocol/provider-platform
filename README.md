@@ -100,6 +100,7 @@ To deploy: push to GitHub, then deploy from your Fly.io dashboard (branch: `dev`
 
 - `DATABASE_URL`: provisioned by `fly postgres create` and attached
 - `SERVICE_AUTH_SECRET`: generate with `node -e "console.log(btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))))"`
+- `ALLOWED_ORIGINS` (optional): comma-separated list of allowed CORS origins. Falls back to default Tigris URLs if not set.
 
 After deploying, SSH in and run migrations:
 
