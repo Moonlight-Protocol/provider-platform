@@ -28,6 +28,12 @@ primary_region = 'ams'
   SERVICE_DOMAIN = 'moonlight-beta-privacy-provider-a.fly.dev'
   # SERVICE_AUTH_SECRET=set in fly.io env secrets
 
+  # OPENTELEMETRY
+  OTEL_DENO = 'true'
+  OTEL_SERVICE_NAME = 'provider-platform'
+  OTEL_EXPORTER_OTLP_PROTOCOL = 'http/protobuf'
+  # OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS set in fly.io secrets
+
   # AUTH
   CHALLENGE_TTL = '900' #15m
   SESSION_TTL = '21600' #6h
