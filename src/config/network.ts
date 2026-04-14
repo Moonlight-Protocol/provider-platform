@@ -9,6 +9,19 @@ export function selectNetwork(envNetwork: string): {
   NETWORK: StellarNetworkId;
 } {
   switch (envNetwork) {
+    case "mainnet": {
+      const rpcUrl = loadOptionalEnv("STELLAR_RPC_URL") ??
+        "https://soroban-rpc.mainnet.stellar.gateway.fm";
+      return {
+        NETWORK_CONFIG: NetworkConfig.CustomNet({
+          networkPassphrase: "Public Global Stellar Network ; September 2015",
+          rpcUrl,
+          horizonUrl: "https://horizon.stellar.org",
+          allowHttp: false,
+        }),
+        NETWORK: "Public Global Stellar Network ; September 2015" as StellarNetworkId,
+      };
+    }
     case "testnet":
       return {
         NETWORK_CONFIG: NetworkProviders.Nodies.TestNet(),
