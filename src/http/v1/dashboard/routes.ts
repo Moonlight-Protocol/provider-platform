@@ -13,7 +13,12 @@ import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 
 const dashboardRouter = new Router();
 
-// --- Auth (public, auth) ---
+// --- Auth (public) ---
+dashboardRouter.post("/dashboard/auth/challenge", postChallengeHandler);
+dashboardRouter.post("/dashboard/auth/verify", postVerifyHandler);
+
+// --- Admin (JWT required) ---
+dashboardRouter.post("/dashboard/bundles/expire", jwtMiddleware, postExpireBundlesHandler);
 
 // --- Protected endpoints (JWT checked inline per-route) ---
 dashboardRouter.get("/dashboard/channels", jwtMiddleware, getChannelsHandler);
