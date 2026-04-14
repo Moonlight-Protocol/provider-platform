@@ -1,5 +1,4 @@
 import { Router } from "@oak/oak";
-import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
 import { postBundleHandler } from "@/http/v1/bundle/post.ts";
 import { getBundleHandler } from "@/http/v1/bundle/get.ts";
 import { listBundlesHandler } from "@/http/v1/bundle/list.ts";
@@ -7,7 +6,6 @@ import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 
 const bundleRouter = new Router();
 
-bundleRouter.use(lowRateLimitMiddleware);
 bundleRouter.use(jwtMiddleware);
 
 // POST /v1/bundle - create/process operations bundle
