@@ -10,13 +10,15 @@ import { discoverCouncilHandler, joinCouncilHandler, getMembershipHandler, syncM
 import { registerPpHandler, listPpsHandler, deletePpHandler } from "./pp.ts";
 import { postExpireBundlesHandler } from "./bundle-admin.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
-import { lowRateLimitMiddleware } from "@/http/middleware/rate-limit/index.ts";
 
 const dashboardRouter = new Router();
 
-// --- Auth (public, strict rate limit) ---
-dashboardRouter.post("/dashboard/auth/challenge", lowRateLimitMiddleware, postChallengeHandler);
-dashboardRouter.post("/dashboard/auth/verify", lowRateLimitMiddleware, postVerifyHandler);
+// --- Auth (public) ---
+dashboardRouter.post("/dashboard/auth/challenge", postChallengeHandler);
+dashboardRouter.post("/dashboard/auth/verify", postVerifyHandler);
+
+// --- Admin (JWT required) ---
+dashboardRouter.post("/dashboard/bundles/expire", jwtMiddleware, postExpireBundlesHandler);
 
 // --- Protected endpoints (JWT checked inline per-route) ---
 dashboardRouter.get("/dashboard/channels", jwtMiddleware, getChannelsHandler);
@@ -24,7 +26,6 @@ dashboardRouter.get("/dashboard/mempool", jwtMiddleware, getMempoolHandler);
 dashboardRouter.get("/dashboard/operations", jwtMiddleware, getOperationsHandler);
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
 dashboardRouter.get("/dashboard/audit-export", jwtMiddleware, getAuditExportHandler);
-dashboardRouter.post("/dashboard/bundles/expire", lowRateLimitMiddleware, jwtMiddleware, postExpireBundlesHandler);
 
 // --- PP management ---
 dashboardRouter.post("/dashboard/pp/register", jwtMiddleware, registerPpHandler);
