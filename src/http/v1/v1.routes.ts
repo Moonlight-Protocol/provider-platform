@@ -5,6 +5,7 @@ import bundleRouter from "@/http/v1/bundle/routes.ts";
 import dashboardRouter from "@/http/v1/dashboard/routes.ts";
 import payRouter from "@/http/v1/pay/routes.ts";
 import healthRouter from "@/http/v1/health/routes.ts";
+import waitlistRouter from "@/http/v1/waitlist/routes.ts";
 import councilRouter from "@/http/v1/council/routes.ts";
 
 const apiRouter = new Router();
@@ -15,5 +16,6 @@ apiRouter.use("/api/v1", dashboardRouter.routes(), dashboardRouter.allowedMethod
 apiRouter.use("/api/v1", councilRouter.routes(), councilRouter.allowedMethods());
 apiRouter.use("/api/v1", payRouter.routes(), payRouter.allowedMethods());
 apiRouter.use("/api/v1", bundleRouter.routes(), bundleRouter.allowedMethods());
+apiRouter.use("/api/v1", waitlistRouter.routes(), waitlistRouter.allowedMethods());
 
 export default apiRouter;
