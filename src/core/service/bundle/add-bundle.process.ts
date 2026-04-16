@@ -242,6 +242,9 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
       const { operationsMLXDR, channelContractId } = input.body;
+      if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
+        logAndThrow(new E.TOO_MANY_OPERATIONS(operationsMLXDR.length, BUNDLE_MAX_OPERATIONS));
+      }
       const sessionData = input.ctx.state.session as JwtSessionData;
 
       // Resolve channel client for on-chain reads (UTXO balances)
@@ -260,9 +263,6 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
       // 3. Parse and classify operations
       span.addEvent("parsing_and_classifying_operations");
-      if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
-        logAndThrow(new E.TOO_MANY_OPERATIONS(operationsMLXDR.length, BUNDLE_MAX_OPERATIONS));
-      }
       const operations = await parseOperations(operationsMLXDR);
       const classified = classifyOperations(operations);
       validateSpendOperations(classified.spend);

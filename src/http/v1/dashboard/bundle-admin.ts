@@ -78,7 +78,6 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
 
   const AGE_FILTER_LIMIT = 10_000;
   let ageExpiredCount = 0;
-  const ageExpiredIdSet = new Set<string>();
 
   // 1. Age-filter path: bounded atomic UPDATE batches until done
   if (hasAgeFilter) {
@@ -87,32 +86,26 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
     do {
       batch = await getBundleRepo().expireOlderThan(cutoff, ACTIVE_STATUSES, AGE_FILTER_LIMIT);
       ageExpiredCount += batch.length;
-      for (const id of batch) ageExpiredIdSet.add(id);
       if (batch.length > 0) {
         getMempool().purgeBundles(batch);
       }
     } while (batch.length >= AGE_FILTER_LIMIT);
   }
 
-  // 2. Explicit-IDs path: DB-first, then mempool-purge (skip IDs already expired via age path)
+  // 2. Explicit-IDs path: DB-first, then mempool-purge.
+  // expireByIds filters by ACTIVE_STATUSES, so IDs already expired by the age path are safe
+  // no-ops — no deduplication needed here.
   let idExpiredCount = 0;
   if (hasIdFilter) {
-    const idsToExpire =
-      hasAgeFilter && ageExpiredIdSet.size > 0
-        ? bundleIds!.filter((id) => !ageExpiredIdSet.has(id))
-        : bundleIds!;
+    const idExpiredIds = await getBundleRepo().expireByIds(bundleIds!, ACTIVE_STATUSES);
+    idExpiredCount = idExpiredIds.length;
+    if (idExpiredCount > 0) {
+      getMempool().purgeBundles(idExpiredIds);
+    }
 
-    if (idsToExpire.length > 0) {
-      const idExpiredIds = await getBundleRepo().expireByIds(idsToExpire, ACTIVE_STATUSES);
-      idExpiredCount = idExpiredIds.length;
-      if (idExpiredCount > 0) {
-        getMempool().purgeBundles(idExpiredIds);
-      }
-
-      const skipped = idsToExpire.length - idExpiredCount;
-      if (skipped > 0) {
-        LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
-      }
+    const skipped = bundleIds!.length - idExpiredCount;
+    if (skipped > 0) {
+      LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
     }
   }
 
