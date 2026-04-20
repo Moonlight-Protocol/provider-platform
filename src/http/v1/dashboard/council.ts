@@ -83,8 +83,16 @@ export const discoverCouncilHandler = async (ctx: Context) => {
       return;
     }
 
-    // Parse the URL to extract the base and optional council ID
-    const councilId = parsed.searchParams.get("council");
+    // Parse the URL to extract the base and optional council ID.
+    // The council ID can be in the query string (?council=C...) or in a
+    // hash fragment (#/join?council=C...) — the latter is the format used
+    // by council-console join links. URL strips fragments, so we extract
+    // it from the raw input first.
+    let councilId = parsed.searchParams.get("council");
+    if (!councilId) {
+      const hashMatch = councilUrl.match(/[#?&]council=([A-Z0-9]+)/);
+      if (hashMatch) councilId = hashMatch[1];
+    }
     const baseUrl = `${parsed.origin}`;
     const councilQs = councilId ? `?councilId=${encodeURIComponent(councilId)}` : "";
 
