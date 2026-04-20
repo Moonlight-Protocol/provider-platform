@@ -47,6 +47,7 @@ primary_region = 'ams'
   MEMPOOL_TTL_CHECK_INTERVAL_MS = '60000'
   MEMPOOL_MAX_RETRY_ATTEMPTS= '3'
   BUNDLE_MAX_OPERATIONS = '20'
+  TRANSACTION_EXPIRATION_OFFSET = '1000' # ledger sequences; ~83min on testnet (~5s/ledger)
 
 [processes]
   app = 'deno task serve'
