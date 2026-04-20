@@ -10,6 +10,7 @@ export enum BUNDLE_ERROR_CODES {
   NO_OPERATIONS_PROVIDED = "BND_007",
   BUNDLE_NOT_FOUND = "BND_008",
   BUNDLE_ACCESS_FORBIDDEN = "BND_009",
+  TOO_MANY_OPERATIONS = "BND_010",
 }
 
 const source = "@service/bundle";
@@ -178,6 +179,26 @@ export class INSUFFICIENT_UTXOS extends PlatformError<{ required: number; availa
         required,
         ...(available !== undefined && { available }),
       },
+    });
+  }
+}
+
+/**
+ * Error thrown when a bundle exceeds the maximum allowed number of operations
+ */
+export class TOO_MANY_OPERATIONS extends PlatformError<{ received: number; max: number }> {
+  constructor(received: number, max: number) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.TOO_MANY_OPERATIONS,
+      message: "Too many operations",
+      details: `The bundle contains ${received} operations, but the maximum allowed is ${max}.`,
+      api: {
+        status: 400,
+        message: "Too many operations",
+        details: `A bundle can contain at most ${max} operations, but ${received} were provided.`,
+      },
+      meta: { received, max },
     });
   }
 }

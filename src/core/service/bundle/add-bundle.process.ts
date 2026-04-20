@@ -20,7 +20,7 @@ import {
   calculatePriorityScore,
   fetchUtxoBalances,
 } from "@/core/service/bundle/bundle.service.ts";
-import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT } from "@/config/env.ts";
+import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT, BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
 import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
@@ -242,6 +242,9 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
       const { operationsMLXDR, channelContractId } = input.body;
+      if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
+        logAndThrow(new E.TOO_MANY_OPERATIONS(operationsMLXDR.length, BUNDLE_MAX_OPERATIONS));
+      }
       const sessionData = input.ctx.state.session as JwtSessionData;
 
       // Resolve channel client for on-chain reads (UTXO balances)

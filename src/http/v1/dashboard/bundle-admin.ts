@@ -92,7 +92,9 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
     } while (batch.length >= AGE_FILTER_LIMIT);
   }
 
-  // 2. Explicit-IDs path: DB-first, then mempool-purge (same ordering as age-filter path)
+  // 2. Explicit-IDs path: DB-first, then mempool-purge.
+  // expireByIds filters by ACTIVE_STATUSES, so IDs already expired by the age path are safe
+  // no-ops — no deduplication needed here.
   let idExpiredCount = 0;
   if (hasIdFilter) {
     const idExpiredIds = await getBundleRepo().expireByIds(bundleIds!, ACTIVE_STATUSES);
