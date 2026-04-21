@@ -53,5 +53,14 @@ if (!Number.isFinite(_rawMaxOps) || !Number.isInteger(_rawMaxOps) || _rawMaxOps 
 }
 export const BUNDLE_MAX_OPERATIONS = _rawMaxOps;
 
+// Transaction expiration offset (ledger sequences ahead of latest ledger)
+const _rawTxExpirationOffset = Number(loadOptionalEnv("TRANSACTION_EXPIRATION_OFFSET") ?? "1000");
+if (!Number.isFinite(_rawTxExpirationOffset) || !Number.isInteger(_rawTxExpirationOffset) || _rawTxExpirationOffset < 1) {
+  throw new Error(
+    `TRANSACTION_EXPIRATION_OFFSET must be a positive integer, got: "${loadOptionalEnv("TRANSACTION_EXPIRATION_OFFSET")}"`
+  );
+}
+export const TRANSACTION_EXPIRATION_OFFSET = _rawTxExpirationOffset;
+
 // Event watcher
 export const EVENT_WATCHER_INTERVAL_MS = Number(Deno.env.get("EVENT_WATCHER_INTERVAL_MS") ?? "30000");

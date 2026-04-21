@@ -2,7 +2,7 @@ import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS, NETWORK_RPC_SERVER } from "@/config/env.ts";
+import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS, NETWORK_RPC_SERVER, TRANSACTION_EXPIRATION_OFFSET } from "@/config/env.ts";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
 import type { SIM_ERRORS } from "@colibri/core";
@@ -20,9 +20,14 @@ import {
   buildRetryBundles,
 } from "@/core/service/executor/executor-failure.helpers.ts";
 
+/** Approximate Stellar ledger close time in milliseconds. Used to convert a
+ *  ledger-sequence offset into a wall-clock duration for the DB timeout.
+ *  Replace with a dynamic fetch once CU-TODO is implemented. */
+const STELLAR_LEDGER_CLOSE_TIME_MS = 5_000;
+
 const EXECUTOR_CONFIG = {
   INTERVAL_MS: MEMPOOL_EXECUTOR_INTERVAL_MS,
-  TRANSACTION_EXPIRATION_OFFSET: 1000,
+  TRANSACTION_EXPIRATION_OFFSET,
   MAX_RETRY_ATTEMPTS: MEMPOOL_MAX_RETRY_ATTEMPTS,
 } as const;
 
@@ -147,7 +152,7 @@ async function createTransactionRecord(
   await transactionRepository.create({
     id: txHash,
     status: TransactionStatus.UNVERIFIED,
-    timeout: new Date(Date.now() + EXECUTOR_CONFIG.TRANSACTION_EXPIRATION_OFFSET * 1000),
+    timeout: new Date(Date.now() + EXECUTOR_CONFIG.TRANSACTION_EXPIRATION_OFFSET * STELLAR_LEDGER_CLOSE_TIME_MS),
     ledgerSequence: latestLedger.sequence.toString(),
     createdAt: new Date(),
     createdBy: accountId,
