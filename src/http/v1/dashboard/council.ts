@@ -4,7 +4,7 @@ import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/co
 import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { addCouncilWatcher, addProviderAddress } from "@/core/service/event-watcher/index.ts";
-import { MODE } from "@/config/env.ts";
+import { MODE, PROVIDER_BASE_URL } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
 /** Reject URLs targeting internal/private network addresses. Skipped in development mode. */
@@ -260,7 +260,7 @@ export const joinCouncilHandler = async (ctx: Context) => {
       res = await fetch(`${baseUrl}/api/v1/public/provider/join-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signedEnvelope),
+        body: JSON.stringify({ ...signedEnvelope, providerUrl: PROVIDER_BASE_URL }),
         signal: joinController.signal,
       });
     } catch (err) {
