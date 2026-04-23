@@ -45,21 +45,22 @@ const MIGRATION_FOLDER = new URL(
   import.meta.url,
 ).pathname;
 
-const MIGRATION_FILES = [
-  "0000_init.sql",
-  "0001_add_operations_mlxdr_to_bundles.sql",
-  "0002_add_processing_status_to_bundle.sql",
-  "0003_add_fee_to_bundles.sql",
-  "0004_add_failed_status_to_transaction.sql",
-  "0005_young_kabuki.sql",
-  "0006_pay_tables.sql",
-  "0007_add_retry_fail_reason_fields.sql",
-  "0008_uc2_council_memberships_and_providers.sql",
-];
+interface JournalEntry {
+  idx: number;
+  tag: string;
+}
 
 async function runMigrations(pg: PGlite): Promise<void> {
-  for (const file of MIGRATION_FILES) {
-    const sql = await Deno.readTextFile(`${MIGRATION_FOLDER}/${file}`);
+  const journalRaw = await Deno.readTextFile(
+    `${MIGRATION_FOLDER}/meta/_journal.json`,
+  );
+  const journal = JSON.parse(journalRaw);
+  const entries: JournalEntry[] = journal.entries;
+
+  for (const entry of entries) {
+    const sql = await Deno.readTextFile(
+      `${MIGRATION_FOLDER}/${entry.tag}.sql`,
+    );
     // Drizzle marks statement boundaries with "--> statement-breakpoint"
     const statements = sql
       .split("--> statement-breakpoint")
