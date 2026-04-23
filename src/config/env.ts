@@ -9,6 +9,11 @@ export const MODE = requireEnv("MODE");
 export const SERVICE_DOMAIN = requireEnv("SERVICE_DOMAIN");
 export const SERVICE_AUTH_SECRET = requireEnv("SERVICE_AUTH_SECRET");
 
+// Externally reachable base URL for this provider-platform instance.
+// Used when registering with councils so pay-platform can submit bundles.
+export const PROVIDER_BASE_URL =
+  loadOptionalEnv("PROVIDER_BASE_URL") ?? `http://localhost:${PORT}`;
+
 export const CHALLENGE_TTL = Number(requireEnv("CHALLENGE_TTL"));
 export const SESSION_TTL = Number(requireEnv("SESSION_TTL"));
 
