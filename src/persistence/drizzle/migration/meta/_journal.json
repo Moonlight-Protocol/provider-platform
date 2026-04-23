@@ -64,6 +64,13 @@
       "when": 1774913203243,
       "tag": "0008_uc2_council_memberships_and_providers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1745366400000,
+      "tag": "0009_add_waitlist_requests",
+      "breakpoints": true
     }
   ]
 }
