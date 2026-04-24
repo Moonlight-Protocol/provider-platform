@@ -29,7 +29,7 @@ curl -s -H "Authorization: Bearer $FLY_API_TOKEN" \
 
 **Error**: `Uncaught (in promise) Error: <VAR_NAME> is not loaded`
 
-The app requires env vars set both in `fly.toml` (non-sensitive) and Fly secrets (sensitive). If a new env var is added to the code but not to Fly, the app will crash-loop.
+The app requires env vars set both in `fly.{testnet,mainnet}.toml` (non-sensitive) and Fly secrets (sensitive). If a new env var is added to the code but not to Fly, the app will crash-loop.
 
 The platform only reads **infrastructure and operational** config from the environment. Privacy Provider keys, council references, and contract IDs are NOT env vars — they live in the database and are populated via the dashboard API.
 
@@ -37,8 +37,8 @@ The platform only reads **infrastructure and operational** config from the envir
 - `DATABASE_URL` — Postgres connection string (provisioned by `fly postgres create` and attached)
 - `SERVICE_AUTH_SECRET` — used both for JWT signing AND for at-rest encryption of PP secret keys in the database
 
-**Required env vars** (set in `fly.toml` `[env]`):
-- See the `[env]` block in `fly.toml` for the full list (PORT, MODE, NETWORK, NETWORK_FEE, SERVICE_DOMAIN, CHALLENGE_TTL, SESSION_TTL, MEMPOOL_*).
+**Required env vars** (set in `fly.{testnet,mainnet}.toml` `[env]`):
+- See the `[env]` block in `fly.testnet.toml` or `fly.mainnet.toml` for the full list (PORT, MODE, NETWORK, NETWORK_FEE, SERVICE_DOMAIN, CHALLENGE_TTL, SESSION_TTL, MEMPOOL_*).
 
 **Fix**:
 ```bash

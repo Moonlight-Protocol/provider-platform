@@ -92,7 +92,7 @@ deno task serve
 
 ## Deploy (to testnet)
 
-We deploy to [fly.io](https://fly.io). The `fly.toml` file is provided as a minimal example.
+We deploy to [fly.io](https://fly.io). Config is split per environment: `fly.testnet.toml` and `fly.mainnet.toml`.
 
 The platform reads only **infrastructure and operational** config from the environment — never Privacy Provider keys, council references, or contract IDs. Those are stored in the database via the dashboard API (`POST /api/v1/dashboard/pp/register`) and the council join flow (`POST /api/v1/dashboard/council/join`). The encryption key for stored secrets at rest is `SERVICE_AUTH_SECRET`.
 
