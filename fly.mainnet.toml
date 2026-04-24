@@ -7,8 +7,8 @@ primary_region = 'ams'
 
 [env]
   PORT = '8080'
-  MODE = 'production'
-  LOG_LEVEL = 'INFO' # Valid values: FATAL, ERROR, WARN, INFO, DEBUG, TRACE
+  MODE = 'development'
+  LOG_LEVEL = 'TRACE' # Valid values: FATAL, ERROR, WARN, INFO, DEBUG, TRACE
 
   # Rule: only INFRASTRUCTURE + OPERATIONAL config goes here. Privacy
   # Provider keys, council references, and contract IDs are stored in the
@@ -28,7 +28,7 @@ primary_region = 'ams'
 
   # OPENTELEMETRY
   OTEL_DENO = 'true'
-  OTEL_SERVICE_NAME = 'provider-platform'
+  OTEL_SERVICE_NAME = 'provider-platform-mainnet'
   OTEL_EXPORTER_OTLP_PROTOCOL = 'http/protobuf'
   # OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS set in fly.io secrets
 
