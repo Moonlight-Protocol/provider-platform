@@ -1,7 +1,4 @@
-# fly.toml app configuration file generated for moonlight-beta-privacy-provider-a on 2026-01-29T20:55:21Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# fly.testnet.toml — provider-platform testnet config
 
 app = 'moonlight-beta-privacy-provider-a'
 primary_region = 'ams'
