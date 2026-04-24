@@ -22,6 +22,7 @@ primary_region = 'ams'
 
   # STELLAR
   NETWORK = 'testnet'
+  STELLAR_RPC_URL = 'https://soroban-testnet.stellar.org'
   NETWORK_FEE = '1000000000' #stroops
 
   # SERVICE
