@@ -22,11 +22,20 @@ export function selectNetwork(envNetwork: string): {
         NETWORK: "Public Global Stellar Network ; September 2015" as StellarNetworkId,
       };
     }
-    case "testnet":
+    case "testnet": {
+      const rpcUrl = loadOptionalEnv("STELLAR_RPC_URL");
       return {
-        NETWORK_CONFIG: NetworkProviders.Nodies.TestNet(),
+        NETWORK_CONFIG: rpcUrl
+          ? NetworkConfig.CustomNet({
+            networkPassphrase: "Test SDF Network ; September 2015",
+            rpcUrl,
+            horizonUrl: "https://horizon-testnet.stellar.org",
+            allowHttp: false,
+          })
+          : NetworkProviders.Nodies.TestNet(),
         NETWORK: StellarNetworkId.Testnet,
       };
+    }
     case "local": {
       const rpcUrl = loadOptionalEnv("STELLAR_RPC_URL") ??
         "http://localhost:8000/soroban/rpc";
