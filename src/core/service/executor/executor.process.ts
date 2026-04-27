@@ -19,6 +19,11 @@ import {
   handleExecutionFailure as _handleExecutionFailure,
   buildRetryBundles,
 } from "@/core/service/executor/executor-failure.helpers.ts";
+import {
+  extractNetworkErrorContext,
+  recordNetworkErrorOnSpan,
+  type NetworkErrorContext,
+} from "@/core/service/executor/error-extraction.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -56,6 +61,7 @@ type SimulationFailureContext = {
 type ExecutionFailureContext = {
   phase: string;
   simulation?: SimulationFailureContext;
+  network?: NetworkErrorContext;
 };
 
 class ExecutionError extends Error {
@@ -106,6 +112,19 @@ function submitTransactionToNetwork(
       const failureContext: ExecutionFailureContext = {
         phase: "submitTransactionToNetwork",
       };
+
+      const networkCtx = extractNetworkErrorContext(error);
+      if (networkCtx) {
+        recordNetworkErrorOnSpan(span, networkCtx);
+        failureContext.network = networkCtx;
+        LOG.error("Network error details", {
+          code: networkCtx.code,
+          source: networkCtx.source,
+          txHash: networkCtx.txHash,
+          errorResult: networkCtx.errorResult,
+          diagnosticEvents: networkCtx.diagnosticEvents,
+        });
+      }
 
       const simError = error as SIM_ERRORS.SIMULATION_FAILED;
       if (simError?.meta?.data) {
@@ -301,6 +320,14 @@ export class Executor {
           ? error.failureContext
           : undefined;
 
+        // Fall back to extracting from the raw error if the inner catch didn't
+        // wrap (e.g. failures outside submitTransactionToNetwork — build,
+        // channel resolve, etc.) so Colibri envelope data is captured everywhere.
+        const networkCtx = failureContext?.network ?? extractNetworkErrorContext(error);
+        if (networkCtx) {
+          recordNetworkErrorOnSpan(span, networkCtx);
+        }
+
         const lastFailureReasonPayload = {
           occurredAt: new Date().toISOString(),
           phase: failureContext?.phase ?? "slotExecution",
@@ -317,6 +344,7 @@ export class Executor {
             : undefined,
           bundleIds,
           simulation: failureContext?.simulation,
+          network: networkCtx,
         };
 
         const lastFailureReason = safeJsonStringify(lastFailureReasonPayload) ??
