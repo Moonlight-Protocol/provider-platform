@@ -5,11 +5,12 @@ const ALLOWED_ORIGINS = envOrigins
   ? envOrigins.split(",").map((o) => o.trim()).filter(Boolean)
   : [];
 
-if (Deno.env.get("MODE") === "development") {
-  ALLOWED_ORIGINS.push(
-    "http://localhost:3000", "http://localhost:3010", "http://localhost:3020",
-    "http://localhost:3050", "http://localhost:3060",
-  );
+const LOCALHOST_ORIGIN = /^https?:\/\/localhost(:\d+)?$/;
+
+function isAllowed(origin: string): boolean {
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (Deno.env.get("MODE") === "development" && LOCALHOST_ORIGIN.test(origin)) return true;
+  return false;
 }
 
 function setCorsHeaders(ctx: Context, origin: string) {
@@ -21,10 +22,10 @@ function setCorsHeaders(ctx: Context, origin: string) {
 
 export async function corsMiddleware(ctx: Context, next: Next) {
   const origin = ctx.request.headers.get("Origin");
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin);
+  const allowed = !!origin && isAllowed(origin);
 
   if (ctx.request.method === "OPTIONS" && allowed) {
-    setCorsHeaders(ctx, origin);
+    setCorsHeaders(ctx, origin!);
     ctx.response.status = 204;
     return;
   }
