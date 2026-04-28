@@ -14,6 +14,8 @@ export type NetworkErrorContext = {
   domain?: string;
   source?: string;
   txHash?: string;
+  txSeqNum?: string;
+  postFailAccountSeq?: string;
   errorResult?: unknown;
   diagnosticEvents?: unknown;
 };
@@ -24,7 +26,12 @@ type MaybeColibri = {
   source?: unknown;
   meta?: {
     data?: {
-      input?: { transaction?: { hash?: () => { toString(encoding?: string): string } } };
+      input?: {
+        transaction?: {
+          hash?: () => { toString(encoding?: string): string };
+          sequence?: unknown;
+        };
+      };
       errorResult?: unknown;
       diagnosticEvents?: unknown;
     };
@@ -63,6 +70,9 @@ export function extractNetworkErrorContext(error: unknown): NetworkErrorContext 
         // hash() not available on this transaction shape — skip
       }
     }
+    if (tx && isString(tx.sequence)) {
+      ctx.txSeqNum = tx.sequence;
+    }
   }
 
   if (!ctx.code && !ctx.errorResult && !ctx.diagnosticEvents && !ctx.txHash) {
@@ -81,6 +91,7 @@ export function recordNetworkErrorOnSpan(span: Span, ctx: NetworkErrorContext): 
   if (ctx.domain) span.setAttribute("colibri.error.domain", ctx.domain);
   if (ctx.source) span.setAttribute("colibri.error.source", ctx.source);
   if (ctx.txHash) span.setAttribute("tx.hash", ctx.txHash);
+  if (ctx.txSeqNum) span.setAttribute("tx.attempted_seq", ctx.txSeqNum);
 
   const errorResultStr = ctx.errorResult !== undefined
     ? safeJson(ctx.errorResult)
