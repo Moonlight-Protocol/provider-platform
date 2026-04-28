@@ -9,7 +9,7 @@ Deno.test("extractNetworkErrorContext — returns undefined for non-Colibri Erro
 
 Deno.test("extractNetworkErrorContext — extracts STX_007 envelope", () => {
   // Mirrors @colibri/core ERROR_STATUS shape: code/domain/source on the error,
-  // meta.data.{errorResult, diagnosticEvents, input.transaction.hash()}.
+  // meta.data.{errorResult, diagnosticEvents, input.transaction.{hash(),sequence}}.
   const fakeColibri = Object.assign(new Error("Transaction processing error!"), {
     code: "STX_007",
     domain: "processes",
@@ -21,6 +21,7 @@ Deno.test("extractNetworkErrorContext — extracts STX_007 envelope", () => {
         input: {
           transaction: {
             hash: () => ({ toString: (_e?: string) => "deadbeef" }),
+            sequence: "9720769416265729",
           },
         },
       },
@@ -33,6 +34,7 @@ Deno.test("extractNetworkErrorContext — extracts STX_007 envelope", () => {
   assertEquals(ctx.domain, "processes");
   assertEquals(ctx.source, "@colibri/core/processes/send-transaction");
   assertEquals(ctx.txHash, "deadbeef");
+  assertEquals(ctx.txSeqNum, "9720769416265729");
   assertEquals(ctx.errorResult, ["txInsufficientFee"]);
   assertEquals(ctx.diagnosticEvents, [{ event: "diag1" }]);
 });

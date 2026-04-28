@@ -86,6 +86,18 @@ function submitTransactionToNetwork(
   return withSpan("Executor.submitTransactionToNetwork", async (span) => {
     const { signer, channelClient, txConfig } = await resolveChannelContext(channelContractId);
 
+    span.setAttribute("tx.source", txConfig.source);
+    try {
+      const acct = await NETWORK_RPC_SERVER.getAccount(txConfig.source);
+      const preSeq = acct.sequenceNumber();
+      span.setAttribute("tx.pre_build_account_seq", preSeq);
+      span.addEvent("pre_build_account_seq", { "tx.source": txConfig.source, seq: preSeq });
+    } catch (e) {
+      span.addEvent("pre_build_seq_lookup_failed", {
+        "error.message": e instanceof Error ? e.message : String(e),
+      });
+    }
+
     span.addEvent("signing_with_provider");
     await txBuilder.signWithProvider(signer, expiration);
 
@@ -101,8 +113,16 @@ function submitTransactionToNetwork(
         },
         config: txConfig,
       });
-      
+
       span.addEvent("transaction_submitted", { "tx.hash": hash.toString() });
+      try {
+        const acctAfter = await NETWORK_RPC_SERVER.getAccount(txConfig.source);
+        span.setAttribute("tx.post_submit_account_seq", acctAfter.sequenceNumber());
+      } catch (e) {
+        span.addEvent("post_submit_seq_lookup_failed", {
+          "error.message": e instanceof Error ? e.message : String(e),
+        });
+      }
       return hash.toString();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -117,10 +137,21 @@ function submitTransactionToNetwork(
       if (networkCtx) {
         recordNetworkErrorOnSpan(span, networkCtx);
         failureContext.network = networkCtx;
+        try {
+          const acctAfter = await NETWORK_RPC_SERVER.getAccount(txConfig.source);
+          const postFailSeq = acctAfter.sequenceNumber();
+          span.setAttribute("tx.post_fail_account_seq", postFailSeq);
+          failureContext.network.postFailAccountSeq = postFailSeq;
+        } catch (e) {
+          span.addEvent("post_fail_seq_lookup_failed", {
+            "error.message": e instanceof Error ? e.message : String(e),
+          });
+        }
         LOG.error("Network error details", {
           code: networkCtx.code,
           source: networkCtx.source,
           txHash: networkCtx.txHash,
+          txSeqNum: networkCtx.txSeqNum,
           errorResult: networkCtx.errorResult,
           diagnosticEvents: networkCtx.diagnosticEvents,
         });
