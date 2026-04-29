@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { signPayload, verifyPayload } from "./signed-payload.ts";
 
 const TEST_SECRET = "SDEBQNNLMYRVLIQU2QVEOHB6F457WZ7URLDXYAU62C7KSQRCCJ37AMPJ";
@@ -57,7 +57,8 @@ Deno.test("verifyPayload rejects a missing timestamp", async () => {
 Deno.test("verifyPayload rejects a wrong public key", async () => {
   const payload = { name: "test" };
   const envelope = await signPayload(payload, TEST_SECRET);
-  envelope.publicKey = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+  envelope.publicKey =
+    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
   const valid = await verifyPayload(envelope);
   assertEquals(valid, false);
 });

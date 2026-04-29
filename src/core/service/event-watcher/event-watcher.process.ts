@@ -1,7 +1,10 @@
 import { LOG } from "@/config/logger.ts";
 import { NETWORK_RPC_SERVER } from "@/config/env.ts";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
-import type { ChannelAuthEvent, EventWatcherConfig } from "./event-watcher.types.ts";
+import type {
+  ChannelAuthEvent,
+  EventWatcherConfig,
+} from "./event-watcher.types.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 function cursorKvKey(contractId: string): Deno.KvKey {
@@ -32,7 +35,10 @@ export class EventWatcher {
   private kv: Deno.Kv | null = null;
 
   constructor(config: { contractId: string; intervalMs?: number }) {
-    this.config = { contractId: config.contractId, intervalMs: config.intervalMs ?? 30_000 };
+    this.config = {
+      contractId: config.contractId,
+      intervalMs: config.intervalMs ?? 30_000,
+    };
   }
 
   /**
@@ -58,7 +64,9 @@ export class EventWatcher {
     this.kv = await Deno.openKv("./.data/memory-kvdb.db");
 
     // Restore cursor from KV, or fall back to current network ledger
-    const stored = await this.kv.get<number>(cursorKvKey(this.config.contractId));
+    const stored = await this.kv.get<number>(
+      cursorKvKey(this.config.contractId),
+    );
     if (stored.value !== null) {
       this.lastLedger = stored.value;
       LOG.info("EventWatcher restored cursor from KV", {
@@ -120,7 +128,7 @@ export class EventWatcher {
   /**
    * Single poll cycle: fetch events since lastLedger, dispatch to handlers.
    */
-  private async poll(): Promise<void> {
+  private poll(): Promise<void> {
     return withSpan("EventWatcher.poll", async (span) => {
       try {
         if (this.lastLedger === null) return;
@@ -149,11 +157,16 @@ export class EventWatcher {
 
         // Persist cursor to KV
         if (this.kv) {
-          await this.kv.set(cursorKvKey(this.config.contractId), this.lastLedger);
+          await this.kv.set(
+            cursorKvKey(this.config.contractId),
+            this.lastLedger,
+          );
         }
       } catch (error) {
         span.addEvent("poll_error", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         LOG.error("EventWatcher poll error", {
           error: error instanceof Error ? error.message : String(error),

@@ -26,14 +26,18 @@ export const getEscrowSummaryHandler = async (ctx: Context) => {
       const account = await accountRepo.findById(session.sub);
       if (!account || account.depositAddress !== address) {
         ctx.response.status = Status.Forbidden;
-        ctx.response.body = { message: "Address does not belong to this account" };
+        ctx.response.body = {
+          message: "Address does not belong to this account",
+        };
         return;
       }
     } else if (!session.type || session.type === "sep10") {
       // Self-custodial: session.sub is the Stellar address
       if (address !== session.sub) {
         ctx.response.status = Status.Forbidden;
-        ctx.response.body = { message: "Address does not match authenticated account" };
+        ctx.response.body = {
+          message: "Address does not match authenticated account",
+        };
         return;
       }
     } else {

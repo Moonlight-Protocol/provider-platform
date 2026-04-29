@@ -8,7 +8,10 @@
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 
-async function deriveKey(secret: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
+async function deriveKey(
+  secret: string,
+  salt: Uint8Array<ArrayBuffer>,
+): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -25,12 +28,19 @@ async function deriveKey(secret: string, salt: Uint8Array<ArrayBuffer>): Promise
   );
 }
 
-export async function encryptSk(plaintext: string, secret: string): Promise<string> {
+export async function encryptSk(
+  plaintext: string,
+  secret: string,
+): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const key = await deriveKey(secret, salt);
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const encrypted = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext)),
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      new TextEncoder().encode(plaintext),
+    ),
   );
   // Concatenate salt + iv + ciphertext and base64-encode
   const combined = new Uint8Array(salt.length + iv.length + encrypted.length);
@@ -40,12 +50,19 @@ export async function encryptSk(plaintext: string, secret: string): Promise<stri
   return btoa(String.fromCharCode(...combined));
 }
 
-export async function decryptSk(ciphertext: string, secret: string): Promise<string> {
+export async function decryptSk(
+  ciphertext: string,
+  secret: string,
+): Promise<string> {
   const combined = Uint8Array.from(atob(ciphertext), (c) => c.charCodeAt(0));
   const salt = combined.slice(0, SALT_LENGTH);
   const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
   const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH);
   const key = await deriveKey(secret, salt);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, encrypted);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encrypted,
+  );
   return new TextDecoder().decode(decrypted);
 }

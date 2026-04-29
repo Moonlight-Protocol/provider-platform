@@ -5,9 +5,12 @@
  * importing env.ts and the real Stellar SDK client.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/self_balance_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { postSelfBalanceHandler } from "@/http/v1/pay/self/balance.ts";
-import { _setMockBalances, _resetMockBalances } from "./mock_channel_service.ts";
+import {
+  _resetMockBalances,
+  _setMockBalances,
+} from "./mock_channel_service.ts";
 import { testAddress } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -31,10 +34,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session },
   };
@@ -82,7 +93,11 @@ Deno.test("self balance - returns balances for given public keys", async () => {
   await postSelfBalanceHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "Balance retrieved");
 
   // deno-lint-ignore no-explicit-any

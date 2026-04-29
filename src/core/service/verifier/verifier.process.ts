@@ -8,9 +8,9 @@ import {
 } from "@/config/env.ts";
 import { verifyTransactionOnNetwork } from "@/core/service/verifier/verifier.service.ts";
 import {
-  TransactionRepository,
   BundleTransactionRepository,
   OperationsBundleRepository,
+  TransactionRepository,
 } from "@/persistence/drizzle/repository/index.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
@@ -26,14 +26,16 @@ const VERIFIER_CONFIG = {
 
 const transactionRepository = new TransactionRepository();
 const bundleTransactionRepository = new BundleTransactionRepository();
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 
 /**
  * Updates transaction status in database
  */
 async function updateTransactionStatus(
   txId: string,
-  status: TransactionStatus
+  status: TransactionStatus,
 ): Promise<void> {
   await transactionRepository.update(txId, {
     status,
@@ -67,9 +69,12 @@ function handleVerificationFailure(
  */
 async function handleVerificationSuccess(
   txId: string,
-  bundleIds: string[]
+  bundleIds: string[],
 ): Promise<void> {
-  LOG.info("Transaction verified successfully", { txId, bundleCount: bundleIds.length });
+  LOG.info("Transaction verified successfully", {
+    txId,
+    bundleCount: bundleIds.length,
+  });
 
   // Update transaction status to VERIFIED
   await updateTransactionStatus(txId, TransactionStatus.VERIFIED);
@@ -131,11 +136,11 @@ export class Verifier {
   /**
    * Verifies all unverified transactions
    */
-  async verifyTransactions(): Promise<void> {
+  verifyTransactions(): Promise<void> {
     return withSpan("Verifier.verifyTransactions", async (span) => {
       try {
         const unverifiedTransactions = await transactionRepository.findByStatus(
-          TransactionStatus.UNVERIFIED
+          TransactionStatus.UNVERIFIED,
         );
 
         if (unverifiedTransactions.length === 0) {
@@ -143,7 +148,9 @@ export class Verifier {
           return;
         }
 
-        span.addEvent("verifying_transactions", { "transactions.count": unverifiedTransactions.length });
+        span.addEvent("verifying_transactions", {
+          "transactions.count": unverifiedTransactions.length,
+        });
         LOG.debug(`Verifying ${unverifiedTransactions.length} transactions`);
 
         for (const transaction of unverifiedTransactions) {
@@ -153,7 +160,9 @@ export class Verifier {
         span.addEvent("verification_cycle_complete");
       } catch (error) {
         span.addEvent("verification_error", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         LOG.error("Error during transaction verification", {
           error: error instanceof Error ? error.message : String(error),
@@ -165,13 +174,14 @@ export class Verifier {
   /**
    * Verifies a single transaction
    */
-  private async verifyTransaction(txId: string): Promise<void> {
+  private verifyTransaction(txId: string): Promise<void> {
     return withSpan("Verifier.verifyTransaction", async (span) => {
       try {
         span.setAttribute("tx.id", txId);
 
         span.addEvent("looking_up_bundle_transactions");
-        const bundleTransactions = await bundleTransactionRepository.findByTransactionId(txId);
+        const bundleTransactions = await bundleTransactionRepository
+          .findByTransactionId(txId);
         const bundleIds = bundleTransactions.map((bt) => bt.bundleId);
 
         if (bundleIds.length === 0) {
@@ -180,10 +190,17 @@ export class Verifier {
           return;
         }
 
-        span.addEvent("verifying_on_network", { "bundles.count": bundleIds.length });
-        const result = await verifyTransactionOnNetwork(txId, NETWORK_RPC_SERVER);
+        span.addEvent("verifying_on_network", {
+          "bundles.count": bundleIds.length,
+        });
+        const result = await verifyTransactionOnNetwork(
+          txId,
+          NETWORK_RPC_SERVER,
+        );
 
-        span.addEvent("verification_result", { "result.status": result.status });
+        span.addEvent("verification_result", {
+          "result.status": result.status,
+        });
 
         if (result.status === "VERIFIED") {
           await handleVerificationSuccess(txId, bundleIds);
@@ -194,7 +211,9 @@ export class Verifier {
         }
       } catch (error) {
         span.addEvent("verification_failed", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         LOG.error(`Failed to verify transaction ${txId}`, {
           error: error instanceof Error ? error.message : String(error),

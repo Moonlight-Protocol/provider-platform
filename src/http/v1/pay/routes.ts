@@ -27,7 +27,11 @@ payRouter.post("/pay/kyc", jwtMiddleware, postKycHandler);
 payRouter.get("/pay/transactions", jwtMiddleware, listTransactionsHandler);
 payRouter.post("/pay/self/balance", jwtMiddleware, postSelfBalanceHandler);
 payRouter.post("/pay/self/send", jwtMiddleware, postSelfSendHandler);
-payRouter.get("/pay/custodial/account", jwtMiddleware, getCustodialAccountHandler);
+payRouter.get(
+  "/pay/custodial/account",
+  jwtMiddleware,
+  getCustodialAccountHandler,
+);
 payRouter.post("/pay/custodial/send", jwtMiddleware, postCustodialSendHandler);
 payRouter.get("/pay/escrow/:address", jwtMiddleware, getEscrowSummaryHandler);
 payRouter.post("/pay/report", jwtMiddleware, postReportHandler);
@@ -37,9 +41,15 @@ const networkEnv = loadOptionalEnv("NETWORK") ?? "";
 const demoEnabled = loadOptionalEnv("PAY_DEMO_ENABLED") === "true";
 if (networkEnv === "local" || networkEnv === "standalone" || demoEnabled) {
   LOG.info("Pay demo routes enabled", { network: networkEnv, demoEnabled });
-  payRouter.post("/pay/demo/simulate-kyc", jwtMiddleware, postSimulateKycHandler);
+  payRouter.post(
+    "/pay/demo/simulate-kyc",
+    jwtMiddleware,
+    postSimulateKycHandler,
+  );
 } else {
-  LOG.info("Pay demo routes disabled (non-local network)", { network: networkEnv });
+  LOG.info("Pay demo routes disabled (non-local network)", {
+    network: networkEnv,
+  });
 }
 
 export default payRouter;

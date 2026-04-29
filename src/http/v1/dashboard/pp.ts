@@ -3,8 +3,11 @@ import { Keypair } from "stellar-sdk";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
-import { encryptSk, decryptSk } from "@/core/crypto/encrypt-sk.ts";
-import { addProviderAddress, removeProviderAddress } from "@/core/service/event-watcher/index.ts";
+import { encryptSk } from "@/core/crypto/encrypt-sk.ts";
+import {
+  addProviderAddress,
+  removeProviderAddress,
+} from "@/core/service/event-watcher/index.ts";
 import { SERVICE_AUTH_SECRET } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -41,9 +44,13 @@ export const registerPpHandler = async (ctx: Context) => {
     // Check if already registered
     const existing = await ppRepo.findByPublicKey(publicKey);
     if (existing) {
-      if (existing.ownerPublicKey && existing.ownerPublicKey !== ownerPublicKey) {
+      if (
+        existing.ownerPublicKey && existing.ownerPublicKey !== ownerPublicKey
+      ) {
         ctx.response.status = Status.Forbidden;
-        ctx.response.body = { message: "This provider belongs to another user" };
+        ctx.response.body = {
+          message: "This provider belongs to another user",
+        };
         return;
       }
       // Re-activate if it was deactivated
@@ -92,7 +99,6 @@ export const registerPpHandler = async (ctx: Context) => {
   }
 };
 
-
 /**
  * GET /dashboard/pp/list
  * Lists PPs owned by the authenticated user, with council membership status.
@@ -110,12 +116,14 @@ export const listPpsHandler = async (ctx: Context) => {
         label: pp.label,
         isActive: pp.isActive,
         createdAt: pp.createdAt.toISOString(),
-        councilMembership: membership ? {
-          councilUrl: membership.councilUrl,
-          councilName: membership.councilName,
-          status: membership.status,
-          channelAuthId: membership.channelAuthId,
-        } : null,
+        councilMembership: membership
+          ? {
+            councilUrl: membership.councilUrl,
+            councilName: membership.councilName,
+            status: membership.status,
+            channelAuthId: membership.channelAuthId,
+          }
+          : null,
       };
     }));
 

@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { PayTransactionStatus } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 
 /**
@@ -56,15 +56,24 @@ Deno.test("PayTransactionStatus - null statusParam skips validation (handler all
   // The handler's condition: if (statusParam && !validStatuses.has(statusParam))
   // When statusParam is null, the condition is falsy so validation is skipped
   const statusParam: string | null = null;
-  const wouldReject = statusParam !== null && statusParam !== "" && !validStatuses.has(statusParam);
-  assertEquals(wouldReject, false, "null should not trigger validation rejection");
+  const wouldReject = statusParam !== null && statusParam !== "" &&
+    !validStatuses.has(statusParam);
+  assertEquals(
+    wouldReject,
+    false,
+    "null should not trigger validation rejection",
+  );
 });
 
 Deno.test("PayTransactionStatus - undefined statusParam skips validation", () => {
   const statusParam: string | undefined = undefined;
   // Mimicking: params.get("status") returns null when absent, but testing undefined too
   const wouldReject = !!statusParam && !validStatuses.has(statusParam);
-  assertEquals(wouldReject, false, "undefined should not trigger validation rejection");
+  assertEquals(
+    wouldReject,
+    false,
+    "undefined should not trigger validation rejection",
+  );
 });
 
 Deno.test("PayTransactionStatus - valid statusParam passes validation", () => {

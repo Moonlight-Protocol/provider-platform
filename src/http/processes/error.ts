@@ -22,9 +22,12 @@ export class INVALID_PAYLOAD extends PlatformError {
       api: {
         status: 400,
         message: "Invalid payload",
-        details: `The HTTP request payload did not conform to the expected format. \n ${issues
-          .map((issue) => `- [${issue.path.join(".")}] ${issue.message}`)
-          .join("\n")}`,
+        details:
+          `The HTTP request payload did not conform to the expected format. \n ${
+            issues
+              .map((issue) => `- [${issue.path.join(".")}] ${issue.message}`)
+              .join("\n")
+          }`,
       },
       meta: {
         zodIssues: issues,
@@ -44,7 +47,8 @@ export class FAILED_TO_PARSE_BODY extends PlatformError {
       api: {
         status: 400,
         message: "Failed to parse request body",
-        details: `The HTTP request body could not be parsed due to an unexpected error.`,
+        details:
+          `The HTTP request body could not be parsed due to an unexpected error.`,
       },
     });
   }
@@ -61,9 +65,12 @@ export class INVALID_QUERY_PARAMS extends PlatformError {
       api: {
         status: 400,
         message: "Invalid query parameters",
-        details: `The HTTP request query parameters did not conform to the expected format. \n ${issues
-          .map((issue) => `- [${issue.path.join(".")}] ${issue.message}`)
-          .join("\n")}`,
+        details:
+          `The HTTP request query parameters did not conform to the expected format. \n ${
+            issues
+              .map((issue) => `- [${issue.path.join(".")}] ${issue.message}`)
+              .join("\n")
+          }`,
       },
       meta: {
         zodIssues: issues,
@@ -84,7 +91,8 @@ export class FAILED_TO_PARSE_QUERY_PARAMS extends PlatformError {
       api: {
         status: 400,
         message: "Failed to parse query parameters",
-        details: `The HTTP request query parameters could not be parsed due to an unexpected error.`,
+        details:
+          `The HTTP request query parameters could not be parsed due to an unexpected error.`,
       },
     });
   }

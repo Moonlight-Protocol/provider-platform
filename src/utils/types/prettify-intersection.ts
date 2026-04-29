@@ -11,7 +11,9 @@
  * // Result: { a: number; b: string; }
  * ```
  */
-export type PrettifyIntersection<T> = {
-  [K in keyof T]: T[K];
+export type PrettifyIntersection<T> =
+  & {
+    [K in keyof T]: T[K];
+  }
   // deno-lint-ignore ban-types
-} & {};
+  & {};

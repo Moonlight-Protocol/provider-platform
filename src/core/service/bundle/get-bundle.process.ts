@@ -15,7 +15,9 @@ import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
 import { withSpan } from "@/core/tracing.ts";
 
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 const sessionRepository = new SessionRepository(drizzleClient);
 
 // ========== HELPER FUNCTIONS ==========
@@ -42,15 +44,16 @@ async function assertBundleOwnership(
   }
 
   if (bundle.createdBy !== userSession.accountId) {
-    logAndThrow(new E.BUNDLE_ACCESS_FORBIDDEN(bundle.id, userSession.accountId));
+    logAndThrow(
+      new E.BUNDLE_ACCESS_FORBIDDEN(bundle.id, userSession.accountId),
+    );
   }
 }
-
 
 // ========== MAIN PROCESS ==========
 
 export const P_GetBundleById = ProcessEngine.create(
-  async (
+  (
     input: GetEndpointInput<typeof requestSchema>,
   ): Promise<BundleGetProcessOutput> => {
     return withSpan("P_GetBundleById", async (span) => {

@@ -1,4 +1,7 @@
-import { MoonlightOperation, MoonlightTransactionBuilder } from "@moonlight/moonlight-sdk";
+import {
+  MoonlightOperation,
+  MoonlightTransactionBuilder,
+} from "@moonlight/moonlight-sdk";
 import type { Slot } from "@/core/service/mempool/mempool.process.ts";
 import type { TransactionBuildResult } from "@/core/service/executor/executor.types.ts";
 import { UtxoBasedStellarAccount, UTXOStatus } from "@moonlight/moonlight-sdk";
@@ -14,7 +17,7 @@ const EXECUTOR_CONFIG = {
  * Builds a transaction from a slot containing multiple bundles.
  * Uses the resolved channel context for the PP's signer and channel client.
  */
-export async function buildTransactionFromSlot(
+export function buildTransactionFromSlot(
   slot: Slot,
   ctx: ChannelContext,
 ): Promise<TransactionBuildResult> {
@@ -26,7 +29,9 @@ export async function buildTransactionFromSlot(
     }
 
     span.addEvent("setting_up_tx_builder", { "bundles.count": bundles.length });
-    const txBuilder = MoonlightTransactionBuilder.fromPrivacyChannel(ctx.channelClient);
+    const txBuilder = MoonlightTransactionBuilder.fromPrivacyChannel(
+      ctx.channelClient,
+    );
     const opexHandler = UtxoBasedStellarAccount.fromPrivacyChannel({
       channelClient: ctx.channelClient,
       root: ctx.ppSecretKey as `S${string}`,
@@ -36,21 +41,32 @@ export async function buildTransactionFromSlot(
     });
 
     span.addEvent("ensuring_opex_utxos");
-    await ensureOpexUtxosAvailable(opexHandler, EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS);
-    const reservedUtxos = opexHandler.reserveUTXOs(EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS);
+    await ensureOpexUtxosAvailable(
+      opexHandler,
+      EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS,
+    );
+    const reservedUtxos = opexHandler.reserveUTXOs(
+      EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS,
+    );
 
     if (!reservedUtxos || reservedUtxos.length === 0) {
-      const availableCount = opexHandler.getUTXOsByState(UTXOStatus.FREE).length;
+      const availableCount =
+        opexHandler.getUTXOsByState(UTXOStatus.FREE).length;
       span.addEvent("insufficient_utxos", { "available": availableCount });
-      throw new Error(`Insufficient UTXOs. Required: ${EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS}, Available: ${availableCount}`);
+      throw new Error(
+        `Insufficient UTXOs. Required: ${EXECUTOR_CONFIG.REQUIRED_OPEX_UTXOS}, Available: ${availableCount}`,
+      );
     }
 
-    const totalFee = bundles.reduce((sum, bundle) => sum + bundle.fee, BigInt(0));
+    const totalFee = bundles.reduce(
+      (sum, bundle) => sum + bundle.fee,
+      BigInt(0),
+    );
     span.addEvent("fee_calculated", { "fee.total": totalFee.toString() });
 
     const feeOperation = MoonlightOperation.create(
       reservedUtxos[0].publicKey,
-      totalFee
+      totalFee,
     );
     txBuilder.addOperation(feeOperation);
 
@@ -76,14 +92,16 @@ export async function buildTransactionFromSlot(
 /**
  * Ensures OPEX account has enough free UTXOs available
  */
-async function ensureOpexUtxosAvailable(
+function ensureOpexUtxosAvailable(
   opexHandler: UtxoBasedStellarAccount,
-  requiredCount: number
+  requiredCount: number,
 ): Promise<void> {
   return withSpan("Executor.ensureOpexUtxosAvailable", async (span) => {
     span.addEvent("checking_free_utxos", { "required": requiredCount });
     let iterations = 0;
-    while (opexHandler.getUTXOsByState(UTXOStatus.FREE).length < requiredCount + 1) {
+    while (
+      opexHandler.getUTXOsByState(UTXOStatus.FREE).length < requiredCount + 1
+    ) {
       iterations++;
       span.addEvent("deriving_batch", { "iteration": iterations });
       await opexHandler.deriveBatch({});

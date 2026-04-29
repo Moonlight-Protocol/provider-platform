@@ -4,28 +4,27 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/escrow_service_test.ts
  */
-import { assertEquals, assertExists, assert } from "jsr:@std/assert";
+import { assert, assertEquals, assertExists } from "@std/assert";
 import {
-  createEscrow,
   claimEscrowForAddress,
+  createEscrow,
   getEscrowSummary,
 } from "@/core/service/pay/escrow.service.ts";
 import {
   createTestAccount,
-  createTestKyc,
   createTestEscrow,
-  testAddress,
-  resetDb,
-  closeDb,
+  createTestKyc,
   ensureInitialized,
   getAccount,
-  getAllTransactions,
   getAllEscrows,
-  PayEscrowStatus,
-  PayTransactionType,
-  PayTransactionStatus,
-  PayKycStatus,
+  getAllTransactions,
   PayCustodialStatus,
+  PayEscrowStatus,
+  PayKycStatus,
+  PayTransactionStatus,
+  PayTransactionType,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -92,7 +91,9 @@ Deno.test("claimEscrowForAddress - claims held escrows for custodial account", a
   const updatedAccount = await getAccount(account.id);
   assertEquals(updatedAccount?.balance, 1000n);
 
-  const txs = (await getAllTransactions()).filter((t) => t.accountId === account.depositAddress);
+  const txs = (await getAllTransactions()).filter((t) =>
+    t.accountId === account.depositAddress
+  );
   assertEquals(txs.length, 1);
   assertEquals(txs[0].type, PayTransactionType.RECEIVE);
   assertEquals(txs[0].status, PayTransactionStatus.COMPLETED);
@@ -141,15 +142,24 @@ Deno.test("claimEscrowForAddress - concurrent claims don't double-credit (race c
   assert(fulfilled.length >= 1, "At least one claim should succeed");
 
   const totalClaimed = fulfilled.reduce((sum, r) => sum + r.value.claimed, 0);
-  const totalAmount = fulfilled.reduce((sum, r) => sum + r.value.totalAmount, 0n);
+  const totalAmount = fulfilled.reduce(
+    (sum, r) => sum + r.value.totalAmount,
+    0n,
+  );
 
   assertEquals(totalClaimed, 1, "Exactly one escrow should be claimed total");
   assertEquals(totalAmount, 1000n, "Total amount should be exactly 1000n");
 
   const finalAccount = await getAccount(account.id);
-  assertEquals(finalAccount?.balance, 1000n, "Balance must be exactly 1000n, not double-credited");
+  assertEquals(
+    finalAccount?.balance,
+    1000n,
+    "Balance must be exactly 1000n, not double-credited",
+  );
 
-  const txs = (await getAllTransactions()).filter((t) => t.accountId === account.depositAddress);
+  const txs = (await getAllTransactions()).filter((t) =>
+    t.accountId === account.depositAddress
+  );
   assertEquals(txs.length, 1, "Exactly one RECEIVE transaction should exist");
 });
 
@@ -164,8 +174,18 @@ Deno.test("getEscrowSummary - returns correct count and total for held escrows",
   const receiverAddress = testAddress();
   const senderAddress = testAddress();
 
-  await createTestEscrow({ heldForAddress: receiverAddress, senderAddress, amount: 3000n, mode: "custodial" });
-  await createTestEscrow({ heldForAddress: receiverAddress, senderAddress, amount: 7000n, mode: "custodial" });
+  await createTestEscrow({
+    heldForAddress: receiverAddress,
+    senderAddress,
+    amount: 3000n,
+    mode: "custodial",
+  });
+  await createTestEscrow({
+    heldForAddress: receiverAddress,
+    senderAddress,
+    amount: 7000n,
+    mode: "custodial",
+  });
 
   const summary = await getEscrowSummary(receiverAddress);
   assertEquals(summary.count, 2);
@@ -187,10 +207,26 @@ Deno.test("getEscrowSummary - excludes claimed escrows", async () => {
   const receiverAddress = testAddress();
   const senderAddress = testAddress();
 
-  await createTestEscrow({ heldForAddress: receiverAddress, senderAddress, amount: 5000n, mode: "custodial", status: PayEscrowStatus.HELD });
-  await createTestEscrow({ heldForAddress: receiverAddress, senderAddress, amount: 3000n, mode: "custodial", status: PayEscrowStatus.CLAIMED });
+  await createTestEscrow({
+    heldForAddress: receiverAddress,
+    senderAddress,
+    amount: 5000n,
+    mode: "custodial",
+    status: PayEscrowStatus.HELD,
+  });
+  await createTestEscrow({
+    heldForAddress: receiverAddress,
+    senderAddress,
+    amount: 3000n,
+    mode: "custodial",
+    status: PayEscrowStatus.CLAIMED,
+  });
 
   const summary = await getEscrowSummary(receiverAddress);
   assertEquals(summary.count, 1, "Only HELD escrows should be counted");
-  assertEquals(summary.totalAmount, 5000n, "Only HELD escrow amount should be summed");
+  assertEquals(
+    summary.totalAmount,
+    5000n,
+    "Only HELD escrow amount should be summed",
+  );
 });

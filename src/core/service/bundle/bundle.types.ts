@@ -60,4 +60,3 @@ export type SlotBundle = {
  * Priority score type (numeric value for comparison)
  */
 export type PriorityScore = number;
-

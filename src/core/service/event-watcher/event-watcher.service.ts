@@ -1,5 +1,5 @@
 import type { Server } from "stellar-sdk/rpc";
-import { xdr, Address } from "stellar-sdk";
+import { Address, type xdr } from "stellar-sdk";
 import { withSpan } from "@/core/tracing.ts";
 import type {
   ChannelAuthEvent,
@@ -39,7 +39,7 @@ function decodeTopicSymbol(val: xdr.ScVal): string | null {
  * @param startLedger - Ledger to start fetching events from
  * @returns Parsed channel auth events and the latest ledger seen
  */
-export async function fetchChannelAuthEvents(
+export function fetchChannelAuthEvents(
   rpcServer: Server,
   contractId: string,
   startLedger: number,

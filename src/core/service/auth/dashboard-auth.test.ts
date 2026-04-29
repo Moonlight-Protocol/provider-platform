@@ -1,16 +1,18 @@
-import { assertEquals, assertRejects } from "jsr:@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { Keypair } from "stellar-sdk";
 import { Buffer } from "buffer";
 import {
   createDashboardChallenge,
-  verifyDashboardChallenge,
   type DashboardAuthConfig,
+  verifyDashboardChallenge,
 } from "./dashboard-auth.ts";
 
 const TEST_KEYPAIR = Keypair.random();
 const TEST_PUBLIC_KEY = TEST_KEYPAIR.publicKey();
 
-const mockGenerateToken = async (sub: string, sid: string) => `mock-jwt-${sub.slice(0, 8)}`;
+// deno-lint-ignore require-await -- mock satisfies generateToken's Promise<string> contract
+const mockGenerateToken = async (sub: string, _sid: string) =>
+  `mock-jwt-${sub.slice(0, 8)}`;
 
 // Config where the signer IS the provider (direct match, no Horizon needed)
 const SELF_SIGNER_CONFIG: DashboardAuthConfig = {
@@ -30,7 +32,10 @@ function signNonce(keypair: typeof TEST_KEYPAIR, nonce: string): string {
   return sigBuffer.toString("base64");
 }
 
-async function signNonceSep53(keypair: typeof TEST_KEYPAIR, nonce: string): Promise<string> {
+async function signNonceSep53(
+  keypair: typeof TEST_KEYPAIR,
+  nonce: string,
+): Promise<string> {
   const prefix = "Stellar Signed Message:\n";
   const prefixedMessage = Buffer.concat([
     Buffer.from(prefix, "utf-8"),
@@ -57,7 +62,13 @@ Deno.test("createDashboardChallenge - returns unique nonces", () => {
 
 Deno.test("verifyDashboardChallenge - rejects unknown nonce", async () => {
   await assertRejects(
-    () => verifyDashboardChallenge("unknown-nonce", "sig", TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        "unknown-nonce",
+        "sig",
+        TEST_PUBLIC_KEY,
+        SELF_SIGNER_CONFIG,
+      ),
     Error,
     "Challenge not found",
   );
@@ -79,7 +90,13 @@ Deno.test("verifyDashboardChallenge - rejects short invalid signature", async ()
   const badSig = btoa("too-short");
 
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, badSig, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        nonce,
+        badSig,
+        TEST_PUBLIC_KEY,
+        SELF_SIGNER_CONFIG,
+      ),
     Error,
     "Invalid signature",
   );
@@ -91,7 +108,13 @@ Deno.test("verifyDashboardChallenge - rejects valid-length but wrong signature",
   const wrongSig = signNonce(Keypair.random(), nonce);
 
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, wrongSig, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        nonce,
+        wrongSig,
+        TEST_PUBLIC_KEY,
+        SELF_SIGNER_CONFIG,
+      ),
     Error,
     "Invalid signature",
   );
@@ -117,7 +140,13 @@ Deno.test("verifyDashboardChallenge - valid signature + different provider (no H
   const signature = signNonce(TEST_KEYPAIR, nonce);
 
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, DIFFERENT_PROVIDER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        nonce,
+        signature,
+        TEST_PUBLIC_KEY,
+        DIFFERENT_PROVIDER_CONFIG,
+      ),
     Error,
     "Signer is not authorized",
   );
@@ -143,7 +172,13 @@ Deno.test("verifyDashboardChallenge - SEP-53 wrong key rejected", async () => {
   const signature = await signNonceSep53(Keypair.random(), nonce);
 
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        nonce,
+        signature,
+        TEST_PUBLIC_KEY,
+        SELF_SIGNER_CONFIG,
+      ),
     Error,
     "Invalid signature",
   );
@@ -154,11 +189,22 @@ Deno.test("verifyDashboardChallenge - nonce is consumed after use", async () => 
   const signature = signNonce(TEST_KEYPAIR, nonce);
 
   // First use succeeds
-  await verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG);
+  await verifyDashboardChallenge(
+    nonce,
+    signature,
+    TEST_PUBLIC_KEY,
+    SELF_SIGNER_CONFIG,
+  );
 
   // Second use fails
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, signature, TEST_PUBLIC_KEY, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(
+        nonce,
+        signature,
+        TEST_PUBLIC_KEY,
+        SELF_SIGNER_CONFIG,
+      ),
     Error,
     "Challenge not found",
   );

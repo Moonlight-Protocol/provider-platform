@@ -5,14 +5,14 @@
  * The generate-jwt module is mocked via deno.json import map.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_register_test.ts
  */
-import { assertEquals, assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { StrKey } from "@colibri/core";
 import { postCustodialRegisterHandler } from "@/http/v1/pay/custodial/register.ts";
 import {
   createTestAccount,
-  testUsername,
-  resetDb,
   ensureInitialized,
+  resetDb,
+  testUsername,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -35,10 +35,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -67,12 +75,20 @@ Deno.test("custodial register - successful registration returns token and deposi
   await postCustodialRegisterHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "Account created");
 
-  const data = (res.body as { data: { token: string; depositAddress: string } }).data;
+  const data =
+    (res.body as { data: { token: string; depositAddress: string } }).data;
   assert(data.token.length > 0, "Token should be non-empty");
-  assert(data.token.startsWith("mock-jwt-custodial-"), "Token should come from mock JWT generator");
+  assert(
+    data.token.startsWith("mock-jwt-custodial-"),
+    "Token should come from mock JWT generator",
+  );
   assert(
     StrKey.isValidEd25519PublicKey(data.depositAddress),
     "Deposit address should be a valid Stellar public key",
@@ -98,7 +114,10 @@ Deno.test("custodial register - duplicate username returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "Registration failed");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Registration failed",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -118,7 +137,10 @@ Deno.test("custodial register - username too short returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "Username must be 3-50 characters");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Username must be 3-50 characters",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +160,10 @@ Deno.test("custodial register - password too short returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "Password must be at least 8 characters");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Password must be at least 8 characters",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -157,7 +182,10 @@ Deno.test("custodial register - missing username returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });
 
 Deno.test("custodial register - missing password returns 400", async () => {
@@ -172,7 +200,10 @@ Deno.test("custodial register - missing password returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });
 
 Deno.test("custodial register - empty body returns 400", async () => {
@@ -185,5 +216,8 @@ Deno.test("custodial register - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });

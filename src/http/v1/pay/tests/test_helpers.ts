@@ -8,10 +8,10 @@
  */
 import { eq } from "drizzle-orm";
 import {
-  drizzleClient,
-  resetDb,
   closeDb,
+  drizzleClient,
   ensureInitialized,
+  resetDb,
 } from "./pglite_db.ts";
 import {
   payCustodialAccount,
@@ -27,8 +27,8 @@ import {
 } from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
 import {
   payTransaction,
-  PayTransactionType,
   PayTransactionStatus,
+  PayTransactionType,
 } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 import { hashPassword } from "@/http/v1/pay/custodial/crypto.ts";
 import { Keypair } from "stellar-sdk";
@@ -204,8 +204,8 @@ export async function getAllKyc() {
 
 // ── Re-exports ───────────────────────────────────────────────────────────
 
-export { drizzleClient, resetDb, closeDb, ensureInitialized };
+export { closeDb, drizzleClient, ensureInitialized, resetDb };
 export { payCustodialAccount, PayCustodialStatus };
 export { payKyc, PayKycStatus };
 export { payEscrow, PayEscrowStatus };
-export { payTransaction, PayTransactionType, PayTransactionStatus };
+export { payTransaction, PayTransactionStatus, PayTransactionType };

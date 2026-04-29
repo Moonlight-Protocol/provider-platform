@@ -7,11 +7,9 @@ import { Keypair } from "stellar-sdk";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
-import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { decryptSk } from "@/core/crypto/encrypt-sk.ts";
 import { getChannelClient } from "@/core/channel-client/index.ts";
-import { SERVICE_AUTH_SECRET, NETWORK_FEE } from "@/config/env.ts";
-import { LOG } from "@/config/logger.ts";
+import { NETWORK_FEE, SERVICE_AUTH_SECRET } from "@/config/env.ts";
 import type { PrivacyChannel } from "@moonlight/moonlight-sdk";
 
 export interface ChannelContext {
@@ -28,7 +26,9 @@ const membershipRepo = new CouncilMembershipRepository(drizzleClient);
  * Given a channelContractId, find the PP that operates it,
  * decrypt its key, and build the channel client + tx config.
  */
-export async function resolveChannelContext(channelContractId: string): Promise<ChannelContext> {
+export async function resolveChannelContext(
+  channelContractId: string,
+): Promise<ChannelContext> {
   // N+1: listActive() then one query per PP for its active membership.
   // Acceptable for now since PP count is small; could be optimized with a join.
   const pps = await ppRepo.listActive();
@@ -39,16 +39,27 @@ export async function resolveChannelContext(channelContractId: string): Promise<
 
     let config: {
       council?: { channelAuthId?: string; councilPublicKey?: string };
-      channels?: Array<{ channelContractId: string; assetCode: string; assetContractId?: string }>;
+      channels?: Array<
+        {
+          channelContractId: string;
+          assetCode: string;
+          assetContractId?: string;
+        }
+      >;
     };
     try {
       config = JSON.parse(membership.configJson);
-    } catch { continue; }
+    } catch {
+      continue;
+    }
 
-    const channel = config.channels?.find((ch) => ch.channelContractId === channelContractId);
+    const channel = config.channels?.find((ch) =>
+      ch.channelContractId === channelContractId
+    );
     if (!channel) continue;
 
-    const channelAuthId = config.council?.channelAuthId ?? membership.channelAuthId;
+    const channelAuthId = config.council?.channelAuthId ??
+      membership.channelAuthId;
 
     // Decrypt the PP's secret key
     const sk = await decryptSk(pp.encryptedSk, SERVICE_AUTH_SECRET);

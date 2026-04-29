@@ -42,7 +42,9 @@ export const postCustodialLoginHandler = async (ctx: Context) => {
       return;
     }
 
-    const token = await generateJwt(account.id, crypto.randomUUID(), { type: "custodial" });
+    const token = await generateJwt(account.id, crypto.randomUUID(), {
+      type: "custodial",
+    });
 
     LOG.info("Custodial login successful", { username });
 

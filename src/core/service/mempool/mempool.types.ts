@@ -18,4 +18,3 @@ export type MempoolStats = {
   totalWeight: number;
   averageBundlesPerSlot: number;
 };
-

@@ -1,10 +1,22 @@
-import { eq, and, or, isNull, desc, count, gte, lte, inArray, lt, asc } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+} from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  operationsBundle,
-  type OperationsBundle,
-  type NewOperationsBundle,
   BundleStatus,
+  type NewOperationsBundle,
+  type OperationsBundle,
+  operationsBundle,
 } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
@@ -27,8 +39,8 @@ export class OperationsBundleRepository extends BaseRepository<
       .where(
         and(
           eq(operationsBundle.status, status),
-          isNull(operationsBundle.deletedAt)
-        )
+          isNull(operationsBundle.deletedAt),
+        ),
       );
   }
 
@@ -45,9 +57,9 @@ export class OperationsBundleRepository extends BaseRepository<
           isNull(operationsBundle.deletedAt),
           or(
             eq(operationsBundle.status, BundleStatus.PENDING),
-            eq(operationsBundle.status, BundleStatus.PROCESSING)
-          )
-        )
+            eq(operationsBundle.status, BundleStatus.PROCESSING),
+          ),
+        ),
       );
   }
 
@@ -61,8 +73,8 @@ export class OperationsBundleRepository extends BaseRepository<
       .where(
         and(
           eq(operationsBundle.status, status),
-          isNull(operationsBundle.deletedAt)
-        )
+          isNull(operationsBundle.deletedAt),
+        ),
       );
     return result?.count ?? 0;
   }
@@ -108,7 +120,7 @@ export class OperationsBundleRepository extends BaseRepository<
           eq(operationsBundle.status, status),
           gte(operationsBundle.updatedAt, since),
           isNull(operationsBundle.deletedAt),
-        )
+        ),
       )
       .orderBy(desc(operationsBundle.updatedAt))
       .limit(limit);
@@ -120,7 +132,11 @@ export class OperationsBundleRepository extends BaseRepository<
    * are affected in a single atomic statement.
    * Returns the IDs of the rows that were actually updated.
    */
-  async expireOlderThan(olderThan: Date, statuses: BundleStatus[], limit?: number): Promise<string[]> {
+  async expireOlderThan(
+    olderThan: Date,
+    statuses: BundleStatus[],
+    limit?: number,
+  ): Promise<string[]> {
     const baseConditions = and(
       isNull(operationsBundle.deletedAt),
       inArray(operationsBundle.status, statuses),
@@ -156,7 +172,10 @@ export class OperationsBundleRepository extends BaseRepository<
    * is one of `activeStatuses`. Rows already in a terminal state are skipped.
    * Returns the IDs of the rows that were actually updated.
    */
-  async expireByIds(ids: string[], activeStatuses: BundleStatus[]): Promise<string[]> {
+  async expireByIds(
+    ids: string[],
+    activeStatuses: BundleStatus[],
+  ): Promise<string[]> {
     if (ids.length === 0) return [];
     const result = await this.db
       .update(operationsBundle)
@@ -166,7 +185,7 @@ export class OperationsBundleRepository extends BaseRepository<
           isNull(operationsBundle.deletedAt),
           inArray(operationsBundle.id, ids),
           inArray(operationsBundle.status, activeStatuses),
-        )
+        ),
       )
       .returning({ id: operationsBundle.id });
     return result.map((r) => r.id);
@@ -191,7 +210,7 @@ export class OperationsBundleRepository extends BaseRepository<
           eq(operationsBundle.id, id),
           isNull(operationsBundle.deletedAt),
           inArray(operationsBundle.status, activeStatuses),
-        )
+        ),
       )
       .returning({ id: operationsBundle.id });
     return result.length > 0;
@@ -203,7 +222,7 @@ export class OperationsBundleRepository extends BaseRepository<
    */
   async findByCreatedBy(
     accountId: string,
-    status?: BundleStatus
+    status?: BundleStatus,
   ): Promise<OperationsBundle[]> {
     const conditions = [
       eq(operationsBundle.createdBy, accountId),
@@ -221,4 +240,3 @@ export class OperationsBundleRepository extends BaseRepository<
       .orderBy(desc(operationsBundle.createdAt));
   }
 }
-

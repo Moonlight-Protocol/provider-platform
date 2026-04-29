@@ -1,6 +1,10 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
-import { utxo, type Utxo, type NewUtxo } from "@/persistence/drizzle/entity/utxo.entity.ts";
+import {
+  type NewUtxo,
+  type Utxo,
+  utxo,
+} from "@/persistence/drizzle/entity/utxo.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
 export class UtxoRepository extends BaseRepository<
@@ -22,8 +26,8 @@ export class UtxoRepository extends BaseRepository<
       .where(
         and(
           eq(utxo.accountId, accountId),
-          isNull(utxo.deletedAt)
-        )
+          isNull(utxo.deletedAt),
+        ),
       );
   }
 
@@ -37,8 +41,8 @@ export class UtxoRepository extends BaseRepository<
       .where(
         and(
           isNull(utxo.spentByAccountId),
-          isNull(utxo.deletedAt)
-        )
+          isNull(utxo.deletedAt),
+        ),
       );
   }
 
@@ -52,8 +56,8 @@ export class UtxoRepository extends BaseRepository<
       .where(
         and(
           eq(utxo.createdAtBundleId, bundleId),
-          isNull(utxo.deletedAt)
-        )
+          isNull(utxo.deletedAt),
+        ),
       );
   }
 
@@ -67,9 +71,8 @@ export class UtxoRepository extends BaseRepository<
       .where(
         and(
           eq(utxo.spentAtBundleId, bundleId),
-          isNull(utxo.deletedAt)
-        )
+          isNull(utxo.deletedAt),
+        ),
       );
   }
 }
-

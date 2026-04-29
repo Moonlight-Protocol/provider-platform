@@ -9,7 +9,7 @@ const PROCESS_NAME = "SetErrorResponse" as const;
 const P_SetErrorResponse = (ctx: Context) => {
   const setApiResponse = (
     response: ErrorResponse,
-    _metadataHelper?: MetadataHelper
+    _metadataHelper?: MetadataHelper,
   ): Context => {
     LOG.trace("Setting API response on context", { status: response.status });
     ctx.response.status = response.status;

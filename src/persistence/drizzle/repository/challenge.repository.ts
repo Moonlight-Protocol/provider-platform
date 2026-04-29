@@ -1,6 +1,10 @@
-import { eq, and, isNull, lt } from "drizzle-orm";
+import { and, eq, isNull, lt } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
-import { challenge, type Challenge, type NewChallenge } from "@/persistence/drizzle/entity/challenge.entity.ts";
+import {
+  type Challenge,
+  challenge,
+  type NewChallenge,
+} from "@/persistence/drizzle/entity/challenge.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
 export class ChallengeRepository extends BaseRepository<
@@ -34,8 +38,8 @@ export class ChallengeRepository extends BaseRepository<
       .where(
         and(
           eq(challenge.accountId, accountId),
-          isNull(challenge.deletedAt)
-        )
+          isNull(challenge.deletedAt),
+        ),
       );
     return results as Challenge[];
   }
@@ -51,9 +55,8 @@ export class ChallengeRepository extends BaseRepository<
       .where(
         and(
           lt(challenge.ttl, now),
-          isNull(challenge.deletedAt)
-        )
+          isNull(challenge.deletedAt),
+        ),
       );
   }
 }
-

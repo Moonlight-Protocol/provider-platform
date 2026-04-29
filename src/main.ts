@@ -7,8 +7,14 @@ import { traceContextMiddleware } from "@/http/middleware/trace-context.ts";
 import { corsMiddleware } from "@/http/middleware/cors.ts";
 import { PORT } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
-import { initializeMempoolSystem, shutdownMempoolSystem } from "@/core/mempool/index.ts";
-import { startEventWatcher, stopEventWatcher } from "@/core/service/event-watcher/index.ts";
+import {
+  initializeMempoolSystem,
+  shutdownMempoolSystem,
+} from "@/core/mempool/index.ts";
+import {
+  startEventWatcher,
+  stopEventWatcher,
+} from "@/core/service/event-watcher/index.ts";
 
 async function bootstrap() {
   try {

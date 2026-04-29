@@ -3,7 +3,10 @@ import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
 import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
-import { addCouncilWatcher, addProviderAddress } from "@/core/service/event-watcher/index.ts";
+import {
+  addCouncilWatcher,
+  addProviderAddress,
+} from "@/core/service/event-watcher/index.ts";
 import { MODE, PROVIDER_BASE_URL } from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -23,7 +26,9 @@ function isInternalUrl(url: URL): boolean {
   if (/^\d+$/.test(host) || /^0x[\da-f]+$/i.test(host)) return true;
 
   // IPv6 checks
-  if (host === "::1" || host.startsWith("::ffff:") || host.startsWith("fe80:")) return true;
+  if (
+    host === "::1" || host.startsWith("::ffff:") || host.startsWith("fe80:")
+  ) return true;
 
   // Explicit localhost and zero address
   if (host === "0.0.0.0") return true;
@@ -79,7 +84,9 @@ export const discoverCouncilHandler = async (ctx: Context) => {
 
     if (isInternalUrl(parsed)) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "councilUrl must not target internal addresses" };
+      ctx.response.body = {
+        message: "councilUrl must not target internal addresses",
+      };
       return;
     }
 
@@ -94,7 +101,9 @@ export const discoverCouncilHandler = async (ctx: Context) => {
       if (hashMatch) councilId = hashMatch[1];
     }
     const baseUrl = `${parsed.origin}`;
-    const councilQs = councilId ? `?councilId=${encodeURIComponent(councilId)}` : "";
+    const councilQs = councilId
+      ? `?councilId=${encodeURIComponent(councilId)}`
+      : "";
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10_000);
@@ -114,7 +123,10 @@ export const discoverCouncilHandler = async (ctx: Context) => {
     }
     clearTimeout(timeoutId);
 
-    const contentLength = parseInt(res.headers.get("Content-Length") ?? "0", 10);
+    const contentLength = parseInt(
+      res.headers.get("Content-Length") ?? "0",
+      10,
+    );
     if (contentLength > 1_048_576) {
       await res.body?.cancel();
       ctx.response.status = Status.BadGateway;
@@ -124,7 +136,9 @@ export const discoverCouncilHandler = async (ctx: Context) => {
 
     if (!res.ok) {
       ctx.response.status = Status.BadGateway;
-      ctx.response.body = { message: `Failed to reach council: HTTP ${res.status}` };
+      ctx.response.body = {
+        message: `Failed to reach council: HTTP ${res.status}`,
+      };
       return;
     }
 
@@ -139,7 +153,10 @@ export const discoverCouncilHandler = async (ctx: Context) => {
     // If a specific council ID was in the URL, verify it matches
     if (councilId && data.council.channelAuthId !== councilId) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "Council ID in URL does not match the council at this endpoint" };
+      ctx.response.body = {
+        message:
+          "Council ID in URL does not match the council at this endpoint",
+      };
       return;
     }
 
@@ -171,7 +188,16 @@ export const discoverCouncilHandler = async (ctx: Context) => {
 export const joinCouncilHandler = async (ctx: Context) => {
   try {
     const body = await ctx.request.body.json();
-    const { councilUrl, councilId: bodyCouncilId, councilName, councilPublicKey, ppPublicKey, label, contactEmail, jurisdictions } = body;
+    const {
+      councilUrl,
+      councilId: bodyCouncilId,
+      councilName,
+      councilPublicKey,
+      ppPublicKey,
+      label: _label,
+      contactEmail: _contactEmail,
+      jurisdictions: _jurisdictions,
+    } = body;
 
     if (!councilUrl || typeof councilUrl !== "string") {
       ctx.response.status = Status.BadRequest;
@@ -190,12 +216,16 @@ export const joinCouncilHandler = async (ctx: Context) => {
       const parsedUrl = new URL(councilUrl);
       if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
         ctx.response.status = Status.BadRequest;
-        ctx.response.body = { message: "councilUrl must be a valid HTTP(S) URL" };
+        ctx.response.body = {
+          message: "councilUrl must be a valid HTTP(S) URL",
+        };
         return;
       }
       if (isInternalUrl(parsedUrl)) {
         ctx.response.status = Status.BadRequest;
-        ctx.response.body = { message: "councilUrl must not target internal addresses" };
+        ctx.response.body = {
+          message: "councilUrl must not target internal addresses",
+        };
         return;
       }
     } catch {
@@ -206,7 +236,10 @@ export const joinCouncilHandler = async (ctx: Context) => {
 
     // Verify PP is registered and owned by this user
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "PP not registered. Register it first." };
@@ -216,11 +249,15 @@ export const joinCouncilHandler = async (ctx: Context) => {
     const baseUrl = councilUrl.replace(/\/+$/, "");
 
     // Check if this PP already has a membership for this council
-    const existing = await membershipRepo.findByCouncilUrlAndPp(baseUrl, ppPublicKey);
+    const existing = await membershipRepo.findByCouncilUrlAndPp(
+      baseUrl,
+      ppPublicKey,
+    );
     if (existing) {
       ctx.response.status = Status.Conflict;
       ctx.response.body = {
-        message: `This PP is already ${existing.status.toLowerCase()} for this council`,
+        message:
+          `This PP is already ${existing.status.toLowerCase()} for this council`,
         data: { status: existing.status },
       };
       return;
@@ -235,9 +272,15 @@ export const joinCouncilHandler = async (ctx: Context) => {
 
     // The client must provide a pre-signed join request envelope
     const { signedEnvelope } = body;
-    if (!signedEnvelope || !signedEnvelope.payload || !signedEnvelope.signature || !signedEnvelope.publicKey) {
+    if (
+      !signedEnvelope || !signedEnvelope.payload || !signedEnvelope.signature ||
+      !signedEnvelope.publicKey
+    ) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "signedEnvelope is required (payload, signature, publicKey, timestamp)" };
+      ctx.response.body = {
+        message:
+          "signedEnvelope is required (payload, signature, publicKey, timestamp)",
+      };
       return;
     }
 
@@ -248,7 +291,9 @@ export const joinCouncilHandler = async (ctx: Context) => {
         ppPublicKey,
       });
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "signedEnvelope publicKey does not match ppPublicKey" };
+      ctx.response.body = {
+        message: "signedEnvelope publicKey does not match ppPublicKey",
+      };
       return;
     }
 
@@ -260,7 +305,10 @@ export const joinCouncilHandler = async (ctx: Context) => {
       res = await fetch(`${baseUrl}/api/v1/public/provider/join-request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...signedEnvelope, providerUrl: PROVIDER_BASE_URL }),
+        body: JSON.stringify({
+          ...signedEnvelope,
+          providerUrl: PROVIDER_BASE_URL,
+        }),
         signal: joinController.signal,
       });
     } catch (err) {
@@ -276,7 +324,9 @@ export const joinCouncilHandler = async (ctx: Context) => {
 
     if (res.status === 409) {
       ctx.response.status = Status.Conflict;
-      ctx.response.body = { message: "A pending request already exists for this provider" };
+      ctx.response.body = {
+        message: "A pending request already exists for this provider",
+      };
       return;
     }
 
@@ -341,13 +391,18 @@ export const getMembershipHandler = async (ctx: Context) => {
 
     if (!ppPublicKey) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "ppPublicKey query parameter is required" };
+      ctx.response.body = {
+        message: "ppPublicKey query parameter is required",
+      };
       return;
     }
 
     // Verify PP ownership
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "Provider not found" };
@@ -375,7 +430,15 @@ export const getMembershipHandler = async (ctx: Context) => {
         councilPublicKey: membership.councilPublicKey,
         channelAuthId: membership.channelAuthId,
         status: membership.status,
-        config: membership.configJson ? (() => { try { return JSON.parse(membership.configJson); } catch { return null; } })() : null,
+        config: membership.configJson
+          ? (() => {
+            try {
+              return JSON.parse(membership.configJson);
+            } catch {
+              return null;
+            }
+          })()
+          : null,
         joinRequestId: membership.joinRequestId,
         ppPublicKey: membership.ppPublicKey,
         createdAt: membership.createdAt.toISOString(),
@@ -409,7 +472,10 @@ export const syncMembershipHandler = async (ctx: Context) => {
 
     // Verify PP ownership
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "Provider not found" };
@@ -429,7 +495,9 @@ export const syncMembershipHandler = async (ctx: Context) => {
     let remoteBody: { status?: string } | null = null;
     try {
       const res = await fetch(
-        `${councilUrl}/api/v1/public/provider/membership-status?councilId=${encodeURIComponent(channelAuthId)}&publicKey=${encodeURIComponent(ppPublicKey)}`,
+        `${councilUrl}/api/v1/public/provider/membership-status?councilId=${
+          encodeURIComponent(channelAuthId)
+        }&publicKey=${encodeURIComponent(ppPublicKey)}`,
       );
       remoteStatus = res.status;
       try {
@@ -437,18 +505,25 @@ export const syncMembershipHandler = async (ctx: Context) => {
       } catch { /* body may not be JSON */ }
     } catch (err) {
       LOG.warn("Failed to query council membership status", {
-        councilUrl, channelAuthId, ppPublicKey,
+        councilUrl,
+        channelAuthId,
+        ppPublicKey,
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    if (remoteStatus === 200 && membership.status !== CouncilMembershipStatus.ACTIVE) {
+    if (
+      remoteStatus === 200 &&
+      membership.status !== CouncilMembershipStatus.ACTIVE
+    ) {
       // Fetch config from council
       let configJson: string | null = membership.configJson;
       let councilName = membership.councilName;
       try {
         const configRes = await fetch(
-          `${councilUrl}/api/v1/public/council?councilId=${encodeURIComponent(channelAuthId)}`,
+          `${councilUrl}/api/v1/public/council?councilId=${
+            encodeURIComponent(channelAuthId)
+          }`,
         );
         if (configRes.ok) {
           const { data } = await configRes.json();
@@ -465,7 +540,10 @@ export const syncMembershipHandler = async (ctx: Context) => {
       LOG.info("Membership synced to ACTIVE", { ppPublicKey, channelAuthId });
 
       ctx.response.status = Status.OK;
-      ctx.response.body = { message: "Membership synced", data: { status: "ACTIVE" } };
+      ctx.response.body = {
+        message: "Membership synced",
+        data: { status: "ACTIVE" },
+      };
       return;
     }
 
@@ -475,22 +553,32 @@ export const syncMembershipHandler = async (ctx: Context) => {
     // (The public endpoint uses 404 + NOT_FOUND for absent providers by design,
     // to limit enumeration; local PENDING + that response implies a rejected join.)
     const isExplicitReject = remoteBody?.status === "REJECTED";
-    const isImplicitReject = remoteStatus === 404 && remoteBody?.status === "NOT_FOUND" &&
+    const isImplicitReject = remoteStatus === 404 &&
+      remoteBody?.status === "NOT_FOUND" &&
       membership.status === CouncilMembershipStatus.PENDING;
 
-    if ((isExplicitReject || isImplicitReject) && membership.status !== CouncilMembershipStatus.REJECTED) {
+    if (
+      (isExplicitReject || isImplicitReject) &&
+      membership.status !== CouncilMembershipStatus.REJECTED
+    ) {
       await membershipRepo.update(membership.id, {
         status: CouncilMembershipStatus.REJECTED,
       });
       LOG.info("Membership synced to REJECTED", { ppPublicKey, channelAuthId });
 
       ctx.response.status = Status.OK;
-      ctx.response.body = { message: "Membership synced", data: { status: "REJECTED" } };
+      ctx.response.body = {
+        message: "Membership synced",
+        data: { status: "REJECTED" },
+      };
       return;
     }
 
     ctx.response.status = Status.OK;
-    ctx.response.body = { message: "Membership unchanged", data: { status: membership.status } };
+    ctx.response.body = {
+      message: "Membership unchanged",
+      data: { status: membership.status },
+    };
   } catch (error) {
     LOG.error("Failed to sync membership", {
       error: error instanceof Error ? error.message : String(error),

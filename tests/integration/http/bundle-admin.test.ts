@@ -1,9 +1,18 @@
 import "../../ensure_test_env.ts";
 import { Application, Router } from "@oak/oak";
-import { assertEquals } from "jsr:@std/assert";
-import { postExpireBundlesHandler, setBundleRepoForTests } from "@/http/v1/dashboard/bundle-admin.ts";
+import { assertEquals } from "@std/assert";
+import {
+  postExpireBundlesHandler,
+  setBundleRepoForTests,
+} from "@/http/v1/dashboard/bundle-admin.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
-import { getBundleRepo, ensureInitialized, resetDb, seedBundle, testBundleId } from "../../test_helpers.ts";
+import {
+  ensureInitialized,
+  getBundleRepo,
+  resetDb,
+  seedBundle,
+  testBundleId,
+} from "../../test_helpers.ts";
 import { getMempool, initializeMempool } from "@/core/mempool/index.ts";
 
 const EXPIRE_PATH = "http://localhost/api/v1/dashboard/bundles/expire";
@@ -18,11 +27,13 @@ function createTestApp(): Application {
 }
 
 async function requestJson(app: Application, body: unknown) {
-  const response = await app.handle(new Request(EXPIRE_PATH, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  }));
+  const response = await app.handle(
+    new Request(EXPIRE_PATH, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
   if (!response) throw new Error("No response from Oak app");
   return response;
 }
@@ -81,25 +92,29 @@ Deno.test("returns 400 when bundleIds contains non-string values", async () => {
 
 Deno.test("validation – zero does not pass the age-filter guard", () => {
   const olderThanMs: number = 0;
-  const hasAgeFilter = typeof olderThanMs === "number" && Number.isFinite(olderThanMs) && olderThanMs > 0;
+  const hasAgeFilter = typeof olderThanMs === "number" &&
+    Number.isFinite(olderThanMs) && olderThanMs > 0;
   assertEquals(hasAgeFilter, false);
 });
 
 Deno.test("validation – positive finite number passes the age-filter guard", () => {
   const olderThanMs: number = 60_000;
-  const hasAgeFilter = typeof olderThanMs === "number" && Number.isFinite(olderThanMs) && olderThanMs > 0;
+  const hasAgeFilter = typeof olderThanMs === "number" &&
+    Number.isFinite(olderThanMs) && olderThanMs > 0;
   assertEquals(hasAgeFilter, true);
 });
 
 Deno.test("validation – array body does not pass the type guard", () => {
   const raw: unknown = [1, 2, 3];
-  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  const isObject = raw !== null && typeof raw === "object" &&
+    !Array.isArray(raw);
   assertEquals(isObject, false);
 });
 
 Deno.test("validation – object body passes the type guard", () => {
   const raw: unknown = { olderThanMs: 60000 };
-  const isObject = raw !== null && typeof raw === "object" && !Array.isArray(raw);
+  const isObject = raw !== null && typeof raw === "object" &&
+    !Array.isArray(raw);
   assertEquals(isObject, true);
 });
 
@@ -111,10 +126,22 @@ Deno.test("age filter expires stale active bundles over HTTP", async () => {
   const recentPending = testBundleId();
   const oldFailed = testBundleId();
 
-  await seedBundle({ id: oldPending, status: BundleStatus.PENDING, createdAt: oldTime });
-  await seedBundle({ id: oldProcessing, status: BundleStatus.PROCESSING, createdAt: oldTime });
+  await seedBundle({
+    id: oldPending,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
+  await seedBundle({
+    id: oldProcessing,
+    status: BundleStatus.PROCESSING,
+    createdAt: oldTime,
+  });
   await seedBundle({ id: recentPending, status: BundleStatus.PENDING });
-  await seedBundle({ id: oldFailed, status: BundleStatus.FAILED, createdAt: oldTime });
+  await seedBundle({
+    id: oldFailed,
+    status: BundleStatus.FAILED,
+    createdAt: oldTime,
+  });
 
   const response = await requestJson(app, { olderThanMs: 60_000 });
   const payload = await response.json();
@@ -123,8 +150,14 @@ Deno.test("age filter expires stale active bundles over HTTP", async () => {
   assertEquals(payload.data.expired, 2);
   assertEquals(payload.data.truncated, false);
   assertEquals((await repo.findById(oldPending))?.status, BundleStatus.EXPIRED);
-  assertEquals((await repo.findById(oldProcessing))?.status, BundleStatus.EXPIRED);
-  assertEquals((await repo.findById(recentPending))?.status, BundleStatus.PENDING);
+  assertEquals(
+    (await repo.findById(oldProcessing))?.status,
+    BundleStatus.EXPIRED,
+  );
+  assertEquals(
+    (await repo.findById(recentPending))?.status,
+    BundleStatus.PENDING,
+  );
   assertEquals((await repo.findById(oldFailed))?.status, BundleStatus.FAILED);
 });
 
@@ -142,7 +175,10 @@ Deno.test("explicit ids expires only active bundles over HTTP", async () => {
   assertEquals(response.status, 200);
   assertEquals(payload.data.expired, 1);
   assertEquals((await repo.findById(pending))?.status, BundleStatus.EXPIRED);
-  assertEquals((await repo.findById(completed))?.status, BundleStatus.COMPLETED);
+  assertEquals(
+    (await repo.findById(completed))?.status,
+    BundleStatus.COMPLETED,
+  );
 });
 
 Deno.test("combined filters count only rows updated once", async () => {
@@ -151,10 +187,17 @@ Deno.test("combined filters count only rows updated once", async () => {
   const stale = testBundleId();
   const fresh = testBundleId();
 
-  await seedBundle({ id: stale, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({
+    id: stale,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
   await seedBundle({ id: fresh, status: BundleStatus.PENDING });
 
-  const response = await requestJson(app, { olderThanMs: 60_000, bundleIds: [stale, fresh] });
+  const response = await requestJson(app, {
+    olderThanMs: 60_000,
+    bundleIds: [stale, fresh],
+  });
   const payload = await response.json();
 
   assertEquals(response.status, 200);
@@ -189,7 +232,10 @@ Deno.test("expireOlderThan respects batch limit (truncation semantics per call)"
 
   const cutoff = new Date(Date.now() - 60_000);
   const LIMIT = 3;
-  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING, BundleStatus.PROCESSING], LIMIT);
+  const expired = await repo.expireOlderThan(cutoff, [
+    BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
+  ], LIMIT);
 
   assertEquals(expired.length, LIMIT);
 });
@@ -223,11 +269,19 @@ Deno.test("combined path – both filters contribute to total expired count", as
   const oldBundle = testBundleId();
   const recentBundle = testBundleId();
 
-  await seedBundle({ id: oldBundle, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({
+    id: oldBundle,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
   await seedBundle({ id: recentBundle, status: BundleStatus.PROCESSING });
 
   const cutoff = new Date(Date.now() - 60_000);
-  const ageExpiredIds = await repo.expireOlderThan(cutoff, ACTIVE_STATUSES, 10_000);
+  const ageExpiredIds = await repo.expireOlderThan(
+    cutoff,
+    ACTIVE_STATUSES,
+    10_000,
+  );
   const idExpiredIds = await repo.expireByIds([recentBundle], ACTIVE_STATUSES);
 
   assertEquals(ageExpiredIds.length, 1);
@@ -247,11 +301,19 @@ Deno.test("combined path – overlapping IDs are excluded from explicit-IDs pass
   const oldBundle = testBundleId();
   const recentBundle = testBundleId();
 
-  await seedBundle({ id: oldBundle, status: BundleStatus.PENDING, createdAt: oldTime });
+  await seedBundle({
+    id: oldBundle,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
   await seedBundle({ id: recentBundle, status: BundleStatus.PROCESSING });
 
   const cutoff = new Date(Date.now() - 60_000);
-  const ageExpiredIds = await repo.expireOlderThan(cutoff, ACTIVE_STATUSES, 10_000);
+  const ageExpiredIds = await repo.expireOlderThan(
+    cutoff,
+    ACTIVE_STATUSES,
+    10_000,
+  );
   assertEquals(ageExpiredIds.length, 1);
   assertEquals(ageExpiredIds[0], oldBundle);
 
@@ -288,7 +350,10 @@ Deno.test("updateStatusIfActive rejects transition after bundle was expired", as
   const id = testBundleId();
   await seedBundle({ id, status: BundleStatus.PENDING });
 
-  const expired = await repo.expireByIds([id], [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+  const expired = await repo.expireByIds([id], [
+    BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
+  ]);
   assertEquals(expired.length, 1);
 
   const updated = await repo.updateStatusIfActive(

@@ -1,7 +1,10 @@
 import { type Context, Status } from "@oak/oak";
 import { Buffer } from "buffer";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
-import { queryBalances, MAX_UTXO_SLOTS } from "@/core/service/pay/channel.service.ts";
+import {
+  MAX_UTXO_SLOTS,
+  queryBalances,
+} from "@/core/service/pay/channel.service.ts";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { LOG } from "@/config/logger.ts";
 
@@ -25,7 +28,9 @@ export const postSelfBalanceHandler = async (ctx: Context) => {
   // Reject custodial JWTs — this endpoint is for self-custodial (SEP-10) users only
   if (session.type === "custodial") {
     ctx.response.status = Status.Forbidden;
-    ctx.response.body = { message: "This endpoint is for self-custodial users only" };
+    ctx.response.body = {
+      message: "This endpoint is for self-custodial users only",
+    };
     return;
   }
 
@@ -63,7 +68,10 @@ export const postSelfBalanceHandler = async (ctx: Context) => {
     );
 
     const channelCtx = await resolveChannelContext(channelContractId);
-    const balances = await queryBalances(utxoPublicKeys, channelCtx.channelClient);
+    const balances = await queryBalances(
+      utxoPublicKeys,
+      channelCtx.channelClient,
+    );
 
     const totalBalance = balances.reduce((sum, b) => sum + b, 0n);
     const utxoCount = balances.filter((b) => b > 0n).length;

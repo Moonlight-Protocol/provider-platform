@@ -8,7 +8,8 @@ import { LOG } from "@/config/logger.ts";
 let testBundleRepoOverride: OperationsBundleRepository | null = null;
 
 function getBundleRepo(): OperationsBundleRepository {
-  return testBundleRepoOverride ?? new OperationsBundleRepository(drizzleClient);
+  return testBundleRepoOverride ??
+    new OperationsBundleRepository(drizzleClient);
 }
 
 /**
@@ -51,18 +52,23 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
 
   const { olderThanMs, bundleIds } = body;
 
-  const hasAgeFilter = typeof olderThanMs === "number" && Number.isFinite(olderThanMs) && olderThanMs > 0;
+  const hasAgeFilter = typeof olderThanMs === "number" &&
+    Number.isFinite(olderThanMs) && olderThanMs > 0;
   const hasIdFilter = Array.isArray(bundleIds) && bundleIds.length > 0;
 
   if (!hasAgeFilter && !hasIdFilter) {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = {
-      message: "Provide at least one of: olderThanMs (positive number) or bundleIds (non-empty array)",
+      message:
+        "Provide at least one of: olderThanMs (positive number) or bundleIds (non-empty array)",
     };
     return;
   }
 
-  if (hasIdFilter && !bundleIds!.every((id) => typeof id === "string" && id.length > 0)) {
+  if (
+    hasIdFilter &&
+    !bundleIds!.every((id) => typeof id === "string" && id.length > 0)
+  ) {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "All bundleIds must be non-empty strings" };
     return;
@@ -71,7 +77,9 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
   if (hasIdFilter && bundleIds!.length > MAX_EXPIRE_IDS) {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = {
-      message: `bundleIds may contain at most ${MAX_EXPIRE_IDS} entries, got ${bundleIds!.length}`,
+      message: `bundleIds may contain at most ${MAX_EXPIRE_IDS} entries, got ${
+        bundleIds!.length
+      }`,
     };
     return;
   }
@@ -84,7 +92,11 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
     const cutoff = new Date(Date.now() - olderThanMs!);
     let batch: string[] = [];
     do {
-      batch = await getBundleRepo().expireOlderThan(cutoff, ACTIVE_STATUSES, AGE_FILTER_LIMIT);
+      batch = await getBundleRepo().expireOlderThan(
+        cutoff,
+        ACTIVE_STATUSES,
+        AGE_FILTER_LIMIT,
+      );
       ageExpiredCount += batch.length;
       if (batch.length > 0) {
         getMempool().purgeBundles(batch);
@@ -97,7 +109,10 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
   // no-ops — no deduplication needed here.
   let idExpiredCount = 0;
   if (hasIdFilter) {
-    const idExpiredIds = await getBundleRepo().expireByIds(bundleIds!, ACTIVE_STATUSES);
+    const idExpiredIds = await getBundleRepo().expireByIds(
+      bundleIds!,
+      ACTIVE_STATUSES,
+    );
     idExpiredCount = idExpiredIds.length;
     if (idExpiredCount > 0) {
       getMempool().purgeBundles(idExpiredIds);
@@ -105,7 +120,9 @@ export const postExpireBundlesHandler = async (ctx: Context) => {
 
     const skipped = bundleIds!.length - idExpiredCount;
     if (skipped > 0) {
-      LOG.warn(`Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`);
+      LOG.warn(
+        `Admin expire: ${skipped} bundle(s) from bundleIds were not active and were skipped`,
+      );
     }
   }
 

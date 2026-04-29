@@ -1,11 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 // TODO: Remove no-explicit-any after fixing Drizzle types
 // unknown should be used instead of any where possible
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  bundleTransaction,
   type BundleTransaction,
+  bundleTransaction,
   type NewBundleTransaction,
 } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
@@ -29,8 +29,8 @@ export class BundleTransactionRepository extends BaseRepository<
       .where(
         and(
           eq(bundleTransaction.bundleId, bundleId),
-          isNull(bundleTransaction.deletedAt)
-        )
+          isNull(bundleTransaction.deletedAt),
+        ),
       );
   }
 
@@ -44,8 +44,8 @@ export class BundleTransactionRepository extends BaseRepository<
       .where(
         and(
           eq(bundleTransaction.transactionId, transactionId),
-          isNull(bundleTransaction.deletedAt)
-        )
+          isNull(bundleTransaction.deletedAt),
+        ),
       );
   }
 
@@ -60,8 +60,8 @@ export class BundleTransactionRepository extends BaseRepository<
         and(
           eq(bundleTransaction.bundleId, bundleId),
           eq(bundleTransaction.transactionId, transactionId),
-          isNull(bundleTransaction.deletedAt)
-        )
+          isNull(bundleTransaction.deletedAt),
+        ),
       )
       .limit(1);
     return result;
@@ -70,7 +70,10 @@ export class BundleTransactionRepository extends BaseRepository<
   /**
    * Soft deletes a record by composite primary key.
    */
-  async deleteByCompositeId(bundleId: string, transactionId: string): Promise<void> {
+  async deleteByCompositeId(
+    bundleId: string,
+    transactionId: string,
+  ): Promise<void> {
     await this.db
       .update(bundleTransaction)
       .set({
@@ -79,8 +82,8 @@ export class BundleTransactionRepository extends BaseRepository<
       .where(
         and(
           eq(bundleTransaction.bundleId, bundleId),
-          eq(bundleTransaction.transactionId, transactionId)
-        )
+          eq(bundleTransaction.transactionId, transactionId),
+        ),
       );
   }
 }

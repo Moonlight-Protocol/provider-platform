@@ -78,7 +78,7 @@ const drizzleClientProxy: PGliteDrizzle = new Proxy({} as PGliteDrizzle, {
   get(_target, prop) {
     if (!_initialized) {
       throw new Error(
-        "PGlite not initialized. Call ensureInitialized() before using drizzleClient."
+        "PGlite not initialized. Call ensureInitialized() before using drizzleClient.",
       );
     }
     const val = (_drizzleClient as any)[prop];

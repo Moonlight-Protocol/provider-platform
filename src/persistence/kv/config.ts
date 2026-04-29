@@ -13,4 +13,4 @@ const memDb = kvdex({
   },
 });
 
-export { memoryKv, memDb };
+export { memDb, memoryKv };

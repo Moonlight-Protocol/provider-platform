@@ -8,20 +8,26 @@ import type { requestSchema } from "@/http/v1/bundle/post.ts";
 import type { PostEndpointInput } from "@/http/pipelines/types.ts";
 import type { OperationTypes } from "@moonlight/moonlight-sdk";
 import { MoonlightOperation } from "@moonlight/moonlight-sdk";
-import { getChannelClient } from "@/core/channel-client/index.ts";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import {
-  classifyOperations,
-  calculateOperationAmounts,
-  calculateFee,
-  generateBundleId,
   calculateBundleTtl,
   calculateBundleWeight,
+  calculateFee,
+  calculateOperationAmounts,
   calculatePriorityScore,
+  classifyOperations,
   fetchUtxoBalances,
+  generateBundleId,
 } from "@/core/service/bundle/bundle.service.ts";
-import { MEMPOOL_EXPENSIVE_OP_WEIGHT, MEMPOOL_CHEAP_OP_WEIGHT, BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
-import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
+import {
+  BUNDLE_MAX_OPERATIONS,
+  MEMPOOL_CHEAP_OP_WEIGHT,
+  MEMPOOL_EXPENSIVE_OP_WEIGHT,
+} from "@/config/env.ts";
+import type {
+  SlotBundle,
+  WeightConfig,
+} from "@/core/service/bundle/bundle.types.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
 import type { ClassifiedOperations } from "@/core/service/bundle/bundle.types.ts";
@@ -37,7 +43,9 @@ import { withSpan } from "@/core/tracing.ts";
 // Repositories
 const sessionRepository = new SessionRepository(drizzleClient);
 const utxoRepository = new UtxoRepository(drizzleClient);
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 
 // Mempool configuration
 const MEMPOOL_WEIGHT_CONFIG: WeightConfig = {
@@ -50,7 +58,7 @@ const MEMPOOL_WEIGHT_CONFIG: WeightConfig = {
 /**
  * Validates the user session
  */
-async function validateSession(sessionId: string) {
+function validateSession(sessionId: string) {
   return withSpan("Bundle.validateSession", async (span) => {
     span.addEvent("looking_up_session", { "session.id": sessionId });
     const userSession = await sessionRepository.findById(sessionId);
@@ -67,7 +75,7 @@ async function validateSession(sessionId: string) {
  * Validates that a bundle with the given ID does not exist, or if it does, ensures it is expired.
  * Throws an error if an active bundle exists.
  */
-async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
+function assertBundleIsExpired(bundleId: string): Promise<boolean> {
   return withSpan("Bundle.assertBundleIsExpired", async (span) => {
     span.addEvent("checking_existing_bundle", { "bundle.id": bundleId });
     const existingBundle = await operationsBundleRepository.findById(bundleId);
@@ -81,11 +89,15 @@ async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
       existingBundle.status !== BundleStatus.EXPIRED &&
       existingBundle.status !== BundleStatus.FAILED
     ) {
-      span.addEvent("bundle_exists_not_expired", { "bundle.status": existingBundle.status });
+      span.addEvent("bundle_exists_not_expired", {
+        "bundle.status": existingBundle.status,
+      });
       logAndThrow(new E.BUNDLE_ALREADY_EXISTS(bundleId));
     }
 
-    span.addEvent("bundle_can_be_reused", { "bundle.status": existingBundle.status });
+    span.addEvent("bundle_can_be_reused", {
+      "bundle.status": existingBundle.status,
+    });
     return true;
   });
 }
@@ -93,11 +105,22 @@ async function assertBundleIsExpired(bundleId: string): Promise<boolean> {
 /**
  * Parses MLXDR operations
  */
-async function parseOperations(operationsMLXDR: string[]): Promise<Array<OperationTypes.CreateOperation | OperationTypes.SpendOperation | OperationTypes.DepositOperation | OperationTypes.WithdrawOperation>> {
+function parseOperations(
+  operationsMLXDR: string[],
+): Promise<
+  Array<
+    | OperationTypes.CreateOperation
+    | OperationTypes.SpendOperation
+    | OperationTypes.DepositOperation
+    | OperationTypes.WithdrawOperation
+  >
+> {
   return withSpan("Bundle.parseOperations", async (span) => {
-    span.addEvent("parsing_operations", { "operations.count": operationsMLXDR.length });
+    span.addEvent("parsing_operations", {
+      "operations.count": operationsMLXDR.length,
+    });
     const operations = await Promise.all(
-      operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr))
+      operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr)),
     );
 
     if (operations.length === 0) {
@@ -105,7 +128,9 @@ async function parseOperations(operationsMLXDR: string[]): Promise<Array<Operati
       logAndThrow(new E.NO_OPERATIONS_PROVIDED());
     }
 
-    span.addEvent("operations_parsed", { "operations.count": operations.length });
+    span.addEvent("operations_parsed", {
+      "operations.count": operations.length,
+    });
     return operations;
   });
 }
@@ -113,7 +138,9 @@ async function parseOperations(operationsMLXDR: string[]): Promise<Array<Operati
 /**
  * Validates spend operations
  */
-function validateSpendOperations(operations: OperationTypes.SpendOperation[]): void {
+function validateSpendOperations(
+  operations: OperationTypes.SpendOperation[],
+): void {
   for (let i = 0; i < operations.length; i++) {
     const operation = operations[i];
     if (!operation.isSignedByUTXO()) {
@@ -122,17 +149,19 @@ function validateSpendOperations(operations: OperationTypes.SpendOperation[]): v
   }
 }
 
-
 /**
  * Persists UTXOs in the database from create operations
  */
-async function persistCreateOperations(
+function persistCreateOperations(
   operations: OperationTypes.CreateOperation[],
   bundleId: string,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   return withSpan("Bundle.persistCreateOperations", async (span) => {
-    span.addEvent("persisting_create_utxos", { "operations.count": operations.length, "bundle.id": bundleId });
+    span.addEvent("persisting_create_utxos", {
+      "operations.count": operations.length,
+      "bundle.id": bundleId,
+    });
     for (const operation of operations) {
       const utxoId = Buffer.from(operation.getUtxo()).toString("base64");
       const utxo = await utxoRepository.findById(utxoId);
@@ -160,14 +189,14 @@ async function persistCreateOperations(
  * Note: The spend amount is fetched directly from the network since
  * SpendOperation intentionally does not have an amount attribute.
  */
-async function persistSpendOperations(
+function persistSpendOperations(
   operations: OperationTypes.SpendOperation[],
   bundleId: string,
   accountId: string,
   channelClient: import("@moonlight/moonlight-sdk").PrivacyChannel,
 ): Promise<void> {
   if (operations.length === 0) {
-    return;
+    return Promise.resolve();
   }
 
   return withSpan("Bundle.persistSpendOperations", async (span) => {
@@ -212,7 +241,7 @@ async function persistSpendOperations(
  */
 function createSlotBundle(
   bundleEntity: OperationsBundle,
-  classified: ClassifiedOperations
+  classified: ClassifiedOperations,
 ): SlotBundle {
   const weight = calculateBundleWeight(classified, MEMPOOL_WEIGHT_CONFIG);
   const priorityScore = calculatePriorityScore({
@@ -239,11 +268,16 @@ function createSlotBundle(
 // ========== MAIN PROCESS ==========
 
 export const P_AddOperationsBundle = ProcessEngine.create(
-  async (input: PostEndpointInput<typeof requestSchema>) => {
+  (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
       const { operationsMLXDR, channelContractId } = input.body;
       if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
-        logAndThrow(new E.TOO_MANY_OPERATIONS(operationsMLXDR.length, BUNDLE_MAX_OPERATIONS));
+        logAndThrow(
+          new E.TOO_MANY_OPERATIONS(
+            operationsMLXDR.length,
+            BUNDLE_MAX_OPERATIONS,
+          ),
+        );
       }
       const sessionData = input.ctx.state.session as JwtSessionData;
 
@@ -276,7 +310,10 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
       // 4. Fee calculation
       span.addEvent("calculating_fee");
-      const amounts = await calculateOperationAmounts(classified, channelClient);
+      const amounts = await calculateOperationAmounts(
+        classified,
+        channelClient,
+      );
       LOG.info("amounts: ", amounts);
       const feeCalculation = calculateFee(amounts);
 
@@ -320,8 +357,17 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 
       // 6. Persist UTXOs
       span.addEvent("persisting_utxos");
-      await persistCreateOperations(classified.create, bundleEntity.id, userSession.accountId);
-      await persistSpendOperations(classified.spend, bundleEntity.id, userSession.accountId, channelClient);
+      await persistCreateOperations(
+        classified.create,
+        bundleEntity.id,
+        userSession.accountId,
+      );
+      await persistSpendOperations(
+        classified.spend,
+        bundleEntity.id,
+        userSession.accountId,
+        channelClient,
+      );
 
       // 7. Create SlotBundle and add to Mempool
       span.addEvent("adding_to_mempool");
@@ -329,8 +375,12 @@ export const P_AddOperationsBundle = ProcessEngine.create(
       const mempool = getMempool();
       await mempool.addBundle(slotBundle);
 
-      span.addEvent("bundle_added_to_mempool", { "bundle.id": bundleEntity.id });
-      LOG.info(`Bundle ${bundleEntity.id} added to mempool for asynchronous processing`);
+      span.addEvent("bundle_added_to_mempool", {
+        "bundle.id": bundleEntity.id,
+      });
+      LOG.info(
+        `Bundle ${bundleEntity.id} added to mempool for asynchronous processing`,
+      );
 
       return {
         ctx: input.ctx,
@@ -340,5 +390,5 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   },
   {
     name: "ProcessNewBundleProcessEngine",
-  }
+  },
 );

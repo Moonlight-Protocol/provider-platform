@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
@@ -35,4 +35,3 @@ export const challengeRelations = relations(challenge, ({ one }) => ({
 
 export type Challenge = typeof challenge.$inferSelect;
 export type NewChallenge = typeof challenge.$inferInsert;
-

@@ -1,4 +1,4 @@
-import { assertEquals, assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { extractNetworkErrorContext } from "@/core/service/executor/error-extraction.ts";
 
 Deno.test("extractNetworkErrorContext — returns undefined for non-Colibri Error", () => {
@@ -10,23 +10,26 @@ Deno.test("extractNetworkErrorContext — returns undefined for non-Colibri Erro
 Deno.test("extractNetworkErrorContext — extracts STX_007 envelope", () => {
   // Mirrors @colibri/core ERROR_STATUS shape: code/domain/source on the error,
   // meta.data.{errorResult, diagnosticEvents, input.transaction.{hash(),sequence}}.
-  const fakeColibri = Object.assign(new Error("Transaction processing error!"), {
-    code: "STX_007",
-    domain: "processes",
-    source: "@colibri/core/processes/send-transaction",
-    meta: {
-      data: {
-        errorResult: ["txInsufficientFee"],
-        diagnosticEvents: [{ event: "diag1" }],
-        input: {
-          transaction: {
-            hash: () => ({ toString: (_e?: string) => "deadbeef" }),
-            sequence: "9720769416265729",
+  const fakeColibri = Object.assign(
+    new Error("Transaction processing error!"),
+    {
+      code: "STX_007",
+      domain: "processes",
+      source: "@colibri/core/processes/send-transaction",
+      meta: {
+        data: {
+          errorResult: ["txInsufficientFee"],
+          diagnosticEvents: [{ event: "diag1" }],
+          input: {
+            transaction: {
+              hash: () => ({ toString: (_e?: string) => "deadbeef" }),
+              sequence: "9720769416265729",
+            },
           },
         },
       },
     },
-  });
+  );
 
   const ctx = extractNetworkErrorContext(fakeColibri);
   assert(ctx);
@@ -77,7 +80,9 @@ Deno.test("extractNetworkErrorContext — silently drops broken hash() implement
         errorResult: [],
         input: {
           transaction: {
-            hash: () => { throw new Error("hash failed"); },
+            hash: () => {
+              throw new Error("hash failed");
+            },
           },
         },
       },

@@ -4,19 +4,19 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/self_send_test.ts
  */
-import { assertEquals, assertExists } from "jsr:@std/assert";
+import { assertEquals, assertExists } from "@std/assert";
 import { postSelfSendHandler } from "@/http/v1/pay/self/send.ts";
 import {
   createTestKyc,
-  testAddress,
-  resetDb,
   ensureInitialized,
-  getAllTransactions,
   getAllEscrows,
-  PayKycStatus,
-  PayTransactionType,
-  PayTransactionStatus,
+  getAllTransactions,
   PayEscrowStatus,
+  PayKycStatus,
+  PayTransactionStatus,
+  PayTransactionType,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -40,10 +40,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session },
   };
@@ -86,11 +94,17 @@ Deno.test("self send - successful send to verified address creates SEND transact
   await postSelfSendHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   const data = (res.body as { data: { status: string } }).data;
   assertEquals(data.status, "pending");
 
-  const txs = (await getAllTransactions()).filter((t) => t.accountId === senderAddress);
+  const txs = (await getAllTransactions()).filter((t) =>
+    t.accountId === senderAddress
+  );
   assertEquals(txs.length, 1);
   assertEquals(txs[0].type, PayTransactionType.SEND);
   assertEquals(txs[0].status, PayTransactionStatus.PENDING);
@@ -119,18 +133,23 @@ Deno.test("self send - send to unverified address creates escrow", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { escrowId?: string; status?: string } }).data;
+  const data =
+    (res.body as { data: { escrowId?: string; status?: string } }).data;
   assertExists(data.escrowId, "Response should contain an escrowId");
   assertEquals(data.status, "escrowed");
 
-  const escrows = (await getAllEscrows()).filter((e) => e.heldForAddress === receiverAddress);
+  const escrows = (await getAllEscrows()).filter((e) =>
+    e.heldForAddress === receiverAddress
+  );
   assertEquals(escrows.length, 1);
   assertEquals(escrows[0].status, PayEscrowStatus.HELD);
   assertEquals(escrows[0].amount, 5_000_000n);
   assertEquals(escrows[0].mode, "self");
 
   // Transaction should also be created with COMPLETED status (escrow path)
-  const txs = (await getAllTransactions()).filter((t) => t.accountId === senderAddress);
+  const txs = (await getAllTransactions()).filter((t) =>
+    t.accountId === senderAddress
+  );
   assertEquals(txs.length, 1);
   assertEquals(txs[0].status, PayTransactionStatus.COMPLETED);
 });

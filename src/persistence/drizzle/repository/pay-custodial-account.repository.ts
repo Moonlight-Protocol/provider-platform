@@ -1,9 +1,9 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  payCustodialAccount,
-  type PayCustodialAccount,
   type NewPayCustodialAccount,
+  type PayCustodialAccount,
+  payCustodialAccount,
 } from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
@@ -16,7 +16,9 @@ export class PayCustodialAccountRepository extends BaseRepository<
     super(db, payCustodialAccount);
   }
 
-  async findByUsername(username: string): Promise<PayCustodialAccount | undefined> {
+  async findByUsername(
+    username: string,
+  ): Promise<PayCustodialAccount | undefined> {
     const [result] = await this.db
       .select()
       .from(payCustodialAccount)
@@ -24,13 +26,15 @@ export class PayCustodialAccountRepository extends BaseRepository<
         and(
           eq(payCustodialAccount.username, username),
           isNull(payCustodialAccount.deletedAt),
-        )
+        ),
       )
       .limit(1);
     return result;
   }
 
-  async findByDepositAddress(address: string): Promise<PayCustodialAccount | undefined> {
+  async findByDepositAddress(
+    address: string,
+  ): Promise<PayCustodialAccount | undefined> {
     const [result] = await this.db
       .select()
       .from(payCustodialAccount)
@@ -38,7 +42,7 @@ export class PayCustodialAccountRepository extends BaseRepository<
         and(
           eq(payCustodialAccount.depositAddress, address),
           isNull(payCustodialAccount.deletedAt),
-        )
+        ),
       )
       .limit(1);
     return result;

@@ -8,18 +8,20 @@ import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 export const P_CreateChallengeMemory = ProcessEngine.create(
-  async (input: ChallengeData) => {
+  (input: ChallengeData) => {
     return withSpan("P_CreateChallengeMemory", async (span) => {
       const { challengeData } = input;
       try {
-        span.addEvent("checking_existing_session", { "challenge.txHash": challengeData.txHash });
+        span.addEvent("checking_existing_session", {
+          "challenge.txHash": challengeData.txHash,
+        });
         const existingSession = await sessionManager.getSession(
-          challengeData.txHash
+          challengeData.txHash,
         );
 
         assertOrThrow(
           !isDefined(existingSession),
-          new E.SESSION_ALREADY_EXISTS(challengeData.txHash)
+          new E.SESSION_ALREADY_EXISTS(challengeData.txHash),
         );
 
         span.addEvent("caching_session");
@@ -27,14 +29,16 @@ export const P_CreateChallengeMemory = ProcessEngine.create(
           challengeData.txHash,
           challengeData.clientAccount,
           challengeData.requestId,
-          challengeData.expiresAt
+          challengeData.expiresAt,
         );
 
         span.addEvent("session_cached");
         return await input;
       } catch (error) {
         span.addEvent("memory_cache_failed", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         logAndThrow(new E.FAILED_TO_CACHE_CHALLENGE_IN_LIVE_SESSIONS(error));
       }
@@ -42,5 +46,5 @@ export const P_CreateChallengeMemory = ProcessEngine.create(
   },
   {
     name: "CreateChallengeMemory",
-  }
+  },
 );

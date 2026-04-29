@@ -6,9 +6,9 @@ import { OperationsBundleRepository } from "@/persistence/drizzle/repository/ope
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import {
+  bundleTransaction,
   operationsBundle,
   transaction,
-  bundleTransaction,
 } from "@/persistence/drizzle/entity/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -25,7 +25,9 @@ export type TestDb = ReturnType<typeof drizzle<typeof schema>>;
  * Throws if `ensureInitialized()` has not been called.
  */
 export function getTestDb(): TestDb {
-  if (!_db) throw new Error("Test DB not initialized – call ensureInitialized() first");
+  if (!_db) {
+    throw new Error("Test DB not initialized – call ensureInitialized() first");
+  }
   return _db;
 }
 

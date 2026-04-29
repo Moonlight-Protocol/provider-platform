@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { StrKey } from "@colibri/core";
 
 // --- Amount validation: regex /^\d+$/ ---
@@ -47,11 +47,19 @@ Deno.test("amount regex - rejects scientific notation", () => {
 // --- BigInt zero-rejection logic ---
 
 Deno.test("BigInt zero-rejection - zero is not positive", () => {
-  assertEquals(BigInt("0") <= 0n, true, "0n <= 0n should be true (rejected by handler)");
+  assertEquals(
+    BigInt("0") <= 0n,
+    true,
+    "0n <= 0n should be true (rejected by handler)",
+  );
 });
 
 Deno.test("BigInt zero-rejection - positive value passes", () => {
-  assertEquals(BigInt("1") > 0n, true, "1n > 0n should be true (accepted by handler)");
+  assertEquals(
+    BigInt("1") > 0n,
+    true,
+    "1n > 0n should be true (accepted by handler)",
+  );
 });
 
 Deno.test("BigInt zero-rejection - large positive value passes", () => {
@@ -77,7 +85,9 @@ Deno.test("StrKey - empty string fails", () => {
 Deno.test("StrKey - key with wrong prefix fails", () => {
   // S... is a secret key prefix, not a public key
   assertEquals(
-    StrKey.isValidEd25519PublicKey("SCZANGBA5YHTNYVVV3C7CAZMCLXPILHSE6PGYAY5WKR3YZLU7E2IGSUD"),
+    StrKey.isValidEd25519PublicKey(
+      "SCZANGBA5YHTNYVVV3C7CAZMCLXPILHSE6PGYAY5WKR3YZLU7E2IGSUD",
+    ),
     false,
   );
 });
@@ -89,7 +99,9 @@ Deno.test("StrKey - correct prefix but wrong length fails", () => {
 Deno.test("StrKey - correct length but invalid checksum fails", () => {
   // Modify the last few chars to break the checksum
   assertEquals(
-    StrKey.isValidEd25519PublicKey("GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN8"),
+    StrKey.isValidEd25519PublicKey(
+      "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN8",
+    ),
     false,
   );
 });

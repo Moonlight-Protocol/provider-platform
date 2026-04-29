@@ -10,7 +10,7 @@ const PROCESS_NAME = "setSuccessResponse" as const;
 
 const P_SetSuccessResponse = <S extends ZodSchema>(schema: S) => {
   const setSuccessResponseProcess = (
-    input: SuccessResponseInput<ZodInfer<S>>
+    input: SuccessResponseInput<ZodInfer<S>>,
   ): Context => {
     const { ctx, data, status, message } = input;
 

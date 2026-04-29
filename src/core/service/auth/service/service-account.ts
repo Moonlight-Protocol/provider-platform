@@ -13,7 +13,9 @@ let _authSigner: LocalSigner | null = null;
 export function getProviderAccount(): LocalSigner {
   if (!_authSigner) {
     const encoder = new TextEncoder();
-    const secretBytes = encoder.encode(SERVICE_AUTH_SECRET + ":auth-challenge-keypair");
+    const secretBytes = encoder.encode(
+      SERVICE_AUTH_SECRET + ":auth-challenge-keypair",
+    );
     const seed = new Uint8Array(32);
     for (let i = 0; i < secretBytes.length; i++) {
       seed[i % 32] ^= secretBytes[i];

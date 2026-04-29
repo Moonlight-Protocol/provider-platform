@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
@@ -33,4 +33,3 @@ export const sessionRelations = relations(session, ({ one }) => ({
 
 export type Session = typeof session.$inferSelect;
 export type NewSession = typeof session.$inferInsert;
-

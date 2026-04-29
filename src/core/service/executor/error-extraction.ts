@@ -47,7 +47,9 @@ function isString(v: unknown): v is string {
  * uses `Object.assign(this, originalError)` so the original `code`/`meta` are
  * copied onto the wrapper, which means duck-typing works through wrapping.
  */
-export function extractNetworkErrorContext(error: unknown): NetworkErrorContext | undefined {
+export function extractNetworkErrorContext(
+  error: unknown,
+): NetworkErrorContext | undefined {
   if (!error || typeof error !== "object") return undefined;
   const e = error as MaybeColibri;
   if (!isString(e.code) && !e.meta?.data) return undefined;
@@ -60,7 +62,9 @@ export function extractNetworkErrorContext(error: unknown): NetworkErrorContext 
   const data = e.meta?.data;
   if (data) {
     if (data.errorResult !== undefined) ctx.errorResult = data.errorResult;
-    if (data.diagnosticEvents !== undefined) ctx.diagnosticEvents = data.diagnosticEvents;
+    if (data.diagnosticEvents !== undefined) {
+      ctx.diagnosticEvents = data.diagnosticEvents;
+    }
 
     const tx = data.input?.transaction;
     if (tx && typeof tx.hash === "function") {
@@ -86,7 +90,10 @@ export function extractNetworkErrorContext(error: unknown): NetworkErrorContext 
  * event. Attributes are queryable in TraceQL (`{span.colibri.error.code = "STX_007"}`)
  * while the event carries the full payload.
  */
-export function recordNetworkErrorOnSpan(span: Span, ctx: NetworkErrorContext): void {
+export function recordNetworkErrorOnSpan(
+  span: Span,
+  ctx: NetworkErrorContext,
+): void {
   if (ctx.code) span.setAttribute("colibri.error.code", ctx.code);
   if (ctx.domain) span.setAttribute("colibri.error.domain", ctx.domain);
   if (ctx.source) span.setAttribute("colibri.error.source", ctx.source);
@@ -104,14 +111,19 @@ export function recordNetworkErrorOnSpan(span: Span, ctx: NetworkErrorContext): 
     span.addEvent("network_error_details", {
       ...(ctx.code ? { "colibri.error.code": ctx.code } : {}),
       ...(errorResultStr ? { "error.result": errorResultStr } : {}),
-      ...(diagnosticEventsStr ? { "diagnostic.events": diagnosticEventsStr } : {}),
+      ...(diagnosticEventsStr
+        ? { "diagnostic.events": diagnosticEventsStr }
+        : {}),
     });
   }
 }
 
 function safeJson(value: unknown): string | undefined {
   try {
-    return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+    return JSON.stringify(
+      value,
+      (_k, v) => (typeof v === "bigint" ? v.toString() : v),
+    );
   } catch {
     return undefined;
   }

@@ -12,15 +12,16 @@ export const PIPE_PostEndpoint = <
   Req extends ZodSchema,
   Res extends ZodSchema,
   // deno-lint-ignore no-explicit-any
-  Steps extends [PipelineStep<any, any, any>, ...PipelineStep<any, any, any>[]]
+  Steps extends [PipelineStep<any, any, any>, ...PipelineStep<any, any, any>[]],
 >({
   name = "POST_EndpointPipeline",
   requestSchema,
   responseSchema,
   steps,
 }: {
-  steps: [...Steps] &
-    PipelineSteps<PostEndpointInput<Req>, PostEndpointOutput<Res>, Steps>;
+  steps:
+    & [...Steps]
+    & PipelineSteps<PostEndpointInput<Req>, PostEndpointOutput<Res>, Steps>;
   name?: string;
   requestSchema: Req;
   responseSchema: Res;
@@ -31,7 +32,7 @@ export const PIPE_PostEndpoint = <
       ...steps,
       P_SetSuccessResponse(responseSchema),
     ],
-    { name }
+    { name },
   );
 
   pipe.addPlugin(PLG_ProcessErrorResponse(), name);

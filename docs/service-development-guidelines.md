@@ -1,28 +1,34 @@
 # Service Development Guidelines
 
-This document describes the patterns and best practices for service development in the Provider Platform, ensuring consistency, maintainability, and code quality.
+This document describes the patterns and best practices for service development
+in the Provider Platform, ensuring consistency, maintainability, and code
+quality.
 
 ## Fundamental Principles
 
 ### 1. KISS (Keep It Simple, Stupid)
+
 - **Prioritize simplicity over complexity**
 - Avoid over-engineering
 - Keep functions small and focused
 - Don't create unnecessary abstractions
 
 ### 2. DRY (Don't Repeat Yourself)
+
 - **Eliminate code duplication**
 - Extract repeated logic into reusable functions
 - Use generic functions when appropriate
 - Identify repetitive patterns and abstract them
 
 ### 3. Single Responsibility Principle (SRP)
+
 - **Each function/class should have a single responsibility**
 - A function should do only one thing, but do it well
 - Separate business logic from data access
 - Separate validation from processing
 
 ### 4. Pragmatism over Perfection
+
 - **Don't separate into files until necessary**
 - Keep related functions in the same file
 - Split only when there's a real need (reusability, complexity, size)
@@ -44,17 +50,21 @@ src/core/service/{service-name}/
 ### When to Create Separate Files
 
 **ALWAYS create separate files for:**
+
 - ✅ **Shared types** (`*.types.ts`) - When types are used in multiple places
 - ✅ **Specific errors** (`*.errors.ts`) - For consistent error handling
-- ✅ **Reusable pure functions** (`*.service.ts`) - Business logic that can be tested in isolation
+- ✅ **Reusable pure functions** (`*.service.ts`) - Business logic that can be
+  tested in isolation
 
 **KEEP in the same file:**
+
 - ✅ Helper functions specific to the process
 - ✅ Logic that's only used in the context of the main process
 - ✅ Simple and specific validations
 - ✅ Local configuration constants
 
 **CONSIDER separating when:**
+
 - ⚠️ Function exceeds 50-80 lines
 - ⚠️ Logic is reused in other services
 - ⚠️ Complexity justifies separation for readability
@@ -107,30 +117,41 @@ export const P_ServiceName = ProcessEngine.create(
 ## Naming Conventions
 
 ### Files
+
 - **Processes**: `{service-name}.process.ts` (e.g., `add-bundle.process.ts`)
 - **Services**: `{service-name}.service.ts` (e.g., `bundle.service.ts`)
 - **Types**: `{service-name}.types.ts` (e.g., `bundle.types.ts`)
 - **Errors**: `{service-name}.errors.ts` (e.g., `bundle.errors.ts`)
 
 ### Functions
+
 - **Validation**: `validate{Entity}` (e.g., `validateSession`, `validateBundle`)
 - **Processing**: `process{Action}` (e.g., `processOperations`, `processUtxos`)
-- **Transformation**: `transform{Entity}` or `{entity}To{Target}` (e.g., `transformToDto`)
+- **Transformation**: `transform{Entity}` or `{entity}To{Target}` (e.g.,
+  `transformToDto`)
 - **Calculation**: `calculate{Thing}` (e.g., `calculateFee`, `calculateTotal`)
 - **Persistence**: `persist{Entity}` or `save{Entity}` (e.g., `persistUtxos`)
-- **Retrieval**: `get{Thing}` or `fetch{Thing}` (e.g., `getTransactionExpiration`)
+- **Retrieval**: `get{Thing}` or `fetch{Thing}` (e.g.,
+  `getTransactionExpiration`)
 
 ### Variables
+
 - **Constants**: `UPPER_SNAKE_CASE` (e.g., `BUNDLE_TTL_HOURS`)
 - **Configurations**: `{SERVICE}_CONFIG` (e.g., `BUNDLE_CONFIG`)
 - **Types**: `PascalCase` (e.g., `ClassifiedOperations`, `FeeCalculation`)
 - **Instances**: `camelCase` (e.g., `userSession`, `operationsBundle`)
 
 ### Error Classes
-- **Platform errors (preferred for domain errors)**: `UPPER_SNAKE_CASE` (e.g., `INVALID_SESSION`, `BUNDLE_ALREADY_EXISTS`)
-- **Error code enums**: `{SERVICE}_ERROR_CODES` (e.g., `BUNDLE_ERROR_CODES.INVALID_SESSION = "BND_001"`)
-- **Source**: constant `source` describing the service context (e.g., `"@service/bundle"`)
-- **Legacy/simple errors**: PascalCase `*Error` may still be used in low-level or non-HTTP contexts, but service/HTTP-facing errors should use `PlatformError`
+
+- **Platform errors (preferred for domain errors)**: `UPPER_SNAKE_CASE` (e.g.,
+  `INVALID_SESSION`, `BUNDLE_ALREADY_EXISTS`)
+- **Error code enums**: `{SERVICE}_ERROR_CODES` (e.g.,
+  `BUNDLE_ERROR_CODES.INVALID_SESSION = "BND_001"`)
+- **Source**: constant `source` describing the service context (e.g.,
+  `"@service/bundle"`)
+- **Legacy/simple errors**: PascalCase `*Error` may still be used in low-level
+  or non-HTTP contexts, but service/HTTP-facing errors should use
+  `PlatformError`
 
 ---
 
@@ -139,40 +160,50 @@ export const P_ServiceName = ProcessEngine.create(
 ### 1. Pure and Reusable Functions (`*.service.ts`)
 
 **Characteristics:**
+
 - Pure functions when possible (no side effects)
 - Easy to test in isolation
 - Reusable in different contexts
 - Well documented with JSDoc
 
 **Example:**
+
 ```typescript
 /**
  * Classifies operations by type
- * 
+ *
  * @param operations - List of Moonlight operations
  * @returns Operations classified by type
  */
 export function classifyOperations(
-  operations: MoonlightOperation[]
+  operations: MoonlightOperation[],
 ): ClassifiedOperations {
   return {
-    create: operations.filter((op) => op.isCreate()) as OperationTypes.CreateOperation[],
-    spend: operations.filter((op) => op.isSpend()) as OperationTypes.SpendOperation[],
-    deposit: operations.filter((op) => op.isDeposit()) as OperationTypes.DepositOperation[],
-    withdraw: operations.filter((op) => op.isWithdraw()) as OperationTypes.WithdrawOperation[],
+    create: operations.filter((op) =>
+      op.isCreate()
+    ) as OperationTypes.CreateOperation[],
+    spend: operations.filter((op) =>
+      op.isSpend()
+    ) as OperationTypes.SpendOperation[],
+    deposit: operations.filter((op) =>
+      op.isDeposit()
+    ) as OperationTypes.DepositOperation[],
+    withdraw: operations.filter((op) =>
+      op.isWithdraw()
+    ) as OperationTypes.WithdrawOperation[],
   };
 }
 
 /**
  * Calculates the total of a list of operations (DRY)
- * 
+ *
  * @param operations - List of operations
  * @param getAmount - Function to extract the value from each operation
  * @returns Calculated total
  */
 export function calculateOperationsTotal<T extends MoonlightOperation>(
   operations: T[],
-  getAmount: (op: T) => bigint
+  getAmount: (op: T) => bigint,
 ): bigint {
   return operations.reduce((acc, op) => acc + getAmount(op), BigInt(0));
 }
@@ -181,12 +212,14 @@ export function calculateOperationsTotal<T extends MoonlightOperation>(
 ### 2. Helper Functions in Process (`*.process.ts`)
 
 **Characteristics:**
+
 - Specific to the process context
 - May have side effects (database access, external calls)
 - Logically ordered (order of use)
 - Descriptive names
 
 **Example:**
+
 ```typescript
 /**
  * Validates the user session
@@ -205,7 +238,7 @@ async function validateSession(sessionId: string) {
 async function persistCreateOperations(
   operations: OperationTypes.CreateOperation[],
   bundleId: string,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   for (const operation of operations) {
     await utxoRepository.create({
@@ -223,6 +256,7 @@ async function persistCreateOperations(
 ### 3. Error Handling (`*.errors.ts`)
 
 **Pattern (service/domain errors):**
+
 - Use `PlatformError` for domain and HTTP-facing errors
 - Define a service-specific error code enum
 - Define a `source` string for traceability
@@ -235,6 +269,7 @@ async function persistCreateOperations(
   - **baseError**: underlying error (when wrapping)
 
 **Example (`bundle.errors.ts` style):**
+
 ```typescript
 import { PlatformError } from "@/error/index.ts";
 
@@ -256,11 +291,13 @@ export class INVALID_SESSION extends PlatformError<{ sessionId: string }> {
       source,
       code: BUNDLE_ERROR_CODES.INVALID_SESSION,
       message: "Invalid session",
-      details: `The session with ID '${sessionId}' was not found or is invalid.`,
+      details:
+        `The session with ID '${sessionId}' was not found or is invalid.`,
       api: {
         status: 401,
         message: "Invalid session",
-        details: "The provided session is invalid or has expired. Please authenticate again.",
+        details:
+          "The provided session is invalid or has expired. Please authenticate again.",
       },
       meta: { sessionId },
     });
@@ -273,7 +310,8 @@ export class BUNDLE_ALREADY_EXISTS extends PlatformError<{ bundleId: string }> {
       source,
       code: BUNDLE_ERROR_CODES.BUNDLE_ALREADY_EXISTS,
       message: "Bundle already exists",
-      details: `A bundle with ID '${bundleId}' already exists in PENDING or COMPLETED status.`,
+      details:
+        `A bundle with ID '${bundleId}' already exists in PENDING or COMPLETED status.`,
       api: {
         status: 409,
         message: "Bundle already exists",
@@ -296,7 +334,8 @@ export class NO_OPERATIONS_PROVIDED extends PlatformError {
       api: {
         status: 400,
         message: "No operations provided",
-        details: "The request must include at least one operation in the operations bundle.",
+        details:
+          "The request must include at least one operation in the operations bundle.",
       },
     });
   }
@@ -304,7 +343,9 @@ export class NO_OPERATIONS_PROVIDED extends PlatformError {
 ```
 
 **Pattern (usage in processes):**
-- Import error module as a namespace: `import * as E from "./{service-name}.errors.ts";`
+
+- Import error module as a namespace:
+  `import * as E from "./{service-name}.errors.ts";`
 - Use `logAndThrow` helper to:
   - Log the error centrally
   - Throw the `PlatformError` so it propagates to the HTTP error pipeline
@@ -325,12 +366,14 @@ async function validateSession(sessionId: string) {
 ### 4. Types and Interfaces (`*.types.ts`)
 
 **Pattern:**
+
 - Service domain-specific types
 - Interfaces for complex data structures
 - Types for unions and compositions
 - Explicit export of all types
 
 **Example:**
+
 ```typescript
 export type ClassifiedOperations = {
   create: OperationTypes.CreateOperation[];
@@ -355,6 +398,7 @@ export type FeeCalculation = {
 ### 5. Main Process
 
 **Structure:**
+
 - Linear and readable flow
 - Numbered comments for main sections
 - Use of helper functions for complexity
@@ -362,6 +406,7 @@ export type FeeCalculation = {
 - Logging at strategic points
 
 **Example (simplified, bundle-style):**
+
 ```typescript
 export const P_AddOperationsBundle = ProcessEngine.create(
   async (input: PostEndpointInput<typeof requestSchema>) => {
@@ -401,9 +446,10 @@ export const P_AddOperationsBundle = ProcessEngine.create(
     // 5. Fee calculation
     const amounts = calculateOperationAmounts(classified);
     const feeCalculation = calculateFee(amounts);
-    
+
     LOG.debug("Fee calculation breakdown", {
-      totalDepositAmount: feeCalculation.breakdown.totalDepositAmount.toString(),
+      totalDepositAmount: feeCalculation.breakdown.totalDepositAmount
+        .toString(),
       // ...
     });
 
@@ -417,7 +463,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   },
   {
     name: "ProcessNewBundleProcessEngine",
-  }
+  },
 );
 ```
 
@@ -428,6 +474,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
 ### 1. Eliminating Code Duplication (DRY)
 
 **❌ Avoid:**
+
 ```typescript
 const totalCreateAmount = createOperations.length > 0
   ? createOperations.reduce((acc, op) => acc + op.getAmount(), BigInt(0))
@@ -439,44 +486,49 @@ const totalSpendAmount = spendOperations.length > 0
 ```
 
 **✅ Prefer:**
+
 ```typescript
 const totalCreateAmount = calculateOperationsTotal(
   createOperations,
-  (op) => op.getAmount()
+  (op) => op.getAmount(),
 );
 
 const totalSpendAmount = calculateOperationsTotal(
   spendOperations,
-  (op) => op.getAmount()
+  (op) => op.getAmount(),
 );
 ```
 
 ### 2. Extracting Magic Values
 
 **❌ Avoid:**
+
 ```typescript
-ttl: new Date(Date.now() + 1000 * 60 * 60 * 24)
+ttl: new Date(Date.now() + 1000 * 60 * 60 * 24);
 const nOfCreate = 1;
 ```
 
 **✅ Prefer:**
+
 ```typescript
 const BUNDLE_CONFIG = {
   TTL_HOURS: 24,
   REQUIRED_OPEX_UTXOS: 1,
 } as const;
 
-ttl: calculateBundleTtl() // or new Date(Date.now() + 1000 * 60 * 60 * BUNDLE_CONFIG.TTL_HOURS)
+ttl: calculateBundleTtl(); // or new Date(Date.now() + 1000 * 60 * 60 * BUNDLE_CONFIG.TTL_HOURS)
 ```
 
 ### 3. Appropriate Logging Usage
 
 **❌ Avoid:**
+
 ```typescript
 console.log("\n\n--------Operation", op.toMLXDR());
 ```
 
 **✅ Prefer:**
+
 ```typescript
 LOG.debug("Fee operation created", { mlxdr: feeOperation.toMLXDR() });
 ```
@@ -484,12 +536,14 @@ LOG.debug("Fee operation created", { mlxdr: feeOperation.toMLXDR() });
 ### 4. Removing Commented Code
 
 **❌ Avoid:**
+
 ```typescript
 operationsBundleId: "blabalblabla",
 // operationsBundleId: newOperationsBundle.id,
 ```
 
 **✅ Prefer:**
+
 ```typescript
 operationsBundleId: newOperationsBundle.id,
 ```
@@ -497,6 +551,7 @@ operationsBundleId: newOperationsBundle.id,
 ### 5. Specific Error Handling
 
 **❌ Avoid:**
+
 ```typescript
 if (!userSession) {
   throw new Error("Invalid Session: Account not found in session");
@@ -504,6 +559,7 @@ if (!userSession) {
 ```
 
 **✅ Prefer:**
+
 ```typescript
 import * as E from "./bundle.errors.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
@@ -516,11 +572,13 @@ if (!userSession) {
 ### 6. Small and Focused Functions
 
 **❌ Avoid:**
+
 ```typescript
 // Function with 100+ lines doing multiple things
 ```
 
 **✅ Prefer:**
+
 ```typescript
 // Multiple small functions, each with a single responsibility
 async function validateSession(...) { ... }
@@ -531,6 +589,7 @@ async function calculateFee(...) { ... }
 ### 7. JSDoc Documentation
 
 **✅ Always document:**
+
 - Public/exported functions
 - Complex functions
 - Non-obvious parameters and returns
@@ -538,11 +597,13 @@ async function calculateFee(...) { ... }
 ```typescript
 /**
  * Calculates the bundle fee based on operations
- * 
+ *
  * @param breakdown - Breakdown of totals by operation type
  * @returns Complete fee calculation including breakdown
  */
-export function calculateFee(breakdown: FeeCalculation["breakdown"]): FeeCalculation {
+export function calculateFee(
+  breakdown: FeeCalculation["breakdown"],
+): FeeCalculation {
   // ...
 }
 ```
@@ -571,7 +632,8 @@ When creating a new service, verify:
 
 ## Complete Example
 
-Refer to the `add-bundle.process.ts` service as a reference implementation following these patterns.
+Refer to the `add-bundle.process.ts` service as a reference implementation
+following these patterns.
 
 ---
 

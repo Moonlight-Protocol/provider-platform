@@ -1,9 +1,9 @@
-import { desc, gte, lt, avg, count } from "drizzle-orm";
+import { avg, count, desc, gte, lt } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
+  type MempoolMetric,
   mempoolMetric,
   type NewMempoolMetric,
-  type MempoolMetric,
 } from "@/persistence/drizzle/entity/mempool-metric.entity.ts";
 
 export class MempoolMetricRepository {

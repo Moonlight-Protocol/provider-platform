@@ -4,16 +4,16 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/kyc_post_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { postKycHandler } from "@/http/v1/pay/kyc/post.ts";
 import {
   createTestAccount,
   createTestKyc,
-  testAddress,
-  resetDb,
   ensureInitialized,
   getAllKyc,
   PayKycStatus,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -37,10 +37,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session },
   };
@@ -92,9 +100,16 @@ Deno.test("kyc post - self-custodial user submits KYC for own address returns 20
   await postKycHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "KYC submitted");
-  assertEquals((res.body as { data: { status: string } }).data.status, PayKycStatus.PENDING);
+  assertEquals(
+    (res.body as { data: { status: string } }).data.status,
+    PayKycStatus.PENDING,
+  );
 
   const kycRecords = await getAllKyc();
   const record = kycRecords.find((k) => k.address === address);
@@ -146,7 +161,11 @@ Deno.test("kyc post - custodial user submits KYC for own deposit address returns
   await postKycHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "KYC submitted");
 
   const kycRecords = await getAllKyc();
@@ -253,7 +272,10 @@ Deno.test("kyc post - missing address returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });
 
 Deno.test("kyc post - missing jurisdiction returns 400", async () => {
@@ -270,7 +292,10 @@ Deno.test("kyc post - missing jurisdiction returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });
 
 Deno.test("kyc post - empty body returns 400", async () => {
@@ -286,5 +311,8 @@ Deno.test("kyc post - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });

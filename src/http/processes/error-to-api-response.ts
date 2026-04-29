@@ -1,4 +1,4 @@
-import { ProcessEngine, type MetadataHelper } from "@fifo/convee";
+import { type MetadataHelper, ProcessEngine } from "@fifo/convee";
 import type { ErrorResponse } from "@/http/default-schemas.ts";
 import { PlatformError } from "@/error/index.ts";
 
@@ -7,7 +7,7 @@ const PROCESS_NAME = "ErrorToApiResponse" as const;
 export const P_ErrorToApiResponse = () => {
   const errorToApiResponse = (
     error: Error | PlatformError<unknown>,
-    _metadataHelper?: MetadataHelper
+    _metadataHelper?: MetadataHelper,
   ): ErrorResponse => {
     if (PlatformError.is(error)) {
       return error.getAPIError();
@@ -20,6 +20,6 @@ export const P_ErrorToApiResponse = () => {
     errorToApiResponse,
     {
       name: PROCESS_NAME,
-    }
+    },
   );
 };

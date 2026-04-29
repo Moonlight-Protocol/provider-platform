@@ -1,4 +1,4 @@
-import type { Transaction, OperationType } from "stellar-sdk";
+import type { OperationType, Transaction } from "stellar-sdk";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import * as E from "@/core/service/auth/challenge/verify/error.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
@@ -14,7 +14,7 @@ export function extractOperationFromChallengeTx(tx: Transaction): {
   const expectedOperationType = "manageData" as OperationType.ManageData;
   assertOrThrow(
     operation.type === expectedOperationType,
-    new E.WRONG_OPERATION_TYPE(expectedOperationType, operation.type)
+    new E.WRONG_OPERATION_TYPE(expectedOperationType, operation.type),
   );
 
   const clientAccount = operation.source;

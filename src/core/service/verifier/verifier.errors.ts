@@ -10,13 +10,15 @@ const source = "@service/verifier";
 /**
  * Error thrown when a transaction is not found on the network
  */
-export class TRANSACTION_NOT_FOUND extends PlatformError<{ transactionId: string }> {
+export class TRANSACTION_NOT_FOUND
+  extends PlatformError<{ transactionId: string }> {
   constructor(transactionId: string) {
     super({
       source,
       code: VERIFIER_ERROR_CODES.TRANSACTION_NOT_FOUND,
       message: "Transaction not found on network",
-      details: `The transaction with ID '${transactionId}' was not found on the Stellar network.`,
+      details:
+        `The transaction with ID '${transactionId}' was not found on the Stellar network.`,
       meta: { transactionId },
     });
   }
@@ -25,7 +27,8 @@ export class TRANSACTION_NOT_FOUND extends PlatformError<{ transactionId: string
 /**
  * Error thrown when transaction verification fails
  */
-export class VERIFICATION_FAILED extends PlatformError<{ transactionId: string; reason: string }> {
+export class VERIFICATION_FAILED
+  extends PlatformError<{ transactionId: string; reason: string }> {
   constructor(transactionId: string, reason: string) {
     super({
       source,

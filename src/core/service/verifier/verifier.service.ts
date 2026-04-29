@@ -10,9 +10,9 @@ import { withSpan } from "@/core/tracing.ts";
  * @param rpcServer - Stellar RPC server instance
  * @returns Verification result: VERIFIED, FAILED, or PENDING
  */
-export async function verifyTransactionOnNetwork(
+export function verifyTransactionOnNetwork(
   txHash: string,
-  rpcServer: Server
+  rpcServer: Server,
 ): Promise<VerificationResult> {
   return withSpan("Verifier.verifyTransactionOnNetwork", async (span) => {
     span.setAttribute("tx.hash", txHash);
@@ -25,7 +25,9 @@ export async function verifyTransactionOnNetwork(
       }
 
       if (txResponse.status === "SUCCESS") {
-        span.addEvent("transaction_verified", { "ledger": txResponse.ledger?.toString() ?? "unknown" });
+        span.addEvent("transaction_verified", {
+          "ledger": txResponse.ledger?.toString() ?? "unknown",
+        });
         return {
           status: "VERIFIED",
           ledgerSequence: txResponse.ledger?.toString(),
@@ -34,7 +36,9 @@ export async function verifyTransactionOnNetwork(
 
       if (txResponse.status === "FAILED") {
         const resultCode = txResponse.resultXdr || "unknown";
-        span.addEvent("transaction_failed_on_network", { "resultCode": String(resultCode) });
+        span.addEvent("transaction_failed_on_network", {
+          "resultCode": String(resultCode),
+        });
         return {
           status: "FAILED",
           reason: `Transaction failed with result code: ${resultCode}`,
@@ -44,7 +48,9 @@ export async function verifyTransactionOnNetwork(
       span.addEvent("transaction_status_unclear");
       return { status: "PENDING" };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error);
 
       if (errorMessage.includes("not found") || errorMessage.includes("404")) {
         span.addEvent("transaction_pending_not_found");

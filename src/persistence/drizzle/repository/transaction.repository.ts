@@ -1,9 +1,9 @@
-import { eq, and, isNull, count } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  transaction,
-  type Transaction,
   type NewTransaction,
+  type Transaction,
+  transaction,
 } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 import type { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
@@ -27,8 +27,8 @@ export class TransactionRepository extends BaseRepository<
       .where(
         and(
           eq(transaction.status, status),
-          isNull(transaction.deletedAt)
-        )
+          isNull(transaction.deletedAt),
+        ),
       );
   }
 
@@ -42,8 +42,8 @@ export class TransactionRepository extends BaseRepository<
       .where(
         and(
           eq(transaction.status, status),
-          isNull(transaction.deletedAt)
-        )
+          isNull(transaction.deletedAt),
+        ),
       );
     return result?.count ?? 0;
   }
@@ -58,11 +58,10 @@ export class TransactionRepository extends BaseRepository<
       .where(
         and(
           eq(transaction.ledgerSequence, ledgerSequence),
-          isNull(transaction.deletedAt)
-        )
+          isNull(transaction.deletedAt),
+        ),
       )
       .limit(1);
     return result;
   }
 }
-

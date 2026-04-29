@@ -9,14 +9,22 @@ const LOCALHOST_ORIGIN = /^https?:\/\/localhost(:\d+)?$/;
 
 function isAllowed(origin: string): boolean {
   if (ALLOWED_ORIGINS.includes(origin)) return true;
-  if (Deno.env.get("MODE") === "development" && LOCALHOST_ORIGIN.test(origin)) return true;
+  if (Deno.env.get("MODE") === "development" && LOCALHOST_ORIGIN.test(origin)) {
+    return true;
+  }
   return false;
 }
 
 function setCorsHeaders(ctx: Context, origin: string) {
   ctx.response.headers.set("Access-Control-Allow-Origin", origin);
-  ctx.response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  ctx.response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  ctx.response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS",
+  );
+  ctx.response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization",
+  );
   ctx.response.headers.set("Access-Control-Max-Age", "86400");
 }
 

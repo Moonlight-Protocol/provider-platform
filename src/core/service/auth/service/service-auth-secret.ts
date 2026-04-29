@@ -1,4 +1,4 @@
-import { SERVICE_AUTH_SECRET, MODE } from "@/config/env.ts";
+import { MODE, SERVICE_AUTH_SECRET } from "@/config/env.ts";
 
 function generateSecret() {
   // Generate 32 random bytes
@@ -11,11 +11,11 @@ function generateSecret() {
 if (!SERVICE_AUTH_SECRET) {
   if (MODE === "production") {
     throw new Error(
-      "SERVICE_AUTH_SECRET must be set in production. A random secret would invalidate all JWTs on restart."
+      "SERVICE_AUTH_SECRET must be set in production. A random secret would invalidate all JWTs on restart.",
     );
   }
   console.warn(
-    "WARNING: SERVICE_AUTH_SECRET is not set. Generating a random secret. This is NOT recommended for production environments."
+    "WARNING: SERVICE_AUTH_SECRET is not set. Generating a random secret. This is NOT recommended for production environments.",
   );
 }
 
@@ -28,12 +28,12 @@ async function importSecret(secret: string, isSignable?: boolean) {
     keyData,
     { name: "HMAC", hash: "SHA-256" } as const,
     false,
-    ["verify" as const, ...(isSignable ? ["sign" as const] : [])]
+    ["verify" as const, ...(isSignable ? ["sign" as const] : [])],
   );
 }
 
 export const SERVICE_AUTH_SECRET_AS_CRYPTO_KEY = await importSecret(authSecret);
 export const SERVICE_AUTH_SECRET_AS_CRYPTO_KEY_SIGNABLE = await importSecret(
   authSecret,
-  true
+  true,
 );
