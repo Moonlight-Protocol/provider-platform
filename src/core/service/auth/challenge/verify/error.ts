@@ -51,11 +51,13 @@ export class CHALLENGE_NOT_FOUND extends PlatformError {
       source,
       code: VERIFY_CHALLENGE_ERROR_CODES.CHALLENGE_NOT_FOUND,
       message: "Authentication challenge not found",
-      details: `The authentication challenge with ID '${challengeId}' was not found.`,
+      details:
+        `The authentication challenge with ID '${challengeId}' was not found.`,
       api: {
         status: 404,
         message: "Authentication challenge not found",
-        details: `No authentication challenge exists with the provided ID '${challengeId}'.`,
+        details:
+          `No authentication challenge exists with the provided ID '${challengeId}'.`,
       },
       meta: {
         challengeId,
@@ -162,7 +164,8 @@ export class WRONG_OPERATION_TYPE extends PlatformError {
       api: {
         status: 500,
         message: "Wrong operation type",
-        details: `The operation type '${actualType}' does not match the expected type '${expectedType}' for the authentication challenge.`,
+        details:
+          `The operation type '${actualType}' does not match the expected type '${expectedType}' for the authentication challenge.`,
       },
       meta: {
         expectedType,
@@ -214,11 +217,13 @@ export class INVALID_SEQUENCE_NUMBER extends PlatformError {
       source,
       code: VERIFY_CHALLENGE_ERROR_CODES.INVALID_SEQUENCE_NUMBER,
       message: "Invalid sequence number",
-      details: `The sequence number '${sequence}' of the authentication challenge transaction is invalid.`,
+      details:
+        `The sequence number '${sequence}' of the authentication challenge transaction is invalid.`,
       api: {
         status: 400,
         message: "Invalid sequence number",
-        details: `The sequence number of the provided authentication challenge transaction must be '0'. The received sequence number was '${sequence}'.`,
+        details:
+          `The sequence number of the provided authentication challenge transaction must be '0'. The received sequence number was '${sequence}'.`,
       },
       meta: {
         sequence,
@@ -277,7 +282,8 @@ export class OPERATION_KEY_MISMATCH extends PlatformError {
       api: {
         status: 400,
         message: "Operation key mismatch",
-        details: `The operation key '${actualKey}' does not match the expected key '${expectedKey}' for the authentication challenge.`,
+        details:
+          `The operation key '${actualKey}' does not match the expected key '${expectedKey}' for the authentication challenge.`,
       },
       meta: {
         expectedKey,
@@ -298,7 +304,8 @@ export class CHALLENGE_TOO_EARLY extends PlatformError {
       api: {
         status: 400,
         message: "Challenge too early",
-        details: `The authentication challenge transaction cannot be used before its minimum time of ${minTime}. Current time is ${currentTime}.`,
+        details:
+          `The authentication challenge transaction cannot be used before its minimum time of ${minTime}. Current time is ${currentTime}.`,
       },
       meta: {
         currentTime,
@@ -319,7 +326,8 @@ export class CHALLENGE_EXPIRED extends PlatformError {
       api: {
         status: 400,
         message: "Challenge expired",
-        details: `The authentication challenge transaction expired at its maximum time of ${maxTime}. Current time is ${currentTime}.`,
+        details:
+          `The authentication challenge transaction expired at its maximum time of ${maxTime}. Current time is ${currentTime}.`,
       },
       meta: {
         currentTime,

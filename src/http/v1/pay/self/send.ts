@@ -3,7 +3,10 @@ import { StrKey } from "@colibri/core";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayTransactionRepository } from "@/persistence/drizzle/repository/pay-transaction.repository.ts";
 import { PayKycRepository } from "@/persistence/drizzle/repository/pay-kyc.repository.ts";
-import { PayTransactionType, PayTransactionStatus } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
+import {
+  PayTransactionStatus,
+  PayTransactionType,
+} from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { createEscrow } from "@/core/service/pay/escrow.service.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
@@ -31,14 +34,18 @@ export const postSelfSendHandler = async (ctx: Context) => {
     // Validate `to` is a valid Stellar public key
     if (typeof to !== "string" || !StrKey.isValidEd25519PublicKey(to)) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "to must be a valid Stellar public key (G...)" };
+      ctx.response.body = {
+        message: "to must be a valid Stellar public key (G...)",
+      };
       return;
     }
 
     // Validate amount is a valid positive integer string
     if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "amount must be a valid positive integer string" };
+      ctx.response.body = {
+        message: "amount must be a valid positive integer string",
+      };
       return;
     }
 
@@ -54,7 +61,9 @@ export const postSelfSendHandler = async (ctx: Context) => {
     // Reject custodial JWTs — this endpoint is for self-custodial (SEP-10) users only
     if (session.type === "custodial") {
       ctx.response.status = Status.Forbidden;
-      ctx.response.body = { message: "This endpoint is for self-custodial users only" };
+      ctx.response.body = {
+        message: "This endpoint is for self-custodial users only",
+      };
       return;
     }
 
@@ -69,7 +78,9 @@ export const postSelfSendHandler = async (ctx: Context) => {
     await txRepo.create({
       id: txId,
       type: PayTransactionType.SEND,
-      status: isVerified ? PayTransactionStatus.PENDING : PayTransactionStatus.COMPLETED,
+      status: isVerified
+        ? PayTransactionStatus.PENDING
+        : PayTransactionStatus.COMPLETED,
       amount: sendAmount,
       assetCode: "XLM",
       fromAddress: accountId,
@@ -96,7 +107,9 @@ export const postSelfSendHandler = async (ctx: Context) => {
 
     ctx.response.status = Status.OK;
     ctx.response.body = {
-      message: isVerified ? "Send initiated" : "Send initiated (held in escrow)",
+      message: isVerified
+        ? "Send initiated"
+        : "Send initiated (held in escrow)",
       data: {
         bundleId: txId,
         status: isVerified ? "pending" : "escrowed",

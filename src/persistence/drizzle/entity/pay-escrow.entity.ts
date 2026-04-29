@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, bigint, index } from "drizzle-orm/pg-core";
+import { bigint, index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 
 export enum PayEscrowStatus {

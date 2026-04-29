@@ -4,24 +4,24 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/demo_simulate_kyc_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { postSimulateKycHandler } from "@/http/v1/pay/demo/simulate-kyc.ts";
 import {
   createTestAccount,
   createTestEscrow,
   createTestKyc,
-  testAddress,
-  resetDb,
   ensureInitialized,
-  getAllKyc,
-  getAllEscrows,
-  getAllTransactions,
   getAccount,
-  PayKycStatus,
-  PayEscrowStatus,
-  PayTransactionType,
-  PayTransactionStatus,
+  getAllEscrows,
+  getAllKyc,
+  getAllTransactions,
   PayCustodialStatus,
+  PayEscrowStatus,
+  PayKycStatus,
+  PayTransactionStatus,
+  PayTransactionType,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -44,10 +44,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -77,10 +85,16 @@ Deno.test("demo simulate-kyc - creates VERIFIED KYC record for new address", asy
   await postSimulateKycHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "KYC simulated");
 
-  const data = (res.body as { data: { status: string; escrowClaimed: number; escrowAmount: string } }).data;
+  const data = (res.body as {
+    data: { status: string; escrowClaimed: number; escrowAmount: string };
+  }).data;
   assertEquals(data.status, "VERIFIED");
   assertEquals(data.escrowClaimed, 0);
   assertEquals(data.escrowAmount, "0");
@@ -150,14 +164,18 @@ Deno.test("demo simulate-kyc - claims held custodial escrow after KYC simulation
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { escrowClaimed: number; escrowAmount: string } }).data;
+  const data =
+    (res.body as { data: { escrowClaimed: number; escrowAmount: string } })
+      .data;
   assertEquals(data.escrowClaimed, 1);
   assertEquals(data.escrowAmount, "5000");
 
   // Escrow should be CLAIMED
   const escrows = await getAllEscrows();
   const claimed = escrows.filter(
-    (e) => e.heldForAddress === account.depositAddress && e.status === PayEscrowStatus.CLAIMED,
+    (e) =>
+      e.heldForAddress === account.depositAddress &&
+      e.status === PayEscrowStatus.CLAIMED,
   );
   assertEquals(claimed.length, 1);
 
@@ -167,7 +185,9 @@ Deno.test("demo simulate-kyc - claims held custodial escrow after KYC simulation
 
   // RECEIVE transaction should be created
   const txs = (await getAllTransactions()).filter(
-    (t) => t.accountId === account.depositAddress && t.type === PayTransactionType.RECEIVE,
+    (t) =>
+      t.accountId === account.depositAddress &&
+      t.type === PayTransactionType.RECEIVE,
   );
   assertEquals(txs.length, 1);
   assertEquals(txs[0].status, PayTransactionStatus.COMPLETED);
@@ -210,7 +230,9 @@ Deno.test("demo simulate-kyc - claims multiple held escrows", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { escrowClaimed: number; escrowAmount: string } }).data;
+  const data =
+    (res.body as { data: { escrowClaimed: number; escrowAmount: string } })
+      .data;
   assertEquals(data.escrowClaimed, 2);
   assertEquals(data.escrowAmount, "10000");
 
@@ -245,13 +267,18 @@ Deno.test("demo simulate-kyc - self-custodial escrow is claimed but no balance c
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { escrowClaimed: number; escrowAmount: string } }).data;
+  const data =
+    (res.body as { data: { escrowClaimed: number; escrowAmount: string } })
+      .data;
   assertEquals(data.escrowClaimed, 1);
   assertEquals(data.escrowAmount, "5000");
 
   // Escrow should be CLAIMED
   const escrows = await getAllEscrows();
-  assertEquals(escrows.filter((e) => e.status === PayEscrowStatus.CLAIMED).length, 1);
+  assertEquals(
+    escrows.filter((e) => e.status === PayEscrowStatus.CLAIMED).length,
+    1,
+  );
 
   // RECEIVE transaction should still be created
   const txs = (await getAllTransactions()).filter(
@@ -276,7 +303,10 @@ Deno.test("demo simulate-kyc - missing address returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });
 
 Deno.test("demo simulate-kyc - missing jurisdiction returns 400", async () => {
@@ -291,7 +321,10 @@ Deno.test("demo simulate-kyc - missing jurisdiction returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });
 
 Deno.test("demo simulate-kyc - empty body returns 400", async () => {
@@ -304,5 +337,8 @@ Deno.test("demo simulate-kyc - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "address and jurisdiction are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "address and jurisdiction are required",
+  );
 });

@@ -12,15 +12,15 @@ import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 export const P_GenerateChallengeJWT = ProcessEngine.create(
-  async (
+  (
     input: PostChallengeInput,
-    _metadataHelper?: MetadataHelper
+    _metadataHelper?: MetadataHelper,
   ): Promise<PostChallengeWithJWT> => {
     return withSpan("P_GenerateChallengeJWT", async (span) => {
       const { signedChallenge } = input.body;
       const tx = new Transaction(
         signedChallenge,
-        NETWORK_CONFIG.networkPassphrase
+        NETWORK_CONFIG.networkPassphrase,
       );
 
       const key = tx.hash().toString("hex");
@@ -41,5 +41,5 @@ export const P_GenerateChallengeJWT = ProcessEngine.create(
   },
   {
     name: "GenerateChallengeJWT",
-  }
+  },
 );

@@ -1,4 +1,13 @@
-import { pgTable, text, pgEnum, timestamp, jsonb, bigint, integer, index } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
@@ -47,9 +56,8 @@ export const operationsBundleRelations = relations(
   operationsBundle,
   ({ many }) => ({
     bundleTransactions: many(bundleTransaction),
-  })
+  }),
 );
 
 export type OperationsBundle = typeof operationsBundle.$inferSelect;
 export type NewOperationsBundle = typeof operationsBundle.$inferInsert;
-

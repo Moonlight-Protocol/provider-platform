@@ -35,7 +35,8 @@ export class FAILED_TO_CACHE_CHALLENGE_IN_LIVE_SESSIONS extends PlatformError {
   constructor(error: Error | unknown) {
     super({
       source,
-      code: STORE_CHALLENGE_ERROR_CODES.FAILED_TO_CACHE_CHALLENGE_IN_LIVE_SESSIONS,
+      code:
+        STORE_CHALLENGE_ERROR_CODES.FAILED_TO_CACHE_CHALLENGE_IN_LIVE_SESSIONS,
       message: "Failed to cache challenge in live sessions",
       details:
         "An error occurred while attempting to cache the authentication challenge in live sessions.",
@@ -59,7 +60,8 @@ export class SESSION_ALREADY_EXISTS extends PlatformError {
       api: {
         status: 409,
         message: "Session already exists",
-        details: `An authentication session with ID '${sessionId}' already exists in live sessions.`,
+        details:
+          `An authentication session with ID '${sessionId}' already exists in live sessions.`,
       },
       meta: {
         sessionId,
@@ -79,7 +81,8 @@ export class CHALLENGE_NOT_FOUND_IN_DATABASE extends PlatformError {
       api: {
         status: 404,
         message: "Challenge not found",
-        details: `The authentication challenge with ID '${challengeId}' was not found in the database.`,
+        details:
+          `The authentication challenge with ID '${challengeId}' was not found in the database.`,
       },
       meta: {
         challengeId,
@@ -99,7 +102,8 @@ export class CHALLENGE_HAS_NO_OPERATIONS extends PlatformError {
       api: {
         status: 400,
         message: "Challenge has no operations",
-        details: `The authentication session with ID '${sessionId}' has a challenge that does not contain any operations.`,
+        details:
+          `The authentication session with ID '${sessionId}' has a challenge that does not contain any operations.`,
       },
       meta: {
         sessionId,
@@ -137,7 +141,8 @@ export class USER_NOT_FOUND_IN_DATABASE extends PlatformError {
       api: {
         status: 404,
         message: "User not found",
-        details: `The user with client account '${clientAccount}' was not found in the database.`,
+        details:
+          `The user with client account '${clientAccount}' was not found in the database.`,
       },
       meta: {
         clientAccount,

@@ -10,9 +10,8 @@ export const userModel = z.object({
 });
 
 export const userCollection = collection(userModel, {
-
   idGenerator: (user) => user.publicKey,
   indices: {
-    publicKey: "primary", 
+    publicKey: "primary",
   },
 });

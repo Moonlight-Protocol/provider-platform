@@ -14,7 +14,9 @@ import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
 import { withSpan } from "@/core/tracing.ts";
 
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 const sessionRepository = new SessionRepository(drizzleClient);
 
 // ========== HELPER FUNCTIONS ==========
@@ -22,7 +24,9 @@ const sessionRepository = new SessionRepository(drizzleClient);
 /**
  * Validates session and returns the account ID
  */
-async function validateSessionAndGetAccountId(sessionId: string): Promise<string> {
+async function validateSessionAndGetAccountId(
+  sessionId: string,
+): Promise<string> {
   const userSession = await sessionRepository.findById(sessionId);
 
   if (!userSession) {
@@ -39,14 +43,17 @@ async function findBundlesByUser(
   accountId: string,
   status?: BundleStatus,
 ): Promise<ReturnType<typeof toBundleDTO>[]> {
-  const bundles = await operationsBundleRepository.findByCreatedBy(accountId, status);
+  const bundles = await operationsBundleRepository.findByCreatedBy(
+    accountId,
+    status,
+  );
   return bundles.map(toBundleDTO);
 }
 
 // ========== MAIN PROCESS ==========
 
 export const P_ListBundlesByUser = ProcessEngine.create(
-  async (
+  (
     input: GetEndpointInput<typeof requestSchema>,
   ): Promise<BundleListProcessOutput> => {
     return withSpan("P_ListBundlesByUser", async (span) => {
@@ -59,7 +66,9 @@ export const P_ListBundlesByUser = ProcessEngine.create(
       });
 
       span.addEvent("validating_session");
-      const accountId = await validateSessionAndGetAccountId(sessionData.sessionId);
+      const accountId = await validateSessionAndGetAccountId(
+        sessionData.sessionId,
+      );
 
       span.addEvent("finding_bundles", { "account.id": accountId });
       const bundles = await findBundlesByUser(accountId, query.status);
@@ -77,4 +86,3 @@ export const P_ListBundlesByUser = ProcessEngine.create(
     name: "ListBundlesByUserProcessEngine",
   },
 );
-

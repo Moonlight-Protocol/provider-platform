@@ -8,7 +8,7 @@ import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 
 export async function jwtMiddleware(
   ctx: Context,
-  next: () => Promise<unknown>
+  next: () => Promise<unknown>,
 ) {
   const authorization = ctx.request.headers.get("authorization");
   if (!isDefined(authorization)) {

@@ -1,5 +1,5 @@
 import { ProcessEngine } from "@fifo/convee";
-import { Transaction, Keypair, type OperationType } from "stellar-sdk";
+import { Keypair, type OperationType, Transaction } from "stellar-sdk";
 import { getProviderAccount } from "@/core/service/auth/service/service-account.ts";
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
@@ -18,20 +18,20 @@ export const P_VerifyChallenge = ProcessEngine.create(
         span.addEvent("deserializing_transaction");
         const tx = new Transaction(
           signedChallenge,
-          NETWORK_CONFIG.networkPassphrase
+          NETWORK_CONFIG.networkPassphrase,
         );
 
         span.addEvent("validating_sequence_number");
         assertOrThrow(
           tx.sequence === "0",
-          new E.INVALID_SEQUENCE_NUMBER(tx.sequence)
+          new E.INVALID_SEQUENCE_NUMBER(tx.sequence),
         );
 
         assertOrThrow(isDefined(tx.timeBounds), new E.MISSING_TIME_BOUNDS());
 
         assertOrThrow(
           isDefined(tx.operations && tx.operations.length > 0),
-          new E.MISSING_OPERATIONS(tx)
+          new E.MISSING_OPERATIONS(tx),
         );
 
         const firstOp = tx.operations[0];
@@ -39,12 +39,12 @@ export const P_VerifyChallenge = ProcessEngine.create(
         const expectedOperationType = "manageData" as OperationType.ManageData;
         assertOrThrow(
           firstOp.type === expectedOperationType,
-          new E.WRONG_OPERATION_TYPE(expectedOperationType, firstOp.type)
+          new E.WRONG_OPERATION_TYPE(expectedOperationType, firstOp.type),
         );
 
         assertOrThrow(
           firstOp.name.startsWith(`${SERVICE_DOMAIN} auth`),
-          new E.OPERATION_KEY_MISMATCH(`${SERVICE_DOMAIN} auth`, firstOp.name)
+          new E.OPERATION_KEY_MISMATCH(`${SERVICE_DOMAIN} auth`, firstOp.name),
         );
 
         span.addEvent("validating_timebounds");
@@ -58,11 +58,11 @@ export const P_VerifyChallenge = ProcessEngine.create(
 
         assertOrThrow(
           currentTime >= minTime,
-          new E.CHALLENGE_TOO_EARLY(currentTime, minTime)
+          new E.CHALLENGE_TOO_EARLY(currentTime, minTime),
         );
         assertOrThrow(
           currentTime <= maxTime,
-          new E.CHALLENGE_EXPIRED(currentTime, maxTime)
+          new E.CHALLENGE_EXPIRED(currentTime, maxTime),
         );
 
         const clientPublicKey = firstOp.source;
@@ -70,10 +70,12 @@ export const P_VerifyChallenge = ProcessEngine.create(
         assertOrThrow(
           isDefined(clientPublicKey) &&
             StrKey.isEd25519PublicKey(clientPublicKey),
-          new E.MISSING_CLIENT_ACCOUNT()
+          new E.MISSING_CLIENT_ACCOUNT(),
         );
 
-        span.addEvent("verifying_signatures", { "client.publicKey": clientPublicKey });
+        span.addEvent("verifying_signatures", {
+          "client.publicKey": clientPublicKey,
+        });
         const clientKeypair = Keypair.fromPublicKey(clientPublicKey);
 
         let isSignedByServer = false;
@@ -85,7 +87,7 @@ export const P_VerifyChallenge = ProcessEngine.create(
               // deno-lint-ignore no-explicit-any
               tx.hash() as any, // Forcing type to Buffer as there seems to be an issue with the lib type inference
               // deno-lint-ignore no-explicit-any
-              sig.signature() as any // Forcing type to Buffer as there seems to be an issue with the lib type inference
+              sig.signature() as any, // Forcing type to Buffer as there seems to be an issue with the lib type inference
             )
           ) {
             isSignedByServer = true;
@@ -106,7 +108,9 @@ export const P_VerifyChallenge = ProcessEngine.create(
         return input;
       } catch (error) {
         span.addEvent("verification_failed", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         logAndThrow(new E.CHALLENGE_VERIFICATION_FAILED(error));
       }
@@ -114,5 +118,5 @@ export const P_VerifyChallenge = ProcessEngine.create(
   },
   {
     name: "VerifyChallengeProcessEngine",
-  }
+  },
 );

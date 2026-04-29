@@ -11,7 +11,7 @@ if (LOG_LEVEL !== undefined && LOG_LEVEL in LogLevel) {
   LOG = new Logger(LogLevel.INFO);
 
   LOG.warn(
-    `LOG_LEVEL is not set or invalid. Defaulting to INFO. Received: ${LOG_LEVEL}`
+    `LOG_LEVEL is not set or invalid. Defaulting to INFO. Received: ${LOG_LEVEL}`,
   );
 }
 

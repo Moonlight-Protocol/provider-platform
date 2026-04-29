@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 
 /**
  * Tests for the demo route guard logic from routes.ts.
@@ -13,7 +13,10 @@ import { assertEquals } from "jsr:@std/assert";
  * directly rather than importing the module.
  */
 
-function shouldEnableDemoRoutes(network: string, payDemoEnabled: string | undefined): boolean {
+function shouldEnableDemoRoutes(
+  network: string,
+  payDemoEnabled: string | undefined,
+): boolean {
   const networkEnv = network ?? "";
   const demoEnabled = payDemoEnabled === "true";
   return networkEnv === "local" || networkEnv === "standalone" || demoEnabled;

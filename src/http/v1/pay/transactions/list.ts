@@ -23,7 +23,9 @@ export const listTransactionsHandler = async (ctx: Context) => {
     if (statusParam && !validStatuses.has(statusParam)) {
       ctx.response.status = Status.BadRequest;
       ctx.response.body = {
-        message: `Invalid status. Must be one of: ${[...validStatuses].join(", ")}`,
+        message: `Invalid status. Must be one of: ${
+          [...validStatuses].join(", ")
+        }`,
       };
       return;
     }

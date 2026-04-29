@@ -1,15 +1,20 @@
+import { assertEquals, assertNotEquals } from "@std/assert";
 import {
-  assertEquals,
-  assertNotEquals,
-} from "jsr:@std/assert";
-import { bytesToHex, hashPassword, hexToBytes, verifyPassword } from "./crypto.ts";
+  bytesToHex,
+  hashPassword,
+  hexToBytes,
+  verifyPassword,
+} from "./crypto.ts";
 
 // --- bytesToHex / hexToBytes ---
 
 Deno.test("bytesToHex - known values", () => {
   assertEquals(bytesToHex(new Uint8Array([0x00])), "00");
   assertEquals(bytesToHex(new Uint8Array([0xff])), "ff");
-  assertEquals(bytesToHex(new Uint8Array([0xde, 0xad, 0xbe, 0xef])), "deadbeef");
+  assertEquals(
+    bytesToHex(new Uint8Array([0xde, 0xad, 0xbe, 0xef])),
+    "deadbeef",
+  );
   assertEquals(bytesToHex(new Uint8Array([1, 2, 3])), "010203");
 });
 
@@ -20,7 +25,10 @@ Deno.test("bytesToHex - empty array", () => {
 Deno.test("hexToBytes - known values", () => {
   assertEquals(hexToBytes("00"), new Uint8Array([0x00]));
   assertEquals(hexToBytes("ff"), new Uint8Array([0xff]));
-  assertEquals(hexToBytes("deadbeef"), new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
+  assertEquals(
+    hexToBytes("deadbeef"),
+    new Uint8Array([0xde, 0xad, 0xbe, 0xef]),
+  );
   assertEquals(hexToBytes("010203"), new Uint8Array([1, 2, 3]));
 });
 
@@ -61,8 +69,16 @@ Deno.test("hashPassword - salt is 16 bytes (32 hex chars)", async () => {
 Deno.test("hashPassword - derived key is 32 bytes (64 hex chars)", async () => {
   const hash = await hashPassword("test-password");
   const [_, derived] = hash.split(":");
-  assertEquals(derived.length, 64, "Derived key should be 64 hex characters (32 bytes)");
-  assertEquals(/^[0-9a-f]+$/.test(derived), true, "Derived key should be lowercase hex");
+  assertEquals(
+    derived.length,
+    64,
+    "Derived key should be 64 hex characters (32 bytes)",
+  );
+  assertEquals(
+    /^[0-9a-f]+$/.test(derived),
+    true,
+    "Derived key should be lowercase hex",
+  );
 });
 
 Deno.test("hashPassword - different calls produce different salts", async () => {

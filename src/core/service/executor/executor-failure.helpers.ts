@@ -38,7 +38,9 @@ export function handleExecutionFailure(
       try {
         const bundle = await deps.operationsBundleRepository.findById(bundleId);
         if (!bundle) {
-          LOG.warn(`Bundle ${bundleId} not found while handling execution failure`);
+          LOG.warn(
+            `Bundle ${bundleId} not found while handling execution failure`,
+          );
           continue;
         }
 
@@ -52,10 +54,13 @@ export function handleExecutionFailure(
             lastFailureReason,
             updatedAt: new Date(),
           });
-          LOG.warn("Bundle moved to dead-letter after max retry attempts reached", {
-            bundleId,
-            retryCount: nextRetryCount,
-          });
+          LOG.warn(
+            "Bundle moved to dead-letter after max retry attempts reached",
+            {
+              bundleId,
+              retryCount: nextRetryCount,
+            },
+          );
         } else {
           await deps.operationsBundleRepository.update(bundleId, {
             status: BundleStatus.PENDING,
@@ -69,7 +74,9 @@ export function handleExecutionFailure(
         }
       } catch (updateError) {
         span.addEvent("bundle_reset_failed", { "bundle.id": bundleId });
-        LOG.error(`Failed to update bundle ${bundleId} status`, { error: updateError });
+        LOG.error(`Failed to update bundle ${bundleId} status`, {
+          error: updateError,
+        });
       }
     }
 
@@ -87,7 +94,9 @@ export function buildRetryBundles(
 ): SlotBundle[] {
   const metaByBundleId = new Map(metaList.map((m) => [m.bundleId, m] as const));
 
-  const eligible = slot.getBundles().filter((b) => metaByBundleId.has(b.bundleId));
+  const eligible = slot.getBundles().filter((b) =>
+    metaByBundleId.has(b.bundleId)
+  );
 
   for (const bundle of eligible) {
     const meta = metaByBundleId.get(bundle.bundleId);

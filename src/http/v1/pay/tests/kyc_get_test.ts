@@ -4,14 +4,14 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/kyc_get_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { getKycHandler } from "@/http/v1/pay/kyc/get.ts";
 import {
   createTestKyc,
-  testAddress,
-  resetDb,
   ensureInitialized,
   PayKycStatus,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -37,10 +37,18 @@ function createMockContext(
       body: { json: () => Promise.resolve({}) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session: session ?? {} },
   };
@@ -68,10 +76,19 @@ Deno.test("kyc get - returns VERIFIED status for verified address", async () => 
   await getKycHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
-  assertEquals((res.body as { message: string }).message, "KYC status retrieved");
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
+  assertEquals(
+    (res.body as { message: string }).message,
+    "KYC status retrieved",
+  );
 
-  const data = (res.body as { data: { status: string; jurisdiction: string | null } }).data;
+  const data =
+    (res.body as { data: { status: string; jurisdiction: string | null } })
+      .data;
   assertEquals(data.status, PayKycStatus.VERIFIED);
   assertEquals(data.jurisdiction, "US");
 });
@@ -89,7 +106,9 @@ Deno.test("kyc get - returns PENDING status for pending address", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { status: string; jurisdiction: string | null } }).data;
+  const data =
+    (res.body as { data: { status: string; jurisdiction: string | null } })
+      .data;
   assertEquals(data.status, PayKycStatus.PENDING);
   assertEquals(data.jurisdiction, null);
 });
@@ -109,7 +128,9 @@ Deno.test("kyc get - returns NONE for address with no KYC record", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { status: string; jurisdiction: string | null } }).data;
+  const data =
+    (res.body as { data: { status: string; jurisdiction: string | null } })
+      .data;
   assertEquals(data.status, "NONE");
   assertEquals(data.jurisdiction, null);
 });
@@ -128,7 +149,10 @@ Deno.test("kyc get - missing address returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "Address is required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Address is required",
+  );
 });
 
 Deno.test("kyc get - undefined params returns 400", async () => {
@@ -144,10 +168,18 @@ Deno.test("kyc get - undefined params returns 400", async () => {
       body: { json: () => Promise.resolve({}) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session: {} },
   };
@@ -156,5 +188,8 @@ Deno.test("kyc get - undefined params returns 400", async () => {
   await getKycHandler(ctx as any);
 
   assertEquals(responseStatus, 400);
-  assertEquals((responseBody as { message: string }).message, "Address is required");
+  assertEquals(
+    (responseBody as { message: string }).message,
+    "Address is required",
+  );
 });

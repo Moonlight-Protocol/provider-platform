@@ -1,10 +1,10 @@
-import { assertEquals, assertExists } from "jsr:@std/assert";
+import { assertEquals, assertExists } from "@std/assert";
 import {
   ensureInitialized,
+  getBundleRepo,
   resetDb,
   seedBundle,
   testBundleId,
-  getBundleRepo,
 } from "../../test_helpers.ts";
 import { handleExecutionFailure } from "@/core/service/executor/executor-failure.helpers.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
@@ -105,9 +105,17 @@ Deno.test(
     const deadLetterId = testBundleId();
 
     // Below max
-    await seedBundle({ id: eligibleId, retryCount: 1, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: eligibleId,
+      retryCount: 1,
+      status: BundleStatus.PROCESSING,
+    });
     // At max
-    await seedBundle({ id: deadLetterId, retryCount: 2, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: deadLetterId,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
 
     const error = makeError("multi-bundle failure");
     const reason = JSON.stringify({

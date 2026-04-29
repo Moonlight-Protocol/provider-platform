@@ -1,4 +1,4 @@
-import { timestamp, text } from "drizzle-orm/pg-core";
+import { text, timestamp } from "drizzle-orm/pg-core";
 
 /**
  * Helper function to create base audit and soft delete fields
@@ -15,4 +15,3 @@ export const createBaseColumns = () => ({
   updatedBy: text("updated_by"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
-

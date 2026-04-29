@@ -3,12 +3,12 @@ import { getMempool, platformVersion } from "@/core/mempool/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 import {
-  MEMPOOL_SLOT_CAPACITY,
-  MEMPOOL_EXPENSIVE_OP_WEIGHT,
   MEMPOOL_CHEAP_OP_WEIGHT,
   MEMPOOL_EXECUTOR_INTERVAL_MS,
-  MEMPOOL_VERIFIER_INTERVAL_MS,
+  MEMPOOL_EXPENSIVE_OP_WEIGHT,
+  MEMPOOL_SLOT_CAPACITY,
   MEMPOOL_TTL_CHECK_INTERVAL_MS,
+  MEMPOOL_VERIFIER_INTERVAL_MS,
 } from "@/config/env.ts";
 
 const metricRepo = new MempoolMetricRepository(drizzleClient);

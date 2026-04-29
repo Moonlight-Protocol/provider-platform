@@ -72,7 +72,7 @@ export interface DashboardAuthConfig {
  * 3. Checks the signer is authorized on the PP's Stellar account
  * 4. Returns a JWT session token
  */
-export async function verifyDashboardChallenge(
+export function verifyDashboardChallenge(
   nonce: string,
   signature: string,
   publicKey: string,
@@ -168,7 +168,7 @@ export async function verifyDashboardChallenge(
     // 4. Issue JWT — hash nonce so raw challenge material isn't in the token
     span.addEvent("issuing_jwt");
     const hashBytes = new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce))
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce)),
     );
     const hashedSessionId = Array.from(hashBytes.slice(0, 16))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -194,7 +194,9 @@ async function isAuthorizedSigner(
   }
 
   if (!horizonUrl) {
-    LOG.warn("No Horizon URL configured, falling back to direct key match only");
+    LOG.warn(
+      "No Horizon URL configured, falling back to direct key match only",
+    );
     return false;
   }
 
@@ -210,7 +212,9 @@ async function isAuthorizedSigner(
     }
 
     const accountData = await response.json();
-    const signers = accountData.signers as Array<{ key: string; weight: number }>;
+    const signers = accountData.signers as Array<
+      { key: string; weight: number }
+    >;
 
     return signers.some((s) => s.key === signerKey && s.weight > 0);
   } catch (error) {

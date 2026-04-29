@@ -4,7 +4,7 @@
  * No database needed — the handler just logs and returns an ID.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/report_test.ts
  */
-import { assertEquals, assertExists } from "jsr:@std/assert";
+import { assertEquals, assertExists } from "@std/assert";
 import { postReportHandler } from "@/http/v1/pay/report/post.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,10 +27,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -60,7 +68,11 @@ Deno.test("report post - valid report returns 200 and id", async () => {
   await postReportHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "Report received");
 
   const data = (res.body as { data: { id: string } }).data;
@@ -96,7 +108,10 @@ Deno.test("report post - missing description returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "description is required and must be a string",
+  );
 });
 
 Deno.test("report post - empty body returns 400", async () => {
@@ -106,7 +121,10 @@ Deno.test("report post - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "description is required and must be a string",
+  );
 });
 
 Deno.test("report post - empty string description returns 400", async () => {
@@ -118,7 +136,10 @@ Deno.test("report post - empty string description returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "description is required and must be a string");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "description is required and must be a string",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -136,10 +157,18 @@ Deno.test("report post - invalid JSON body returns 400", async () => {
       },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -148,5 +177,8 @@ Deno.test("report post - invalid JSON body returns 400", async () => {
   await postReportHandler(ctx as any);
 
   assertEquals(responseStatus, 400);
-  assertEquals((responseBody as { message: string }).message, "Invalid request body");
+  assertEquals(
+    (responseBody as { message: string }).message,
+    "Invalid request body",
+  );
 });

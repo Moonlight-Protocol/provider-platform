@@ -1,6 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import type { Context } from "@oak/oak";
-import { ZodError, type infer as ZodInfer, type ZodSchema } from "zod";
+import { type infer as ZodInfer, ZodError, type ZodSchema } from "zod";
 import { LOG } from "@/config/logger.ts";
 import type { ContextWithParsedQuery } from "@/http/processes/types.ts";
 import * as E from "@/http/processes/error.ts";
@@ -9,7 +9,6 @@ import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 const PROCESS_NAME = "ParseRequestQuery" as const;
 
 /**
- *
  * Factory Process that parses and validates URL query parameters
  *
  * @param schema - Zod schema to validate the query parameters against
@@ -28,17 +27,16 @@ const PROCESS_NAME = "ParseRequestQuery" as const;
  *
  * const parseQueryProcess = P_ParseRequestQuery(querySchema);
  * ```
- *
  */
 const P_ParseRequestQuery = <S extends ZodSchema>(schema: S) => {
   const parseRequestProcess = (
-    ctx: Context
+    ctx: Context,
   ): ContextWithParsedQuery<ZodInfer<S>> => {
     LOG.trace("Parsing request query");
 
     try {
       const queryPayload = Object.fromEntries(
-        ctx.request.url.searchParams.entries()
+        ctx.request.url.searchParams.entries(),
       );
       const validatedPayload = schema.parse(queryPayload);
       return { ctx, query: validatedPayload };

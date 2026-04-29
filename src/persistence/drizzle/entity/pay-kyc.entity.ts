@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp, index } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 
 export enum PayKycStatus {

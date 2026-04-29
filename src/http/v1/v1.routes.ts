@@ -11,11 +11,27 @@ import councilRouter from "@/http/v1/council/routes.ts";
 const apiRouter = new Router();
 
 apiRouter.use("/api/v1", healthRouter.routes(), healthRouter.allowedMethods());
-apiRouter.use("/api/v1", stellarRouter.routes(), stellarRouter.allowedMethods());
-apiRouter.use("/api/v1", dashboardRouter.routes(), dashboardRouter.allowedMethods());
-apiRouter.use("/api/v1", councilRouter.routes(), councilRouter.allowedMethods());
+apiRouter.use(
+  "/api/v1",
+  stellarRouter.routes(),
+  stellarRouter.allowedMethods(),
+);
+apiRouter.use(
+  "/api/v1",
+  dashboardRouter.routes(),
+  dashboardRouter.allowedMethods(),
+);
+apiRouter.use(
+  "/api/v1",
+  councilRouter.routes(),
+  councilRouter.allowedMethods(),
+);
 apiRouter.use("/api/v1", payRouter.routes(), payRouter.allowedMethods());
 apiRouter.use("/api/v1", bundleRouter.routes(), bundleRouter.allowedMethods());
-apiRouter.use("/api/v1", waitlistRouter.routes(), waitlistRouter.allowedMethods());
+apiRouter.use(
+  "/api/v1",
+  waitlistRouter.routes(),
+  waitlistRouter.allowedMethods(),
+);
 
 export default apiRouter;

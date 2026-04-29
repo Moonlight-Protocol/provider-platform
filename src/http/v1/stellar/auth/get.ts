@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { regex } from "@colibri/core";
-import { Status, type Context } from "@oak/oak";
+import { type Context, Status } from "@oak/oak";
 import { P_CreateChallengeDB } from "@/core/service/auth/challenge/store/create-challenge-db.ts";
 import { P_CreateChallengeMemory } from "@/core/service/auth/challenge/store/create-challenge-memory.ts";
 import { P_CreateChallenge } from "@/core/service/auth/challenge/create/create-challenge.ts";
@@ -19,7 +19,7 @@ export const responseSchema = z.object({
 });
 
 const assembleResponse = (
-  input: ChallengeData
+  input: ChallengeData,
 ): GetEndpointOutput<typeof responseSchema> => {
   const message = "Auth challenge successfully created";
 

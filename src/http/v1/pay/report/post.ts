@@ -14,7 +14,9 @@ export const postReportHandler = async (ctx: Context) => {
 
     if (!description || typeof description !== "string") {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "description is required and must be a string" };
+      ctx.response.body = {
+        message: "description is required and must be a string",
+      };
       return;
     }
 

@@ -4,14 +4,14 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/escrow_summary_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { getEscrowSummaryHandler } from "@/http/v1/pay/escrow/summary.ts";
 import {
   createTestEscrow,
-  testAddress,
-  resetDb,
   ensureInitialized,
   PayEscrowStatus,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -37,10 +37,18 @@ function createMockContext(
       body: { json: () => Promise.resolve({}) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session: session ?? {} },
   };
@@ -84,10 +92,18 @@ Deno.test("escrow summary - returns correct count and total for held escrows", a
   await getEscrowSummaryHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
-  assertEquals((res.body as { message: string }).message, "Escrow summary retrieved");
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Escrow summary retrieved",
+  );
 
-  const data = (res.body as { data: { count: number; totalAmount: string } }).data;
+  const data =
+    (res.body as { data: { count: number; totalAmount: string } }).data;
   assertEquals(data.count, 2);
   assertEquals(data.totalAmount, "10000");
 });
@@ -110,7 +126,8 @@ Deno.test("escrow summary - returns 0 for address with no escrows", async () => 
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { count: number; totalAmount: string } }).data;
+  const data =
+    (res.body as { data: { count: number; totalAmount: string } }).data;
   assertEquals(data.count, 0);
   assertEquals(data.totalAmount, "0");
 });
@@ -150,9 +167,14 @@ Deno.test("escrow summary - excludes claimed escrows from count", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 200);
-  const data = (res.body as { data: { count: number; totalAmount: string } }).data;
+  const data =
+    (res.body as { data: { count: number; totalAmount: string } }).data;
   assertEquals(data.count, 1, "Only HELD escrows should be counted");
-  assertEquals(data.totalAmount, "5000", "Only HELD escrow amount should be summed");
+  assertEquals(
+    data.totalAmount,
+    "5000",
+    "Only HELD escrow amount should be summed",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -169,7 +191,10 @@ Deno.test("escrow summary - missing address returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "Address is required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Address is required",
+  );
 });
 
 Deno.test("escrow summary - undefined params returns 400", async () => {
@@ -185,10 +210,18 @@ Deno.test("escrow summary - undefined params returns 400", async () => {
       body: { json: () => Promise.resolve({}) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -197,5 +230,8 @@ Deno.test("escrow summary - undefined params returns 400", async () => {
   await getEscrowSummaryHandler(ctx as any);
 
   assertEquals(responseStatus, 400);
-  assertEquals((responseBody as { message: string }).message, "Address is required");
+  assertEquals(
+    (responseBody as { message: string }).message,
+    "Address is required",
+  );
 });

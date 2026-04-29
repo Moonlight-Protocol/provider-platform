@@ -1,6 +1,11 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
-import { account, type Account, type NewAccount, type AccountType } from "@/persistence/drizzle/entity/account.entity.ts";
+import {
+  type Account,
+  account,
+  type AccountType,
+  type NewAccount,
+} from "@/persistence/drizzle/entity/account.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
 export class AccountRepository extends BaseRepository<
@@ -22,8 +27,8 @@ export class AccountRepository extends BaseRepository<
       .where(
         and(
           eq(account.userId, userId),
-          isNull(account.deletedAt)
-        )
+          isNull(account.deletedAt),
+        ),
       );
   }
 
@@ -37,9 +42,8 @@ export class AccountRepository extends BaseRepository<
       .where(
         and(
           eq(account.type, type as AccountType),
-          isNull(account.deletedAt)
-        )
+          isNull(account.deletedAt),
+        ),
       );
   }
 }
-

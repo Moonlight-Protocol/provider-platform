@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 
 export enum CouncilMembershipStatus {

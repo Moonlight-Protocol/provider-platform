@@ -12,7 +12,8 @@ const source = "@service/executor";
 /**
  * Error thrown when transaction building fails
  */
-export class TRANSACTION_BUILD_FAILED extends PlatformError<{ reason: string }> {
+export class TRANSACTION_BUILD_FAILED
+  extends PlatformError<{ reason: string }> {
   constructor(reason: string) {
     super({
       source,
@@ -27,7 +28,8 @@ export class TRANSACTION_BUILD_FAILED extends PlatformError<{ reason: string }> 
 /**
  * Error thrown when transaction submission fails
  */
-export class TRANSACTION_SUBMIT_FAILED extends PlatformError<{ reason: string; transactionHash?: string }> {
+export class TRANSACTION_SUBMIT_FAILED
+  extends PlatformError<{ reason: string; transactionHash?: string }> {
   constructor(reason: string, transactionHash?: string) {
     super({
       source,
@@ -42,13 +44,15 @@ export class TRANSACTION_SUBMIT_FAILED extends PlatformError<{ reason: string; t
 /**
  * Error thrown when there are insufficient UTXOs for transaction
  */
-export class INSUFFICIENT_UTXOS extends PlatformError<{ required: number; available: number }> {
+export class INSUFFICIENT_UTXOS
+  extends PlatformError<{ required: number; available: number }> {
   constructor(required: number, available: number) {
     super({
       source,
       code: EXECUTOR_ERROR_CODES.INSUFFICIENT_UTXOS,
       message: "Insufficient UTXOs",
-      details: `Not enough free UTXOs available. Required: ${required}, Available: ${available}`,
+      details:
+        `Not enough free UTXOs available. Required: ${required}, Available: ${available}`,
       meta: { required, available },
     });
   }

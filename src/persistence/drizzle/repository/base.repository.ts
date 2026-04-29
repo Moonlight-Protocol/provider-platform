@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 //TODO: Remove no-explicit-any after fixing Drizzle types
 // unknown should be used instead of any where possible
-import { eq, and, isNull, type SQL } from "drizzle-orm";
+import { and, eq, isNull, type SQL } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 
@@ -11,11 +11,11 @@ import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 export abstract class BaseRepository<
   TTable extends PgTable,
   TSelect = any,
-  TInsert = any
+  TInsert = any,
 > {
   constructor(
     protected readonly db: DrizzleClient,
-    protected readonly table: TTable
+    protected readonly table: TTable,
   ) {}
 
   /**
@@ -39,8 +39,8 @@ export abstract class BaseRepository<
       .where(
         and(
           eq((this.table as any).id, id),
-          isNull((this.table as any).deletedAt)
-        ) as SQL<unknown>
+          isNull((this.table as any).deletedAt),
+        ) as SQL<unknown>,
       )
       .limit(1);
     return result as TSelect | undefined;

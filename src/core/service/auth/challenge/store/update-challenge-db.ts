@@ -16,12 +16,12 @@ import { withSpan } from "@/core/tracing.ts";
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
 export const P_UpdateChallengeDB = ProcessEngine.create(
-  async (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
+  (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
     return withSpan("P_UpdateChallengeDB", async (span) => {
       const { signedChallenge } = input.body;
       const tx = new Transaction(
         signedChallenge,
-        NETWORK_CONFIG.networkPassphrase
+        NETWORK_CONFIG.networkPassphrase,
       );
       const hash = tx.hash().toString("hex");
 
@@ -29,12 +29,14 @@ export const P_UpdateChallengeDB = ProcessEngine.create(
       const challenge = await challengeRepository.findOneByTxHash(hash);
       assertOrThrow(
         isDefined(challenge),
-        new E.CHALLENGE_NOT_FOUND_IN_DATABASE(hash)
+        new E.CHALLENGE_NOT_FOUND_IN_DATABASE(hash),
       );
 
       challenge.status = ChallengeStatus.VERIFIED;
 
-      span.addEvent("updating_challenge_status", { "challenge.status": ChallengeStatus.VERIFIED });
+      span.addEvent("updating_challenge_status", {
+        "challenge.status": ChallengeStatus.VERIFIED,
+      });
       await challengeRepository.update(challenge.id, {
         ...challenge,
       });
@@ -47,5 +49,5 @@ export const P_UpdateChallengeDB = ProcessEngine.create(
   },
   {
     name: "UpdateChallengeDB",
-  }
+  },
 );

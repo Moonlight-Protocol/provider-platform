@@ -8,6 +8,7 @@
 // deno-lint-ignore no-explicit-any
 const stubChannelClient = {} as any;
 
+// deno-lint-ignore require-await -- mock satisfies resolveChannelContext async contract
 export async function resolveChannelContext(_channelContractId: string) {
   return {
     signer: null,

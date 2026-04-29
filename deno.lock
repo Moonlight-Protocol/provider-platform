@@ -1087,6 +1087,7 @@
       "jsr:@noble/hashes@^1.6.1",
       "jsr:@oak/oak@^17.1.4",
       "jsr:@olli/kvdex@^3.1.4",
+      "jsr:@std/assert@1",
       "jsr:@std/dotenv@~0.225.6",
       "jsr:@zaubrik/djwt@^3.0.2",
       "npm:@drizzle-team/brocli@0.11",

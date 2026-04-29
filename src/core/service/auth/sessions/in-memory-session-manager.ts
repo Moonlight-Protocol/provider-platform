@@ -8,7 +8,7 @@ class InMemorySessionManager {
     txHash: string,
     clientAccount: string,
     requestId: string,
-    expiresAt: Date
+    expiresAt: Date,
   ): Promise<void> {
     LOG.debug(`Adding session to store: ${txHash}`);
     LOG.debug(`Entries: ${await memDb.countAll()}`);

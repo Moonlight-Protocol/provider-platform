@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { ChannelRegistry } from "./channel-registry.ts";
 import type { ChannelAuthEvent } from "./event-watcher.types.ts";
 

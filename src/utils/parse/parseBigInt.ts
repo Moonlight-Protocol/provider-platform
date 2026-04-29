@@ -19,7 +19,7 @@ export const parseBigInt = (obj: unknown): ParsedValue => {
 
   if (obj !== null && typeof obj === "object") {
     return Object.fromEntries(
-      Object.entries(obj).map(([k, v]) => [k, parseBigInt(v)])
+      Object.entries(obj).map(([k, v]) => [k, parseBigInt(v)]),
     );
   }
 

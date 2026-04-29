@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, bigint, index } from "drizzle-orm/pg-core";
+import { bigint, index, pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 
 export enum PayCustodialStatus {
@@ -17,7 +17,9 @@ export const payCustodialAccount = pgTable("pay_custodial_accounts", {
   passwordHash: text("password_hash").notNull(),
   depositAddress: text("deposit_address").notNull(),
   balance: bigint("balance", { mode: "bigint" }).notNull().$default(() => 0n),
-  status: payCustodialStatusEnum("status").notNull().default(PayCustodialStatus.ACTIVE),
+  status: payCustodialStatusEnum("status").notNull().default(
+    PayCustodialStatus.ACTIVE,
+  ),
   ...createBaseColumns(),
 }, (table) => [
   index("idx_pay_custodial_username").on(table.username),

@@ -19,15 +19,15 @@ const accountRepository = new AccountRepository(drizzleClient);
 const sessionRepository = new SessionRepository(drizzleClient);
 
 export const P_UpdateChallengeSession = ProcessEngine.create(
-  async (
+  (
     input: PostChallengeWithJWT,
-    _metadataHelper?: MetadataHelper
+    _metadataHelper?: MetadataHelper,
   ): Promise<PostChallengeWithJWT> => {
     return withSpan("P_UpdateChallengeSession", async (span) => {
       const { signedChallenge } = input.body;
       const tx = new Transaction(
         signedChallenge,
-        NETWORK_CONFIG.networkPassphrase
+        NETWORK_CONFIG.networkPassphrase,
       );
 
       const key = tx.hash().toString("hex");
@@ -55,18 +55,20 @@ export const P_UpdateChallengeSession = ProcessEngine.create(
 
       assertOrThrow(
         isDefined(tx.operations) && tx.operations.length > 0,
-        new E.CHALLENGE_HAS_NO_OPERATIONS(key)
+        new E.CHALLENGE_HAS_NO_OPERATIONS(key),
       );
 
       const txOperation = tx.operations[0] as Operation.ManageData;
       const txClientAccount = txOperation.source;
       assertOrThrow(isDefined(txClientAccount), new E.MISSING_CLIENT_ACCOUNT());
 
-      span.addEvent("looking_up_account", { "client.account": txClientAccount });
+      span.addEvent("looking_up_account", {
+        "client.account": txClientAccount,
+      });
       const account = await accountRepository.findById(txClientAccount);
       assertOrThrow(
         isDefined(account),
-        new E.USER_NOT_FOUND_IN_DATABASE(txClientAccount)
+        new E.USER_NOT_FOUND_IN_DATABASE(txClientAccount),
       );
 
       span.addEvent("persisting_session");
@@ -85,5 +87,5 @@ export const P_UpdateChallengeSession = ProcessEngine.create(
   },
   {
     name: "UpdateChallengeSession",
-  }
+  },
 );

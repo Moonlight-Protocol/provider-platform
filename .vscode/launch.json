@@ -1,20 +1,20 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "Deno: Debug",
-        "request": "launch",
-        "type": "node",
-        "runtimeExecutable": "deno",
-        "cwd": "${workspaceFolder}",
-        "program": "${workspaceFolder}/src/main.ts",
-        "outputCapture": "std"
-      },
-      {
-        "name": "Deno: Attach",
-        "request": "attach",
-        "type": "node",
-        "port": 9229,
-      }
-    ]
-  }
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Deno: Debug",
+      "request": "launch",
+      "type": "node",
+      "runtimeExecutable": "deno",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/src/main.ts",
+      "outputCapture": "std"
+    },
+    {
+      "name": "Deno: Attach",
+      "request": "attach",
+      "type": "node",
+      "port": 9229
+    }
+  ]
+}

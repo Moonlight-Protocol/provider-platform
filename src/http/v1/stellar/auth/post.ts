@@ -19,7 +19,7 @@ export const responseSchema = z.object({
 });
 
 const assembleResponse = (
-  input: ContextWithJWT
+  input: ContextWithJWT,
 ): PostEndpointOutput<typeof responseSchema> => {
   const message = "Auth challenge verified successfully";
 

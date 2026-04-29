@@ -65,4 +65,3 @@ export const listBundlesHandler = (ctx: Context) => {
 
   return handler.run(ctx);
 };
-

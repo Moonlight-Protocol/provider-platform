@@ -1,9 +1,9 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  payKyc,
-  type PayKyc,
   type NewPayKyc,
+  type PayKyc,
+  payKyc,
 } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
@@ -24,7 +24,7 @@ export class PayKycRepository extends BaseRepository<
         and(
           eq(payKyc.address, address),
           isNull(payKyc.deletedAt),
-        )
+        ),
       )
       .limit(1);
     return result;

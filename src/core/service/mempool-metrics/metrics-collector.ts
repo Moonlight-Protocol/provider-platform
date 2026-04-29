@@ -64,11 +64,14 @@ export class MetricsCollector {
       // Compute processing times from completed bundles (createdAt → updatedAt)
       const processingTimesMs = completed
         .filter((b) => b.createdAt && b.updatedAt)
-        .map((b) => new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime())
+        .map((b) =>
+          new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime()
+        )
         .filter((t) => t >= 0);
 
       const avgProcessingMs = processingTimesMs.length > 0
-        ? processingTimesMs.reduce((a, b) => a + b, 0) / processingTimesMs.length
+        ? processingTimesMs.reduce((a, b) => a + b, 0) /
+          processingTimesMs.length
         : null;
 
       const p95ProcessingMs = processingTimesMs.length > 0
@@ -97,10 +100,15 @@ export class MetricsCollector {
       });
 
       // Cleanup: delete metrics older than retention period
-      const retentionCutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+      const retentionCutoff = new Date(
+        Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000,
+      );
       const deleted = await this.metricRepo.deleteOlderThan(retentionCutoff);
       if (deleted > 0) {
-        LOG.debug("Cleaned up old metrics", { deleted, retentionDays: RETENTION_DAYS });
+        LOG.debug("Cleaned up old metrics", {
+          deleted,
+          retentionDays: RETENTION_DAYS,
+        });
       }
     } catch (error) {
       LOG.error("MetricsCollector failed to collect", {

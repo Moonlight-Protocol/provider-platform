@@ -1,10 +1,13 @@
 import { Router, Status } from "@oak/oak";
 
-const denoJson = JSON.parse(await Deno.readTextFile(new URL("../../../../deno.json", import.meta.url)));
+const denoJson = JSON.parse(
+  await Deno.readTextFile(new URL("../../../../deno.json", import.meta.url)),
+);
 const version: string = denoJson.version ?? "unknown";
 
 // Extract moonlight-sdk version from import specifier (e.g. "jsr:@moonlight/moonlight-sdk@^0.7.0" → "0.7.0")
-const sdkSpecifier: string = denoJson.imports?.["@moonlight/moonlight-sdk"] ?? "";
+const sdkSpecifier: string = denoJson.imports?.["@moonlight/moonlight-sdk"] ??
+  "";
 const sdkMatch = sdkSpecifier.match(/@\^?(\d+\.\d+\.\d+)/);
 const sdkVersion = sdkMatch?.[1] ?? "unknown";
 

@@ -9,13 +9,17 @@ waitlistRouter.post("/waitlist", async (ctx) => {
   const email = body?.email;
   const walletPublicKey = body?.walletPublicKey;
 
-  if (typeof email !== "string" || !EMAIL_RE.test(email) || email.length > 254) {
+  if (
+    typeof email !== "string" || !EMAIL_RE.test(email) || email.length > 254
+  ) {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "Invalid email" };
     return;
   }
 
-  console.log(`[waitlist] ${email}${walletPublicKey ? ` (${walletPublicKey})` : ""}`);
+  console.log(
+    `[waitlist] ${email}${walletPublicKey ? ` (${walletPublicKey})` : ""}`,
+  );
 
   ctx.response.status = Status.OK;
   ctx.response.body = { message: "Added to waitlist" };

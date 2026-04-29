@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, integer } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text } from "drizzle-orm/pg-core";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 
 export const paymentProvider = pgTable("payment_providers", {
