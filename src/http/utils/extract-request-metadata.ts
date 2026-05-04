@@ -14,8 +14,7 @@ export function extractRequestMetadata(ctx: Context) {
     clientIP = ctx.request.ip;
   } catch (_error) {
     // Fallback when ctx.request.ip fails
-    clientIP =
-      ctx.request.headers.get("x-forwarded-for") ||
+    clientIP = ctx.request.headers.get("x-forwarded-for") ||
       ctx.request.headers.get("x-real-ip") ||
       ctx.request.headers.get("cf-connecting-ip") ||
       "unknown";

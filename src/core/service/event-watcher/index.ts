@@ -41,7 +41,10 @@ async function initFromDb(): Promise<void> {
     // Find all active memberships to determine which councils to watch
     for (const pp of pps) {
       const membership = await membershipRepo.getCurrentForPp(pp.publicKey);
-      if (membership?.status === CouncilMembershipStatus.ACTIVE && membership.channelAuthId) {
+      if (
+        membership?.status === CouncilMembershipStatus.ACTIVE &&
+        membership.channelAuthId
+      ) {
         await ensureWatcher(membership.channelAuthId);
       }
     }
@@ -60,18 +63,30 @@ async function initFromDb(): Promise<void> {
 async function ensureWatcher(channelAuthId: string): Promise<void> {
   if (activeWatchers.has(channelAuthId)) return;
 
-  const watcher = new EventWatcher({ contractId: channelAuthId, intervalMs: EVENT_WATCHER_INTERVAL_MS });
+  const watcher = new EventWatcher({
+    contractId: channelAuthId,
+    intervalMs: EVENT_WATCHER_INTERVAL_MS,
+  });
   watcher.onEvent(async (event) => {
-    if (registeredProviders.has(event.address) || event.type === "contract_initialized") {
+    if (
+      registeredProviders.has(event.address) ||
+      event.type === "contract_initialized"
+    ) {
       await channelRegistry.handleEvent(event);
 
       // When a registered PP is added on-chain, activate its membership
-      if (event.type === "provider_added" && registeredProviders.has(event.address)) {
+      if (
+        event.type === "provider_added" &&
+        registeredProviders.has(event.address)
+      ) {
         await activateMembership(event.address, channelAuthId);
       }
 
       // When a registered PP is removed on-chain, update its membership
-      if (event.type === "provider_removed" && registeredProviders.has(event.address)) {
+      if (
+        event.type === "provider_removed" &&
+        registeredProviders.has(event.address)
+      ) {
         await deactivateMembership(event.address, channelAuthId);
       }
     } else {
@@ -98,10 +113,15 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
   LOG.info("Started event watcher for council", { channelAuthId });
 }
 
-async function activateMembership(ppPublicKey: string, channelAuthId: string): Promise<void> {
+async function activateMembership(
+  ppPublicKey: string,
+  channelAuthId: string,
+): Promise<void> {
   try {
     const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
-    if (!membership || membership.status === CouncilMembershipStatus.ACTIVE) return;
+    if (!membership || membership.status === CouncilMembershipStatus.ACTIVE) {
+      return;
+    }
     if (membership.channelAuthId !== channelAuthId) return;
 
     // Fetch council config from the council's public API
@@ -109,7 +129,9 @@ async function activateMembership(ppPublicKey: string, channelAuthId: string): P
     let councilName = membership.councilName;
     try {
       const res = await fetch(
-        `${membership.councilUrl}/api/v1/public/council?councilId=${encodeURIComponent(channelAuthId)}`,
+        `${membership.councilUrl}/api/v1/public/council?councilId=${
+          encodeURIComponent(channelAuthId)
+        }`,
       );
       if (res.ok) {
         const { data } = await res.json();
@@ -123,28 +145,41 @@ async function activateMembership(ppPublicKey: string, channelAuthId: string): P
       configJson,
       councilName,
     });
-    LOG.info("PP membership activated via on-chain event", { ppPublicKey, channelAuthId });
+    LOG.info("PP membership activated via on-chain event", {
+      ppPublicKey,
+      channelAuthId,
+    });
   } catch (err) {
     LOG.error("Failed to activate membership from event", {
-      ppPublicKey, channelAuthId,
+      ppPublicKey,
+      channelAuthId,
       error: err instanceof Error ? err.message : String(err),
     });
   }
 }
 
-async function deactivateMembership(ppPublicKey: string, channelAuthId: string): Promise<void> {
+async function deactivateMembership(
+  ppPublicKey: string,
+  channelAuthId: string,
+): Promise<void> {
   try {
     const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
-    if (!membership || membership.status !== CouncilMembershipStatus.ACTIVE) return;
+    if (!membership || membership.status !== CouncilMembershipStatus.ACTIVE) {
+      return;
+    }
     if (membership.channelAuthId !== channelAuthId) return;
 
     await membershipRepo.update(membership.id, {
       status: CouncilMembershipStatus.REJECTED,
     });
-    LOG.info("PP membership deactivated via on-chain event", { ppPublicKey, channelAuthId });
+    LOG.info("PP membership deactivated via on-chain event", {
+      ppPublicKey,
+      channelAuthId,
+    });
   } catch (err) {
     LOG.error("Failed to deactivate membership from event", {
-      ppPublicKey, channelAuthId,
+      ppPublicKey,
+      channelAuthId,
       error: err instanceof Error ? err.message : String(err),
     });
   }

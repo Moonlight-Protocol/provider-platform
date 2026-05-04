@@ -1,9 +1,9 @@
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 import {
-  paymentProvider,
-  type PaymentProvider,
   type NewPaymentProvider,
+  type PaymentProvider,
+  paymentProvider,
 } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 
@@ -16,7 +16,9 @@ export class PpRepository extends BaseRepository<
     super(db, paymentProvider);
   }
 
-  async findByPublicKey(publicKey: string): Promise<PaymentProvider | undefined> {
+  async findByPublicKey(
+    publicKey: string,
+  ): Promise<PaymentProvider | undefined> {
     const [result] = await this.db
       .select()
       .from(paymentProvider)
@@ -69,7 +71,10 @@ export class PpRepository extends BaseRepository<
       .orderBy(paymentProvider.createdAt);
   }
 
-  async findByPublicKeyAndOwner(publicKey: string, ownerPublicKey: string): Promise<PaymentProvider | undefined> {
+  async findByPublicKeyAndOwner(
+    publicKey: string,
+    ownerPublicKey: string,
+  ): Promise<PaymentProvider | undefined> {
     const [result] = await this.db
       .select()
       .from(paymentProvider)

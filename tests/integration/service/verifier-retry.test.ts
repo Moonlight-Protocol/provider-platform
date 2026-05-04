@@ -1,12 +1,12 @@
-import { assertEquals, assertExists } from "jsr:@std/assert";
+import { assertEquals, assertExists } from "@std/assert";
 import {
   ensureInitialized,
+  getBundleRepo,
+  getTestDb,
   resetDb,
   seedBundle,
   seedTransaction,
   testBundleId,
-  getBundleRepo,
-  getTestDb,
 } from "../../test_helpers.ts";
 import { handleVerificationFailure } from "@/core/service/verifier/verifier-failure.helpers.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
@@ -29,7 +29,10 @@ async function setup() {
 }
 
 /** Minimal updateTxStatus backed by PGlite */
-async function updateTxStatus(txId: string, status: TransactionStatus): Promise<void> {
+async function updateTxStatus(
+  txId: string,
+  status: TransactionStatus,
+): Promise<void> {
   const db = getTestDb();
   await db.update(transaction).set({ status, updatedAt: new Date() }).where(
     eq(transaction.id, txId),
@@ -37,7 +40,9 @@ async function updateTxStatus(txId: string, status: TransactionStatus): Promise<
 }
 
 /** Reads the transaction status from PGlite */
-async function getTxStatus(txId: string): Promise<TransactionStatus | undefined> {
+async function getTxStatus(
+  txId: string,
+): Promise<TransactionStatus | undefined> {
   const db = getTestDb();
   const [row] = await db
     .select({ status: transaction.status })
@@ -94,20 +99,30 @@ Deno.test(
   async () => {
     const repo = await setup();
     const bundleId = testBundleId();
-    await seedBundle({ id: bundleId, retryCount: 0, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: bundleId,
+      retryCount: 0,
+      status: BundleStatus.PROCESSING,
+    });
     const tx = await seedTransaction({ bundleIds: [bundleId] });
 
     const reAddedBundles: SlotBundle[] = [];
 
-    await handleVerificationFailure(tx.id, "ledger entry not found", [bundleId], {
-      operationsBundleRepository: repo,
-      updateTxStatus,
-      createSlotBundleFn: mockCreateSlotBundle,
-      reAddBundlesFn: async (bundles) => {
-        reAddedBundles.push(...bundles);
+    await handleVerificationFailure(
+      tx.id,
+      "ledger entry not found",
+      [bundleId],
+      {
+        operationsBundleRepository: repo,
+        updateTxStatus,
+        createSlotBundleFn: mockCreateSlotBundle,
+        // deno-lint-ignore require-await -- mock satisfies reAddBundlesFn async contract
+        reAddBundlesFn: async (bundles) => {
+          reAddedBundles.push(...bundles);
+        },
+        maxRetryAttempts: MAX_RETRY,
       },
-      maxRetryAttempts: MAX_RETRY,
-    });
+    );
 
     // Transaction marked FAILED
     assertEquals(await getTxStatus(tx.id), TransactionStatus.FAILED);
@@ -130,7 +145,11 @@ Deno.test(
   async () => {
     const repo = await setup();
     const bundleId = testBundleId();
-    await seedBundle({ id: bundleId, retryCount: 2, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: bundleId,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
     const tx = await seedTransaction({ bundleIds: [bundleId] });
 
     const reAddedBundles: SlotBundle[] = [];
@@ -139,6 +158,7 @@ Deno.test(
       operationsBundleRepository: repo,
       updateTxStatus,
       createSlotBundleFn: mockCreateSlotBundle,
+      // deno-lint-ignore require-await -- mock satisfies reAddBundlesFn async contract
       reAddBundlesFn: async (bundles) => {
         reAddedBundles.push(...bundles);
       },
@@ -166,8 +186,16 @@ Deno.test(
     const eligibleId = testBundleId();
     const deadLetterId = testBundleId();
 
-    await seedBundle({ id: eligibleId, retryCount: 0, status: BundleStatus.PROCESSING });
-    await seedBundle({ id: deadLetterId, retryCount: 2, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: eligibleId,
+      retryCount: 0,
+      status: BundleStatus.PROCESSING,
+    });
+    await seedBundle({
+      id: deadLetterId,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
     const tx = await seedTransaction({ bundleIds: [eligibleId, deadLetterId] });
 
     const reAddedBundles: SlotBundle[] = [];
@@ -180,6 +208,7 @@ Deno.test(
         operationsBundleRepository: repo,
         updateTxStatus,
         createSlotBundleFn: mockCreateSlotBundle,
+        // deno-lint-ignore require-await -- mock satisfies reAddBundlesFn async contract
         reAddBundlesFn: async (bundles) => {
           reAddedBundles.push(...bundles);
         },
@@ -206,7 +235,11 @@ Deno.test(
   async () => {
     const repo = await setup();
     const bundleId = testBundleId();
-    await seedBundle({ id: bundleId, retryCount: 0, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: bundleId,
+      retryCount: 0,
+      status: BundleStatus.PROCESSING,
+    });
     const tx = await seedTransaction({ bundleIds: [bundleId] });
 
     await handleVerificationFailure(tx.id, "bad signature", [bundleId], {
@@ -237,8 +270,16 @@ Deno.test(
     const id1 = testBundleId();
     const id2 = testBundleId();
     // Both at max retries
-    await seedBundle({ id: id1, retryCount: 2, status: BundleStatus.PROCESSING });
-    await seedBundle({ id: id2, retryCount: 2, status: BundleStatus.PROCESSING });
+    await seedBundle({
+      id: id1,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
+    await seedBundle({
+      id: id2,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
     const tx = await seedTransaction({ bundleIds: [id1, id2] });
 
     let reAddCalled = false;
@@ -247,6 +288,7 @@ Deno.test(
       operationsBundleRepository: repo,
       updateTxStatus,
       createSlotBundleFn: mockCreateSlotBundle,
+      // deno-lint-ignore require-await -- mock satisfies reAddBundlesFn async contract
       reAddBundlesFn: async () => {
         reAddCalled = true;
       },

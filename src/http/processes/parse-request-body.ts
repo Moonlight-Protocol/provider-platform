@@ -1,6 +1,6 @@
 import { ProcessEngine } from "@fifo/convee";
 import type { Context } from "@oak/oak";
-import { ZodError, type infer as ZodInfer, type ZodSchema } from "zod";
+import { type infer as ZodInfer, ZodError, type ZodSchema } from "zod";
 import { LOG } from "@/config/logger.ts";
 import type { ContextWithParsedBody } from "@/http/processes/types.ts";
 import * as E from "@/http/processes/error.ts";
@@ -9,7 +9,6 @@ import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 const PROCESS_NAME = "ParseRequestBody" as const;
 
 /**
- *
  * Factory Process that parses and validates the request body
  *
  * @param schema - Zod schema to validate the request body against
@@ -28,11 +27,10 @@ const PROCESS_NAME = "ParseRequestBody" as const;
  *
  * const parseBodyProcess = P_ParseRequestBody(bodySchema);
  * ```
- *
  */
 const P_ParseRequestBody = <S extends ZodSchema>(schema: S) => {
   const parseRequestProcess = async (
-    ctx: Context
+    ctx: Context,
   ): Promise<ContextWithParsedBody<ZodInfer<S>>> => {
     LOG.trace("Parsing request body");
 

@@ -4,13 +4,13 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_account_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { getCustodialAccountHandler } from "@/http/v1/pay/custodial/account.ts";
 import {
   createTestAccount,
-  resetDb,
   ensureInitialized,
   PayCustodialStatus,
+  resetDb,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -33,10 +33,18 @@ function createMockContext(
       body: { json: () => Promise.resolve({}) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session },
   };
@@ -74,10 +82,21 @@ Deno.test("custodial account - returns account info for valid session", async ()
   await getCustodialAccountHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "Account retrieved");
 
-  const data = (res.body as { data: { id: string; depositAddress: string; balance: string; status: string } }).data;
+  const data = (res.body as {
+    data: {
+      id: string;
+      depositAddress: string;
+      balance: string;
+      status: string;
+    };
+  }).data;
   assertEquals(data.id, account.id);
   assertEquals(data.depositAddress, account.depositAddress);
   assertEquals(data.balance, "5000000");

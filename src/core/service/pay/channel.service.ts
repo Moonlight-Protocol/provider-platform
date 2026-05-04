@@ -6,7 +6,10 @@
  */
 import { Buffer } from "buffer";
 import { LOG } from "@/config/logger.ts";
-import { ChannelReadMethods, type UTXOPublicKey, type PrivacyChannel } from "@moonlight/moonlight-sdk";
+import {
+  ChannelReadMethods,
+  type PrivacyChannel,
+} from "@moonlight/moonlight-sdk";
 
 /**
  * Queries on-chain UTXO balances for the given public keys.

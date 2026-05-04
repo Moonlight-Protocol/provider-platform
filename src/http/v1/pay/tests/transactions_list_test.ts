@@ -4,16 +4,16 @@
  * Uses PGlite (in-memory PostgreSQL via WASM) — real SQL, real transactions.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/transactions_list_test.ts
  */
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { listTransactionsHandler } from "@/http/v1/pay/transactions/list.ts";
 import {
   createTestAccount,
   createTestTransaction,
-  testAddress,
-  resetDb,
   ensureInitialized,
-  PayTransactionType,
   PayTransactionStatus,
+  PayTransactionType,
+  resetDb,
+  testAddress,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -46,10 +46,18 @@ function createMockContext(
       url,
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: { session },
   };
@@ -103,8 +111,15 @@ Deno.test("transactions list - returns transactions for account", async () => {
   await listTransactionsHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
-  assertEquals((res.body as { message: string }).message, "Transactions retrieved");
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Transactions retrieved",
+  );
 
   // deno-lint-ignore no-explicit-any
   const data = (res.body as { data: any }).data;
@@ -141,7 +156,11 @@ Deno.test("transactions list - pagination limit works", async () => {
   assertEquals(res.status, 200);
   // deno-lint-ignore no-explicit-any
   const data = (res.body as { data: any }).data;
-  assertEquals(data.transactions.length, 2, "Should return only 2 items with limit=2");
+  assertEquals(
+    data.transactions.length,
+    2,
+    "Should return only 2 items with limit=2",
+  );
   assertEquals(data.total, 5, "Total should still be 5");
 });
 
@@ -169,7 +188,11 @@ Deno.test("transactions list - pagination offset works", async () => {
   assertEquals(res.status, 200);
   // deno-lint-ignore no-explicit-any
   const data = (res.body as { data: any }).data;
-  assertEquals(data.transactions.length, 2, "Should return 2 items starting from offset 3");
+  assertEquals(
+    data.transactions.length,
+    2,
+    "Should return 2 items starting from offset 3",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -209,7 +232,11 @@ Deno.test("transactions list - status filter returns only matching transactions"
   assertEquals(res.status, 200);
   // deno-lint-ignore no-explicit-any
   const data = (res.body as { data: any }).data;
-  assertEquals(data.transactions.length, 1, "Should return only PENDING transactions");
+  assertEquals(
+    data.transactions.length,
+    1,
+    "Should return only PENDING transactions",
+  );
   assertEquals(data.transactions[0].status, "pending");
 });
 
@@ -233,7 +260,11 @@ Deno.test("transactions list - invalid status returns 400", async () => {
 
   assertEquals(res.status, 400);
   const msg = (res.body as { message: string }).message;
-  assertEquals(msg.startsWith("Invalid status"), true, `Expected message to start with 'Invalid status', got: ${msg}`);
+  assertEquals(
+    msg.startsWith("Invalid status"),
+    true,
+    `Expected message to start with 'Invalid status', got: ${msg}`,
+  );
 });
 
 // ---------------------------------------------------------------------------

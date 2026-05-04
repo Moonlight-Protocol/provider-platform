@@ -65,7 +65,9 @@ export const postCustodialRegisterHandler = async (ctx: Context) => {
       updatedAt: new Date(),
     });
 
-    const token = await generateJwt(accountId, crypto.randomUUID(), { type: "custodial" });
+    const token = await generateJwt(accountId, crypto.randomUUID(), {
+      type: "custodial",
+    });
 
     LOG.info("Custodial account registered", { username });
 

@@ -1,8 +1,8 @@
-import { assertEquals, assertInstanceOf } from "jsr:@std/assert";
+import { assertEquals, assertInstanceOf } from "@std/assert";
 import { PlatformError } from "@/error/index.ts";
 import {
-  TOO_MANY_OPERATIONS,
   BUNDLE_ERROR_CODES,
+  TOO_MANY_OPERATIONS,
 } from "@/core/service/bundle/bundle.errors.ts";
 import { bundleRequestSchema } from "@/http/v1/bundle/bundle.schemas.ts";
 
@@ -32,12 +32,16 @@ function bundleBody(partial: { operationsMLXDR: string[] }) {
 // ---------------------------------------------------------------------------
 
 Deno.test("schema – rejects empty operationsMLXDR array", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: [] }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: [] }),
+  );
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – accepts single operation", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ["op-0"] }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: ["op-0"] }),
+  );
   assertEquals(result.success, true);
 });
 
@@ -46,22 +50,30 @@ Deno.test("schema – accepts single operation", () => {
 // ---------------------------------------------------------------------------
 
 Deno.test("schema – accepts exactly MAX operations", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX) }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: ops(TEST_MAX) }),
+  );
   assertEquals(result.success, true);
 });
 
 Deno.test("schema – rejects MAX + 1 operations", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }),
+  );
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – rejects significantly over MAX operations", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX * 5) }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: ops(TEST_MAX * 5) }),
+  );
   assertEquals(result.success, false);
 });
 
 Deno.test("schema – error message references the maximum", () => {
-  const result = operationsSchema.safeParse(bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }));
+  const result = operationsSchema.safeParse(
+    bundleBody({ operationsMLXDR: ops(TEST_MAX + 1) }),
+  );
   assertEquals(result.success, false);
   if (!result.success) {
     const issue = result.error.issues[0];

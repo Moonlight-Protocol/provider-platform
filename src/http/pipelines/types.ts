@@ -1,4 +1,4 @@
-import type { ZodSchema, z } from "zod";
+import type { z, ZodSchema } from "zod";
 import type {
   ContextWithParsedBody,
   ContextWithParsedQuery,

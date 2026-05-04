@@ -1,5 +1,8 @@
 import { eq } from "drizzle-orm";
-import { walletUser, type WalletUser } from "@/persistence/drizzle/entity/wallet-user.entity.ts";
+import {
+  type WalletUser,
+  walletUser,
+} from "@/persistence/drizzle/entity/wallet-user.entity.ts";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 
 export class WalletUserRepository {

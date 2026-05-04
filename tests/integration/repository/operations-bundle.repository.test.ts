@@ -1,10 +1,10 @@
-import { assertEquals, assertExists, assertNotEquals } from "jsr:@std/assert";
+import { assertEquals, assertExists, assertNotEquals } from "@std/assert";
 import {
   ensureInitialized,
+  getBundleRepo,
   resetDb,
   seedBundle,
   testBundleId,
-  getBundleRepo,
 } from "../../test_helpers.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 
@@ -83,7 +83,10 @@ Deno.test("update – persists FAILED status with lastFailureReason", async () =
   const id = testBundleId();
   await seedBundle({ id });
 
-  const reason = JSON.stringify({ phase: "execution", error: { message: "boom" } });
+  const reason = JSON.stringify({
+    phase: "execution",
+    error: { message: "boom" },
+  });
   await repo.update(id, {
     status: BundleStatus.FAILED,
     retryCount: 3,
@@ -213,13 +216,32 @@ Deno.test("expireOlderThan – expires only bundles older than cutoff with match
   const recentPending = testBundleId();
   const oldCompleted = testBundleId();
 
-  await seedBundle({ id: oldPending, status: BundleStatus.PENDING, createdAt: oldTime });
-  await seedBundle({ id: oldProcessing, status: BundleStatus.PROCESSING, createdAt: oldTime });
-  await seedBundle({ id: recentPending, status: BundleStatus.PENDING, createdAt: recentTime });
-  await seedBundle({ id: oldCompleted, status: BundleStatus.COMPLETED, createdAt: oldTime });
+  await seedBundle({
+    id: oldPending,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
+  await seedBundle({
+    id: oldProcessing,
+    status: BundleStatus.PROCESSING,
+    createdAt: oldTime,
+  });
+  await seedBundle({
+    id: recentPending,
+    status: BundleStatus.PENDING,
+    createdAt: recentTime,
+  });
+  await seedBundle({
+    id: oldCompleted,
+    status: BundleStatus.COMPLETED,
+    createdAt: oldTime,
+  });
 
   const cutoff = new Date(Date.now() - 60_000);
-  const expired = await repo.expireOlderThan(cutoff, [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+  const expired = await repo.expireOlderThan(cutoff, [
+    BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
+  ]);
 
   assertEquals(expired.length, 2);
   assertEquals(expired.includes(oldPending), true);
@@ -300,7 +322,10 @@ Deno.test("expireByIds – skips already-expired bundles", async () => {
   const id = testBundleId();
   await seedBundle({ id, status: BundleStatus.EXPIRED });
 
-  const expired = await repo.expireByIds([id], [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+  const expired = await repo.expireByIds([id], [
+    BundleStatus.PENDING,
+    BundleStatus.PROCESSING,
+  ]);
   assertEquals(expired.length, 0);
 });
 
@@ -316,11 +341,23 @@ Deno.test("findByStatusAndDateRange – filters by date range and status", async
   const oldId = testBundleId();
   const recentId = testBundleId();
 
-  await seedBundle({ id: oldId, status: BundleStatus.PENDING, createdAt: oldTime });
-  await seedBundle({ id: recentId, status: BundleStatus.PENDING, createdAt: recentTime });
+  await seedBundle({
+    id: oldId,
+    status: BundleStatus.PENDING,
+    createdAt: oldTime,
+  });
+  await seedBundle({
+    id: recentId,
+    status: BundleStatus.PENDING,
+    createdAt: recentTime,
+  });
 
   const cutoff = new Date(Date.now() - 60_000);
-  const results = await repo.findByStatusAndDateRange(BundleStatus.PENDING, undefined, cutoff);
+  const results = await repo.findByStatusAndDateRange(
+    BundleStatus.PENDING,
+    undefined,
+    cutoff,
+  );
   const ids = results.map((r) => r.id);
 
   assertEquals(ids.includes(oldId), true);
@@ -333,7 +370,12 @@ Deno.test("findByStatusAndDateRange – respects limit", async () => {
     await seedBundle({ status: BundleStatus.PENDING });
   }
 
-  const results = await repo.findByStatusAndDateRange(BundleStatus.PENDING, undefined, undefined, 3);
+  const results = await repo.findByStatusAndDateRange(
+    BundleStatus.PENDING,
+    undefined,
+    undefined,
+    3,
+  );
   assertEquals(results.length, 3);
 });
 

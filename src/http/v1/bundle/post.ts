@@ -20,7 +20,7 @@ type BundleProcessOutput = {
 };
 
 const assembleResponse = (
-  input: BundleProcessOutput
+  input: BundleProcessOutput,
 ): PostEndpointOutput<typeof responseSchema> => {
   const message = "Bundle received and queued for processing";
 
@@ -50,4 +50,3 @@ export const postBundleHandler = (ctx: Context) => {
 
   return handler.run(ctx);
 };
-

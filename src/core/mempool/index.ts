@@ -2,7 +2,10 @@ import { Mempool } from "@/core/service/mempool/mempool.process.ts";
 import { Executor } from "@/core/service/executor/executor.process.ts";
 import { Verifier } from "@/core/service/verifier/verifier.process.ts";
 import { MetricsCollector } from "@/core/service/mempool-metrics/metrics-collector.ts";
-import { MEMPOOL_SLOT_CAPACITY, MEMPOOL_TTL_CHECK_INTERVAL_MS } from "@/config/env.ts";
+import {
+  MEMPOOL_SLOT_CAPACITY,
+  MEMPOOL_TTL_CHECK_INTERVAL_MS,
+} from "@/config/env.ts";
 import { LOG } from "@/config/logger.ts";
 
 /**
@@ -85,7 +88,8 @@ export async function initializeMempoolSystem(): Promise<void> {
   // Read platform version once at startup (import.meta.dirname resolves
   // to the module's directory, so this works regardless of CWD)
   try {
-    const denoJsonPath = new URL("../../../deno.json", import.meta.url).pathname;
+    const denoJsonPath =
+      new URL("../../../deno.json", import.meta.url).pathname;
     const denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
     platformVersion = denoJson.version ?? "unknown";
   } catch {

@@ -19,7 +19,8 @@ export function selectNetwork(envNetwork: string): {
           horizonUrl: "https://horizon.stellar.org",
           allowHttp: false,
         }),
-        NETWORK: "Public Global Stellar Network ; September 2015" as StellarNetworkId,
+        NETWORK:
+          "Public Global Stellar Network ; September 2015" as StellarNetworkId,
       };
     }
     case "testnet": {

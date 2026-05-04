@@ -38,7 +38,9 @@ export async function handleVerificationFailure(
     try {
       const bundle = await deps.operationsBundleRepository.findById(bundleId);
       if (!bundle) {
-        LOG.warn(`Bundle ${bundleId} not found while handling verification failure`);
+        LOG.warn(
+          `Bundle ${bundleId} not found while handling verification failure`,
+        );
         continue;
       }
 
@@ -54,7 +56,9 @@ export async function handleVerificationFailure(
       }) ?? reason;
 
       await deps.operationsBundleRepository.update(bundleId, {
-        status: hasReachedMaxAttempts ? BundleStatus.FAILED : BundleStatus.PENDING,
+        status: hasReachedMaxAttempts
+          ? BundleStatus.FAILED
+          : BundleStatus.PENDING,
         retryCount: nextRetryCount,
         lastFailureReason,
         updatedAt: new Date(),
@@ -63,10 +67,13 @@ export async function handleVerificationFailure(
       if (!hasReachedMaxAttempts) {
         retryableBundleIds.push(bundleId);
       } else {
-        LOG.warn("Bundle moved to dead-letter after max verification retry attempts reached", {
-          bundleId,
-          retryCount: nextRetryCount,
-        });
+        LOG.warn(
+          "Bundle moved to dead-letter after max verification retry attempts reached",
+          {
+            bundleId,
+            retryCount: nextRetryCount,
+          },
+        );
       }
     } catch (error) {
       LOG.error(`Failed to update bundle ${bundleId} status`, { error });
@@ -79,11 +86,16 @@ export async function handleVerificationFailure(
     await Promise.all(
       retryableBundleIds.map(async (bundleId) => {
         try {
-          const updated = await deps.operationsBundleRepository.findById(bundleId);
+          const updated = await deps.operationsBundleRepository.findById(
+            bundleId,
+          );
           if (!updated) return null;
           return await deps.createSlotBundleFn(updated);
         } catch (error) {
-          LOG.error(`Failed to build SlotBundle for retry of bundle ${bundleId}`, { error });
+          LOG.error(
+            `Failed to build SlotBundle for retry of bundle ${bundleId}`,
+            { error },
+          );
           return null;
         }
       }),

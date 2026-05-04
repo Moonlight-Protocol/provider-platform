@@ -1,4 +1,4 @@
-import { pgTable, text, bigint } from "drizzle-orm/pg-core";
+import { bigint, pgTable, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
@@ -12,10 +12,10 @@ export const utxo = pgTable("utxos", {
     .references(() => account.id),
   spentByAccountId: text("spent_by_account_id"),
   createdAtBundleId: text("created_at_bundle_id").references(
-    () => operationsBundle.id
+    () => operationsBundle.id,
   ),
   spentAtBundleId: text("spent_at_bundle_id").references(
-    () => operationsBundle.id
+    () => operationsBundle.id,
   ),
   ...createBaseColumns(),
 });
@@ -38,4 +38,3 @@ export const utxoRelations = relations(utxo, ({ one }) => ({
 
 export type Utxo = typeof utxo.$inferSelect;
 export type NewUtxo = typeof utxo.$inferInsert;
-

@@ -25,15 +25,16 @@ export class BUNDLE_NOT_FOUND extends PlatformError<{ bundleId: string }> {
 /**
  * Error thrown when a slot is full and cannot accommodate more bundles
  */
-export class SLOT_FULL extends PlatformError<{ slotWeight: number; capacity: number }> {
+export class SLOT_FULL
+  extends PlatformError<{ slotWeight: number; capacity: number }> {
   constructor(slotWeight: number, capacity: number) {
     super({
       source,
       code: MEMPOOL_ERROR_CODES.SLOT_FULL,
       message: "Slot is full",
-      details: `The slot cannot accommodate more bundles. Current weight: ${slotWeight}, Capacity: ${capacity}`,
+      details:
+        `The slot cannot accommodate more bundles. Current weight: ${slotWeight}, Capacity: ${capacity}`,
       meta: { slotWeight, capacity },
     });
   }
 }
-

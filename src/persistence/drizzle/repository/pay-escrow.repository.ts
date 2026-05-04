@@ -1,9 +1,9 @@
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
-  payEscrow,
-  type PayEscrow,
   type NewPayEscrow,
+  type PayEscrow,
+  payEscrow,
   PayEscrowStatus,
 } from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
@@ -27,7 +27,7 @@ export class PayEscrowRepository extends BaseRepository<
           eq(payEscrow.heldForAddress, address),
           eq(payEscrow.status, PayEscrowStatus.HELD),
           isNull(payEscrow.deletedAt),
-        )
+        ),
       )
       .orderBy(desc(payEscrow.createdAt));
   }
@@ -41,7 +41,7 @@ export class PayEscrowRepository extends BaseRepository<
         and(
           eq(payEscrow.senderAddress, address),
           isNull(payEscrow.deletedAt),
-        )
+        ),
       )
       .orderBy(desc(payEscrow.createdAt));
   }

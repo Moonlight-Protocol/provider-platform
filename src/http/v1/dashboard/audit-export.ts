@@ -26,7 +26,9 @@ export const getAuditExportHandler = async (ctx: Context) => {
   if (!(statusParam in BundleStatus)) {
     ctx.response.status = Status.BadRequest;
     ctx.response.body = {
-      message: `Invalid status. Must be one of: ${Object.keys(BundleStatus).join(", ")}`,
+      message: `Invalid status. Must be one of: ${
+        Object.keys(BundleStatus).join(", ")
+      }`,
     };
     return;
   }
@@ -39,7 +41,9 @@ export const getAuditExportHandler = async (ctx: Context) => {
 
   if ((from && isNaN(from.getTime())) || (to && isNaN(to.getTime()))) {
     ctx.response.status = Status.BadRequest;
-    ctx.response.body = { message: "Invalid date format. Use ISO 8601 (e.g., 2026-01-01)." };
+    ctx.response.body = {
+      message: "Invalid date format. Use ISO 8601 (e.g., 2026-01-01).",
+    };
     return;
   }
 
@@ -62,7 +66,9 @@ export const getAuditExportHandler = async (ctx: Context) => {
     ctx.response.headers.set("Content-Type", "text/csv");
     ctx.response.headers.set(
       "Content-Disposition",
-      `attachment; filename="audit-export-${status}-${new Date().toISOString().slice(0, 10)}.csv"`,
+      `attachment; filename="audit-export-${status}-${
+        new Date().toISOString().slice(0, 10)
+      }.csv"`,
     );
     ctx.response.body = csv;
   } catch (error) {

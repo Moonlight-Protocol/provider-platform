@@ -3,8 +3,15 @@ import { eq } from "drizzle-orm";
 import { StrKey } from "@colibri/core";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayKycRepository } from "@/persistence/drizzle/repository/pay-kyc.repository.ts";
-import { payCustodialAccount, PayCustodialStatus } from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
-import { payTransaction, PayTransactionType, PayTransactionStatus } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
+import {
+  payCustodialAccount,
+  PayCustodialStatus,
+} from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
+import {
+  payTransaction,
+  PayTransactionStatus,
+  PayTransactionType,
+} from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { createEscrow } from "@/core/service/pay/escrow.service.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
@@ -25,14 +32,18 @@ export const postCustodialSendHandler = async (ctx: Context) => {
     // Validate `to` is a valid Stellar public key
     if (typeof to !== "string" || !StrKey.isValidEd25519PublicKey(to)) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "to must be a valid Stellar public key (G...)" };
+      ctx.response.body = {
+        message: "to must be a valid Stellar public key (G...)",
+      };
       return;
     }
 
     // Validate amount is a valid positive integer string
     if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "amount must be a valid positive integer string" };
+      ctx.response.body = {
+        message: "amount must be a valid positive integer string",
+      };
       return;
     }
 
@@ -74,11 +85,17 @@ export const postCustodialSendHandler = async (ctx: Context) => {
       }
 
       if (account.status === PayCustodialStatus.SUSPENDED) {
-        return { error: "Account suspended", status: Status.Forbidden } as const;
+        return {
+          error: "Account suspended",
+          status: Status.Forbidden,
+        } as const;
       }
 
       if (account.balance < sendAmount) {
-        return { error: "Insufficient balance", status: Status.BadRequest } as const;
+        return {
+          error: "Insufficient balance",
+          status: Status.BadRequest,
+        } as const;
       }
 
       // Debit balance atomically
@@ -95,7 +112,9 @@ export const postCustodialSendHandler = async (ctx: Context) => {
       await tx.insert(payTransaction).values({
         id: txId,
         type: PayTransactionType.SEND,
-        status: receiverIsVerified ? PayTransactionStatus.PENDING : PayTransactionStatus.COMPLETED,
+        status: receiverIsVerified
+          ? PayTransactionStatus.PENDING
+          : PayTransactionStatus.COMPLETED,
         amount: sendAmount,
         assetCode: "XLM",
         fromAddress: account.depositAddress,
@@ -106,7 +125,11 @@ export const postCustodialSendHandler = async (ctx: Context) => {
         updatedAt: new Date(),
       });
 
-      return { txId, isVerified: receiverIsVerified, depositAddress: account.depositAddress } as const;
+      return {
+        txId,
+        isVerified: receiverIsVerified,
+        depositAddress: account.depositAddress,
+      } as const;
     });
 
     if ("error" in result) {
@@ -132,7 +155,9 @@ export const postCustodialSendHandler = async (ctx: Context) => {
 
     ctx.response.status = Status.OK;
     ctx.response.body = {
-      message: isVerified ? "Send initiated" : "Send initiated (held in escrow)",
+      message: isVerified
+        ? "Send initiated"
+        : "Send initiated (held in escrow)",
       data: {
         bundleId: txId,
         status: isVerified ? "pending" : "escrowed",

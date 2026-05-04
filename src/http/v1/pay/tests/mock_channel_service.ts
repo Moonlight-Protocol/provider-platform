@@ -21,6 +21,7 @@ export function _resetMockBalances(): void {
   _mockBalances = null;
 }
 
+// deno-lint-ignore require-await -- mock satisfies queryBalances Promise<bigint[]> contract
 export async function queryBalances(
   publicKeys: Uint8Array[],
   _channelClient?: unknown,

@@ -14,9 +14,10 @@ export type JwtPayload = {
   type?: "sep10" | "custodial";
 };
 
+// deno-lint-ignore require-await -- mock satisfies generateJwt's Promise<string> contract
 export default async function generateJwt(
   clientAccount: string,
-  challengeHash: string,
+  _challengeHash: string,
   opts?: { type?: "sep10" | "custodial" },
 ): Promise<string> {
   // Return a deterministic token for tests

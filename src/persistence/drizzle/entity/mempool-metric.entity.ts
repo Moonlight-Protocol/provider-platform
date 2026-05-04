@@ -1,11 +1,11 @@
 import {
+  doublePrecision,
+  index,
+  integer,
   pgTable,
   serial,
   text,
-  integer,
-  doublePrecision,
   timestamp,
-  index,
 } from "drizzle-orm/pg-core";
 
 export const mempoolMetric = pgTable("mempool_metrics", {

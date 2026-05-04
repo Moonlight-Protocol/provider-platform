@@ -11,12 +11,19 @@
  *
  * Funds never leave the channel — privacy preserved.
  */
-import { eq, and, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PayEscrowRepository } from "@/persistence/drizzle/repository/pay-escrow.repository.ts";
 import { PayKycRepository } from "@/persistence/drizzle/repository/pay-kyc.repository.ts";
-import { payEscrow, PayEscrowStatus } from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
-import { payTransaction, PayTransactionType, PayTransactionStatus } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
+import {
+  payEscrow,
+  PayEscrowStatus,
+} from "@/persistence/drizzle/entity/pay-escrow.entity.ts";
+import {
+  payTransaction,
+  PayTransactionStatus,
+  PayTransactionType,
+} from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 import { payCustodialAccount } from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { LOG } from "@/config/logger.ts";
@@ -43,7 +50,9 @@ export async function createEscrow(opts: {
     senderAddress: opts.senderAddress,
     amount: opts.amount,
     status: PayEscrowStatus.HELD,
-    utxoPublicKeys: opts.utxoPublicKeys ? JSON.stringify(opts.utxoPublicKeys) : null,
+    utxoPublicKeys: opts.utxoPublicKeys
+      ? JSON.stringify(opts.utxoPublicKeys)
+      : null,
     bundleId: opts.bundleId ?? null,
     mode: opts.mode,
     createdAt: new Date(),
@@ -89,7 +98,7 @@ export async function claimEscrowForAddress(address: string): Promise<{
           eq(payEscrow.heldForAddress, address),
           eq(payEscrow.status, PayEscrowStatus.HELD),
           isNull(payEscrow.deletedAt),
-        )
+        ),
       )
       .for("update");
 

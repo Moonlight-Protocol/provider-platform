@@ -27,14 +27,22 @@ export async function hashPassword(password: string): Promise<string> {
     ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: salt.buffer as ArrayBuffer, iterations: 100000, hash: "SHA-256" },
+    {
+      name: "PBKDF2",
+      salt: salt.buffer as ArrayBuffer,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
     key,
     256,
   );
   return `${bytesToHex(salt)}:${bytesToHex(new Uint8Array(derived))}`;
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+export async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
   const [salt, stored] = hash.split(":");
   if (!salt || !stored) return false;
 
@@ -46,7 +54,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: hexToBytes(salt).buffer as ArrayBuffer, iterations: 100000, hash: "SHA-256" },
+    {
+      name: "PBKDF2",
+      salt: hexToBytes(salt).buffer as ArrayBuffer,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
     key,
     256,
   );
@@ -76,8 +89,12 @@ async function timingSafeEqual(a: Uint8Array, b: Uint8Array): Promise<boolean> {
     false,
     ["sign"],
   );
-  const sigA = new Uint8Array(await crypto.subtle.sign("HMAC", key, a.buffer as ArrayBuffer));
-  const sigB = new Uint8Array(await crypto.subtle.sign("HMAC", key, b.buffer as ArrayBuffer));
+  const sigA = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, a.buffer as ArrayBuffer),
+  );
+  const sigB = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, b.buffer as ArrayBuffer),
+  );
   let result = 0;
   for (let i = 0; i < sigA.length; i++) {
     result |= sigA[i] ^ sigB[i];

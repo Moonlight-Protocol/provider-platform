@@ -25,7 +25,7 @@ jobs:
 
       - name: Deploy to Fly.io
         run: |
-          if flyctl deploy -a "$APP" --remote-only; then
+          if flyctl deploy --config fly.mainnet.toml --remote-only; then
             echo "Deploy succeeded"
           else
             echo "Deploy failed — cleaning up unreachable machines..."
@@ -37,7 +37,7 @@ jobs:
             done
 
             echo "Retrying deploy..."
-            flyctl deploy -a "$APP" --remote-only
+            flyctl deploy --config fly.mainnet.toml --remote-only
           fi
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

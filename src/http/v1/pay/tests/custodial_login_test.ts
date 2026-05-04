@@ -5,13 +5,13 @@
  * The generate-jwt module is mocked via deno.json import map.
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_login_test.ts
  */
-import { assertEquals, assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { postCustodialLoginHandler } from "@/http/v1/pay/custodial/login.ts";
 import {
   createTestAccount,
-  resetDb,
   ensureInitialized,
   PayCustodialStatus,
+  resetDb,
 } from "./test_helpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -34,10 +34,18 @@ function createMockContext(
       body: { json: () => Promise.resolve(body) },
     },
     response: {
-      get status() { return responseStatus; },
-      set status(s: number) { responseStatus = s; },
-      get body() { return responseBody; },
-      set body(b: unknown) { responseBody = b; },
+      get status() {
+        return responseStatus;
+      },
+      set status(s: number) {
+        responseStatus = s;
+      },
+      get body() {
+        return responseBody;
+      },
+      set body(b: unknown) {
+        responseBody = b;
+      },
     },
     state: {},
   };
@@ -68,12 +76,19 @@ Deno.test("custodial login - valid login returns 200 and token", async () => {
   await postCustodialLoginHandler(ctx);
   const res = getResponse();
 
-  assertEquals(res.status, 200, `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`);
+  assertEquals(
+    res.status,
+    200,
+    `Expected 200 but got ${res.status}: ${JSON.stringify(res.body)}`,
+  );
   assertEquals((res.body as { message: string }).message, "Login successful");
 
   const data = (res.body as { data: { token: string } }).data;
   assert(data.token.length > 0, "Token should be non-empty");
-  assert(data.token.startsWith("mock-jwt-custodial-"), "Token should come from mock JWT generator");
+  assert(
+    data.token.startsWith("mock-jwt-custodial-"),
+    "Token should come from mock JWT generator",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -95,7 +110,10 @@ Deno.test("custodial login - wrong password returns 401", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 401);
-  assertEquals((res.body as { message: string }).message, "Invalid credentials");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Invalid credentials",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -147,7 +165,10 @@ Deno.test("custodial login - suspended account returns 401 (same as invalid cred
   // Suspended accounts get the same response as invalid credentials
   // to avoid confirming the password is correct
   assertEquals(res.status, 401);
-  assertEquals((res.body as { message: string }).message, "Invalid credentials");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "Invalid credentials",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -166,7 +187,10 @@ Deno.test("custodial login - missing username returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });
 
 Deno.test("custodial login - missing password returns 400", async () => {
@@ -181,7 +205,10 @@ Deno.test("custodial login - missing password returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });
 
 Deno.test("custodial login - empty body returns 400", async () => {
@@ -194,5 +221,8 @@ Deno.test("custodial login - empty body returns 400", async () => {
   const res = getResponse();
 
   assertEquals(res.status, 400);
-  assertEquals((res.body as { message: string }).message, "username and password are required");
+  assertEquals(
+    (res.body as { message: string }).message,
+    "username and password are required",
+  );
 });

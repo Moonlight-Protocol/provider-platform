@@ -3,7 +3,7 @@ import { LOG } from "@/config/logger.ts";
 
 export async function appendRequestIdMiddleware(
   ctx: Context,
-  next: () => Promise<unknown>
+  next: () => Promise<unknown>,
 ) {
   const requestId = crypto.randomUUID();
   ctx.state.requestId = requestId;

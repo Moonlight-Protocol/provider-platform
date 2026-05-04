@@ -24,11 +24,13 @@ export class INVALID_SESSION extends PlatformError<{ sessionId: string }> {
       source,
       code: BUNDLE_ERROR_CODES.INVALID_SESSION,
       message: "Invalid session",
-      details: `The session with ID '${sessionId}' was not found or is invalid.`,
+      details:
+        `The session with ID '${sessionId}' was not found or is invalid.`,
       api: {
         status: 401,
         message: "Invalid session",
-        details: "The provided session is invalid or has expired. Please authenticate again.",
+        details:
+          "The provided session is invalid or has expired. Please authenticate again.",
       },
       meta: {
         sessionId,
@@ -60,17 +62,20 @@ export class BUNDLE_NOT_FOUND extends PlatformError<{ bundleId: string }> {
 /**
  * Error thrown when the authenticated user does not own the requested bundle
  */
-export class BUNDLE_ACCESS_FORBIDDEN extends PlatformError<{ bundleId: string; accountId: string }> {
+export class BUNDLE_ACCESS_FORBIDDEN
+  extends PlatformError<{ bundleId: string; accountId: string }> {
   constructor(bundleId: string, accountId: string) {
     super({
       source,
       code: BUNDLE_ERROR_CODES.BUNDLE_ACCESS_FORBIDDEN,
       message: "Bundle access forbidden",
-      details: `The account '${accountId}' is not allowed to access bundle '${bundleId}'.`,
+      details:
+        `The account '${accountId}' is not allowed to access bundle '${bundleId}'.`,
       api: {
         status: 403,
         message: "Bundle access forbidden",
-        details: "You are not allowed to access this bundle. Only the creator can retrieve it.",
+        details:
+          "You are not allowed to access this bundle. Only the creator can retrieve it.",
       },
       meta: { bundleId, accountId },
     });
@@ -86,11 +91,13 @@ export class BUNDLE_ALREADY_EXISTS extends PlatformError<{ bundleId: string }> {
       source,
       code: BUNDLE_ERROR_CODES.BUNDLE_ALREADY_EXISTS,
       message: "Bundle already exists",
-      details: `A bundle with ID '${bundleId}' already exists in PENDING or COMPLETED status.`,
+      details:
+        `A bundle with ID '${bundleId}' already exists in PENDING or COMPLETED status.`,
       api: {
         status: 409,
         message: "Bundle already exists",
-        details: `An operations bundle with the same ID is already being processed or has already been completed. Please wait for it to complete or use a different set of operations.`,
+        details:
+          `An operations bundle with the same ID is already being processed or has already been completed. Please wait for it to complete or use a different set of operations.`,
       },
       meta: {
         bundleId,
@@ -112,7 +119,8 @@ export class NO_OPERATIONS_PROVIDED extends PlatformError {
       api: {
         status: 400,
         message: "No operations provided",
-        details: "The request must include at least one operation in the operations bundle.",
+        details:
+          "The request must include at least one operation in the operations bundle.",
       },
     });
   }
@@ -121,7 +129,8 @@ export class NO_OPERATIONS_PROVIDED extends PlatformError {
 /**
  * Error thrown when a spend operation is not signed by the UTXO owner
  */
-export class SPEND_OPERATION_NOT_SIGNED extends PlatformError<{ operationIndex?: number }> {
+export class SPEND_OPERATION_NOT_SIGNED
+  extends PlatformError<{ operationIndex?: number }> {
   constructor(operationIndex?: number) {
     super({
       source,
@@ -131,7 +140,8 @@ export class SPEND_OPERATION_NOT_SIGNED extends PlatformError<{ operationIndex?:
       api: {
         status: 400,
         message: "Spend operation not signed",
-        details: "All spend operations must be signed by the UTXO owner. Please ensure the operation includes the required signature.",
+        details:
+          "All spend operations must be signed by the UTXO owner. Please ensure the operation includes the required signature.",
       },
       meta: operationIndex !== undefined ? { operationIndex } : undefined,
     });
@@ -151,7 +161,8 @@ export class UTXO_NOT_FOUND extends PlatformError<{ utxoId: string }> {
       api: {
         status: 404,
         message: "UTXO not found",
-        details: `The UTXO referenced in the spend operation does not exist or has already been spent. UTXO ID: ${utxoId}`,
+        details:
+          `The UTXO referenced in the spend operation does not exist or has already been spent. UTXO ID: ${utxoId}`,
       },
       meta: {
         utxoId,
@@ -163,17 +174,21 @@ export class UTXO_NOT_FOUND extends PlatformError<{ utxoId: string }> {
 /**
  * Error thrown when there are not enough UTXOs available for the operation
  */
-export class INSUFFICIENT_UTXOS extends PlatformError<{ required: number; available?: number }> {
+export class INSUFFICIENT_UTXOS
+  extends PlatformError<{ required: number; available?: number }> {
   constructor(required: number, available?: number) {
     super({
       source,
       code: BUNDLE_ERROR_CODES.INSUFFICIENT_UTXOS,
       message: "Insufficient UTXOs",
-      details: `Not enough free UTXOs available. Required: ${required}${available !== undefined ? `, Available: ${available}` : ""}.`,
+      details: `Not enough free UTXOs available. Required: ${required}${
+        available !== undefined ? `, Available: ${available}` : ""
+      }.`,
       api: {
         status: 400,
         message: "Insufficient UTXOs",
-        details: "The system does not have enough available UTXOs to process this bundle. Please try again later.",
+        details:
+          "The system does not have enough available UTXOs to process this bundle. Please try again later.",
       },
       meta: {
         required,
@@ -186,17 +201,20 @@ export class INSUFFICIENT_UTXOS extends PlatformError<{ required: number; availa
 /**
  * Error thrown when a bundle exceeds the maximum allowed number of operations
  */
-export class TOO_MANY_OPERATIONS extends PlatformError<{ received: number; max: number }> {
+export class TOO_MANY_OPERATIONS
+  extends PlatformError<{ received: number; max: number }> {
   constructor(received: number, max: number) {
     super({
       source,
       code: BUNDLE_ERROR_CODES.TOO_MANY_OPERATIONS,
       message: "Too many operations",
-      details: `The bundle contains ${received} operations, but the maximum allowed is ${max}.`,
+      details:
+        `The bundle contains ${received} operations, but the maximum allowed is ${max}.`,
       api: {
         status: 400,
         message: "Too many operations",
-        details: `A bundle can contain at most ${max} operations, but ${received} were provided.`,
+        details:
+          `A bundle can contain at most ${max} operations, but ${received} were provided.`,
       },
       meta: { received, max },
     });

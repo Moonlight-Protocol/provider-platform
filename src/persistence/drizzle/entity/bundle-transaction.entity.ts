@@ -1,4 +1,4 @@
-import { pgTable, text, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, primaryKey, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
@@ -16,7 +16,7 @@ export const bundleTransaction = pgTable(
     ...createBaseColumns(),
   },
   (table) => [
-    primaryKey({ columns: [table.bundleId, table.transactionId] })
+    primaryKey({ columns: [table.bundleId, table.transactionId] }),
   ],
 );
 
@@ -32,9 +32,8 @@ export const bundleTransactionRelations = relations(
       fields: [bundleTransaction.transactionId],
       references: [transaction.id],
     }),
-  })
+  }),
 );
 
 export type BundleTransaction = typeof bundleTransaction.$inferSelect;
 export type NewBundleTransaction = typeof bundleTransaction.$inferInsert;
-

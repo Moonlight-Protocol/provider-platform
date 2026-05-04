@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 
 /**
  * Tests for discoverCouncilHandler input validation.
@@ -51,21 +51,30 @@ if (discoverCouncilHandler) {
     const ctx = createMockContext({ councilUrl: "ftp://evil.com" });
     await handler(ctx);
     assertEquals(ctx.response.status, 400);
-    assertEquals(ctx.response.body.message, "councilUrl must be a valid HTTP(S) URL");
+    assertEquals(
+      ctx.response.body.message,
+      "councilUrl must be a valid HTTP(S) URL",
+    );
   });
 
   Deno.test("council discover: rejects invalid URL", async () => {
     const ctx = createMockContext({ councilUrl: "not-a-url" });
     await handler(ctx);
     assertEquals(ctx.response.status, 400);
-    assertEquals(ctx.response.body.message, "councilUrl must be a valid HTTP(S) URL");
+    assertEquals(
+      ctx.response.body.message,
+      "councilUrl must be a valid HTTP(S) URL",
+    );
   });
 
   Deno.test("council discover: rejects file:// protocol", async () => {
     const ctx = createMockContext({ councilUrl: "file:///etc/passwd" });
     await handler(ctx);
     assertEquals(ctx.response.status, 400);
-    assertEquals(ctx.response.body.message, "councilUrl must be a valid HTTP(S) URL");
+    assertEquals(
+      ctx.response.body.message,
+      "councilUrl must be a valid HTTP(S) URL",
+    );
   });
 
   Deno.test("council discover: rejects empty string", async () => {

@@ -4,9 +4,9 @@ import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.ent
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/index.ts";
 import {
-  MEMPOOL_SLOT_CAPACITY,
-  MEMPOOL_EXPENSIVE_OP_WEIGHT,
   MEMPOOL_CHEAP_OP_WEIGHT,
+  MEMPOOL_EXPENSIVE_OP_WEIGHT,
+  MEMPOOL_SLOT_CAPACITY,
   MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS,
 } from "@/config/env.ts";
 import {
@@ -14,13 +14,16 @@ import {
   calculatePriorityScore,
   classifyOperations,
 } from "@/core/service/bundle/bundle.service.ts";
-import type { SlotBundle, WeightConfig } from "@/core/service/bundle/bundle.types.ts";
+import type {
+  SlotBundle,
+  WeightConfig,
+} from "@/core/service/bundle/bundle.types.ts";
 import type { OperationTypes } from "@moonlight/moonlight-sdk";
 import {
   canBundleFitInSlot,
   compareBundlePriority,
-  isBundleExpired,
   findLowestPriorityBundle,
+  isBundleExpired,
 } from "@/core/service/mempool/mempool.service.ts";
 import type { MempoolStats } from "@/core/service/mempool/mempool.types.ts";
 import * as E from "@/core/service/mempool/mempool.errors.ts";
@@ -34,30 +37,47 @@ const MEMPOOL_CONFIG = {
   } as WeightConfig,
 } as const;
 
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 
 /**
  * Parses MLXDR operations from a bundle entity
  */
 async function parseOperationsFromBundle(
-  operationsMLXDR: string[]
-): Promise<Array<OperationTypes.CreateOperation | OperationTypes.SpendOperation | OperationTypes.DepositOperation | OperationTypes.WithdrawOperation>> {
+  operationsMLXDR: string[],
+): Promise<
+  Array<
+    | OperationTypes.CreateOperation
+    | OperationTypes.SpendOperation
+    | OperationTypes.DepositOperation
+    | OperationTypes.WithdrawOperation
+  >
+> {
   const { MoonlightOperation } = await import("@moonlight/moonlight-sdk");
   const operations = await Promise.all(
-    operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr))
+    operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr)),
   );
-  return operations as Array<OperationTypes.CreateOperation | OperationTypes.SpendOperation | OperationTypes.DepositOperation | OperationTypes.WithdrawOperation>;
+  return operations as Array<
+    | OperationTypes.CreateOperation
+    | OperationTypes.SpendOperation
+    | OperationTypes.DepositOperation
+    | OperationTypes.WithdrawOperation
+  >;
 }
 
 /**
  * Creates a SlotBundle from an OperationsBundle entity
  */
 export async function createSlotBundleFromEntity(
-  bundle: OperationsBundle
+  bundle: OperationsBundle,
 ): Promise<SlotBundle> {
   const operations = await parseOperationsFromBundle(bundle.operationsMLXDR);
   const classified = classifyOperations(operations);
-  const weight = calculateBundleWeight(classified, MEMPOOL_CONFIG.WEIGHT_CONFIG);
+  const weight = calculateBundleWeight(
+    classified,
+    MEMPOOL_CONFIG.WEIGHT_CONFIG,
+  );
   const priorityScore = calculatePriorityScore({
     fee: bundle.fee,
     ttl: bundle.ttl,
@@ -85,11 +105,12 @@ export async function createSlotBundleFromEntity(
 async function loadPendingBundlesFromDB(): Promise<SlotBundle[]> {
   const bundles = await operationsBundleRepository.findPendingOrProcessing();
   const slotBundles = await Promise.all(
-    bundles.map((bundle: OperationsBundle) => createSlotBundleFromEntity(bundle))
+    bundles.map((bundle: OperationsBundle) =>
+      createSlotBundleFromEntity(bundle)
+    ),
   );
   return slotBundles;
 }
-
 
 /**
  * Slot class for managing bundles within a capacity limit
@@ -211,7 +232,6 @@ export class Slot {
   }
 }
 
-
 /**
  * Mempool service for managing transaction queue with slots
  */
@@ -241,7 +261,9 @@ export class Mempool {
         ], STARTUP_EXPIRY_BATCH_LIMIT);
         totalExpired += batch.length;
       } while (batch.length >= STARTUP_EXPIRY_BATCH_LIMIT);
-      LOG.info(`Startup expiry: marked ${totalExpired} stale bundle(s) as EXPIRED (older than ${MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS}ms)`);
+      LOG.info(
+        `Startup expiry: marked ${totalExpired} stale bundle(s) as EXPIRED (older than ${MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS}ms)`,
+      );
     } else {
       LOG.info("Startup expiry disabled (MEMPOOL_STARTUP_MAX_BUNDLE_AGE_MS=0)");
     }
@@ -253,21 +275,25 @@ export class Mempool {
       await this.addBundle(bundle);
     }
 
-    LOG.info(`Mempool initialized with ${this.slots.length} slots and ${this.getTotalBundles()} bundles`);
+    LOG.info(
+      `Mempool initialized with ${this.slots.length} slots and ${this.getTotalBundles()} bundles`,
+    );
   }
 
   /**
    * Adds a bundle to the mempool
    * Tries to fit in existing slots, creates new slot if necessary
    */
-  async addBundle(bundleData: SlotBundle): Promise<void> {
+  addBundle(bundleData: SlotBundle): Promise<void> {
     return withSpan("Mempool.addBundle", async (span) => {
       span.setAttribute("bundle.id", bundleData.bundleId);
       span.setAttribute("bundle.weight", bundleData.weight);
 
       if (isBundleExpired(bundleData)) {
         span.addEvent("bundle_expired");
-        LOG.warn(`Bundle ${bundleData.bundleId} is expired, marking as EXPIRED`);
+        LOG.warn(
+          `Bundle ${bundleData.bundleId} is expired, marking as EXPIRED`,
+        );
         await operationsBundleRepository.update(bundleData.bundleId, {
           status: BundleStatus.EXPIRED,
           updatedAt: new Date(),
@@ -301,8 +327,13 @@ export class Mempool {
           span.addEvent("added_to_new_slot");
           LOG.debug(`Bundle ${bundleData.bundleId} added to new slot`);
         } else {
-          span.addEvent("slot_full", { "bundle.weight": bundleData.weight, "slot.capacity": this.capacity });
-          LOG.error(`Bundle ${bundleData.bundleId} cannot fit in any slot, weight: ${bundleData.weight}, capacity: ${this.capacity}`);
+          span.addEvent("slot_full", {
+            "bundle.weight": bundleData.weight,
+            "slot.capacity": this.capacity,
+          });
+          LOG.error(
+            `Bundle ${bundleData.bundleId} cannot fit in any slot, weight: ${bundleData.weight}, capacity: ${this.capacity}`,
+          );
           throw new E.SLOT_FULL(bundleData.weight, this.capacity);
         }
       }
@@ -317,13 +348,18 @@ export class Mempool {
         if (updated) return;
 
         span.addEvent("bundle_status_not_active");
-        LOG.warn(`Bundle ${bundleData.bundleId} was concurrently moved to a terminal status, removing from mempool`);
+        LOG.warn(
+          `Bundle ${bundleData.bundleId} was concurrently moved to a terminal status, removing from mempool`,
+        );
         this.purgeBundles([bundleData.bundleId]);
       } catch (error) {
         span.addEvent("bundle_status_update_failed");
-        LOG.error(`Failed to mark bundle ${bundleData.bundleId} as PROCESSING; removing from mempool`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOG.error(
+          `Failed to mark bundle ${bundleData.bundleId} as PROCESSING; removing from mempool`,
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
         this.purgeBundles([bundleData.bundleId]);
         throw error;
       }
@@ -350,13 +386,15 @@ export class Mempool {
   /**
    * Re-adds bundles to the mempool after execution failure
    * Used to restore bundles that failed during execution
-   * 
+   *
    * @param bundles - Array of bundles to re-add
    */
-  async reAddBundles(bundles: SlotBundle[]): Promise<void> {
+  reAddBundles(bundles: SlotBundle[]): Promise<void> {
     return withSpan("Mempool.reAddBundles", async (span) => {
       span.addEvent("re_adding_bundles", { "bundles.count": bundles.length });
-      LOG.debug(`Re-adding ${bundles.length} bundles to mempool after execution failure`);
+      LOG.debug(
+        `Re-adding ${bundles.length} bundles to mempool after execution failure`,
+      );
 
       let succeeded = 0;
       let failed = 0;
@@ -373,14 +411,17 @@ export class Mempool {
           });
         }
       }
-      span.addEvent("re_add_complete", { "succeeded": succeeded, "failed": failed });
+      span.addEvent("re_add_complete", {
+        "succeeded": succeeded,
+        "failed": failed,
+      });
     });
   }
 
   /**
    * Expires bundles that have passed their TTL
    */
-  async expireBundles(): Promise<void> {
+  expireBundles(): Promise<void> {
     return withSpan("Mempool.expireBundles", async (span) => {
       const expiredBundleIds: string[] = [];
 
@@ -401,7 +442,9 @@ export class Mempool {
       }
 
       if (expiredBundleIds.length > 0) {
-        span.addEvent("expiring_bundles", { "expired.count": expiredBundleIds.length });
+        span.addEvent("expiring_bundles", {
+          "expired.count": expiredBundleIds.length,
+        });
       }
 
       for (const bundleId of expiredBundleIds) {
@@ -457,7 +500,10 @@ export class Mempool {
    */
   getStats(): MempoolStats {
     const totalBundles = this.getTotalBundles();
-    const totalWeight = this.slots.reduce((sum, slot) => sum + slot.getTotalWeight(), 0);
+    const totalWeight = this.slots.reduce(
+      (sum, slot) => sum + slot.getTotalWeight(),
+      0,
+    );
     const totalSlots = this.slots.length;
 
     return {
@@ -475,4 +521,3 @@ export class Mempool {
     return this.slots.reduce((sum, slot) => sum + slot.getBundleCount(), 0);
   }
 }
-

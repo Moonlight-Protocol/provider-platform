@@ -4,11 +4,11 @@ import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.
 import { UserRepository } from "@/persistence/drizzle/repository/user.repository.ts";
 import { AccountRepository } from "@/persistence/drizzle/repository/account.repository.ts";
 import {
-  UserStatus,
   ChallengeStatus,
+  type NewAccount,
   type NewChallenge,
   type NewUser,
-  type NewAccount,
+  UserStatus,
 } from "@/persistence/drizzle/entity/index.ts";
 import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
@@ -20,13 +20,15 @@ const userRepository = new UserRepository(drizzleClient);
 const accountRepository = new AccountRepository(drizzleClient);
 
 export const P_CreateChallengeDB = ProcessEngine.create(
-  async (input: ChallengeData) => {
+  (input: ChallengeData) => {
     return withSpan("P_CreateChallengeDB", async (span) => {
       const { challengeData } = input;
       try {
-        span.addEvent("looking_up_account", { "client.account": challengeData.clientAccount });
+        span.addEvent("looking_up_account", {
+          "client.account": challengeData.clientAccount,
+        });
         let account = await accountRepository.findById(
-          challengeData.clientAccount
+          challengeData.clientAccount,
         );
 
         let user: NewUser | undefined;
@@ -46,7 +48,9 @@ export const P_CreateChallengeDB = ProcessEngine.create(
           span.addEvent("account_exists");
         }
 
-        span.addEvent("persisting_challenge", { "challenge.txHash": challengeData.txHash });
+        span.addEvent("persisting_challenge", {
+          "challenge.txHash": challengeData.txHash,
+        });
         await challengeRepository.create({
           id: crypto.randomUUID(),
           accountId: account.id,
@@ -59,7 +63,9 @@ export const P_CreateChallengeDB = ProcessEngine.create(
         return await input;
       } catch (error) {
         span.addEvent("db_store_failed", {
-          "error.message": error instanceof Error ? error.message : String(error),
+          "error.message": error instanceof Error
+            ? error.message
+            : String(error),
         });
         logAndThrow(new E.FAILED_TO_STORE_CHALLENGE_IN_DATABASE(error));
       }
@@ -67,5 +73,5 @@ export const P_CreateChallengeDB = ProcessEngine.create(
   },
   {
     name: "CreateChallengeDB",
-  }
+  },
 );

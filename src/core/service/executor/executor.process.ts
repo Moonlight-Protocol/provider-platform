@@ -2,23 +2,33 @@ import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { MEMPOOL_EXECUTOR_INTERVAL_MS, MEMPOOL_MAX_RETRY_ATTEMPTS, NETWORK_RPC_SERVER, TRANSACTION_EXPIRATION_OFFSET } from "@/config/env.ts";
+import {
+  MEMPOOL_EXECUTOR_INTERVAL_MS,
+  MEMPOOL_MAX_RETRY_ATTEMPTS,
+  NETWORK_RPC_SERVER,
+  TRANSACTION_EXPIRATION_OFFSET,
+} from "@/config/env.ts";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
 import type { SIM_ERRORS } from "@colibri/core";
 import { buildTransactionFromSlot } from "@/core/service/executor/executor.service.ts";
 import type { MoonlightTransactionBuilder } from "@moonlight/moonlight-sdk";
 import {
+  BundleTransactionRepository,
   OperationsBundleRepository,
   TransactionRepository,
-  BundleTransactionRepository,
 } from "@/persistence/drizzle/repository/index.ts";
 import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
 import { withSpan } from "@/core/tracing.ts";
 import {
-  handleExecutionFailure as _handleExecutionFailure,
   buildRetryBundles,
+  handleExecutionFailure as _handleExecutionFailure,
 } from "@/core/service/executor/executor-failure.helpers.ts";
+import {
+  extractNetworkErrorContext,
+  type NetworkErrorContext,
+  recordNetworkErrorOnSpan,
+} from "@/core/service/executor/error-extraction.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -31,7 +41,9 @@ const EXECUTOR_CONFIG = {
   MAX_RETRY_ATTEMPTS: MEMPOOL_MAX_RETRY_ATTEMPTS,
 } as const;
 
-const operationsBundleRepository = new OperationsBundleRepository(drizzleClient);
+const operationsBundleRepository = new OperationsBundleRepository(
+  drizzleClient,
+);
 const transactionRepository = new TransactionRepository();
 const bundleTransactionRepository = new BundleTransactionRepository();
 
@@ -56,6 +68,7 @@ type SimulationFailureContext = {
 type ExecutionFailureContext = {
   phase: string;
   simulation?: SimulationFailureContext;
+  network?: NetworkErrorContext;
 };
 
 class ExecutionError extends Error {
@@ -78,7 +91,24 @@ function submitTransactionToNetwork(
   channelContractId: string,
 ): Promise<string> {
   return withSpan("Executor.submitTransactionToNetwork", async (span) => {
-    const { signer, channelClient, txConfig } = await resolveChannelContext(channelContractId);
+    const { signer, channelClient, txConfig } = await resolveChannelContext(
+      channelContractId,
+    );
+
+    span.setAttribute("tx.source", txConfig.source);
+    try {
+      const acct = await NETWORK_RPC_SERVER.getAccount(txConfig.source);
+      const preSeq = acct.sequenceNumber();
+      span.setAttribute("tx.pre_build_account_seq", preSeq);
+      span.addEvent("pre_build_account_seq", {
+        "tx.source": txConfig.source,
+        seq: preSeq,
+      });
+    } catch (e) {
+      span.addEvent("pre_build_seq_lookup_failed", {
+        "error.message": e instanceof Error ? e.message : String(e),
+      });
+    }
 
     span.addEvent("signing_with_provider");
     await txBuilder.signWithProvider(signer, expiration);
@@ -95,21 +125,63 @@ function submitTransactionToNetwork(
         },
         config: txConfig,
       });
-      
+
       span.addEvent("transaction_submitted", { "tx.hash": hash.toString() });
+      try {
+        const acctAfter = await NETWORK_RPC_SERVER.getAccount(txConfig.source);
+        span.setAttribute(
+          "tx.post_submit_account_seq",
+          acctAfter.sequenceNumber(),
+        );
+      } catch (e) {
+        span.addEvent("post_submit_seq_lookup_failed", {
+          "error.message": e instanceof Error ? e.message : String(e),
+        });
+      }
       return hash.toString();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error
+        ? error.message
+        : String(error);
       LOG.error("Transaction submission failed", { error: errorMessage });
       span.addEvent("submission_failed", { "error.message": errorMessage });
-      const baseError = error instanceof Error ? error : new Error(errorMessage);
+      const baseError = error instanceof Error
+        ? error
+        : new Error(errorMessage);
       const failureContext: ExecutionFailureContext = {
         phase: "submitTransactionToNetwork",
       };
 
+      const networkCtx = extractNetworkErrorContext(error);
+      if (networkCtx) {
+        recordNetworkErrorOnSpan(span, networkCtx);
+        failureContext.network = networkCtx;
+        try {
+          const acctAfter = await NETWORK_RPC_SERVER.getAccount(
+            txConfig.source,
+          );
+          const postFailSeq = acctAfter.sequenceNumber();
+          span.setAttribute("tx.post_fail_account_seq", postFailSeq);
+          failureContext.network.postFailAccountSeq = postFailSeq;
+        } catch (e) {
+          span.addEvent("post_fail_seq_lookup_failed", {
+            "error.message": e instanceof Error ? e.message : String(e),
+          });
+        }
+        LOG.error("Network error details", {
+          code: networkCtx.code,
+          source: networkCtx.source,
+          txHash: networkCtx.txHash,
+          txSeqNum: networkCtx.txSeqNum,
+          errorResult: networkCtx.errorResult,
+          diagnosticEvents: networkCtx.diagnosticEvents,
+        });
+      }
+
       const simError = error as SIM_ERRORS.SIMULATION_FAILED;
       if (simError?.meta?.data) {
-        const simResponse = simError.meta.data.simulationResponse ?? simError.meta.data;
+        const simResponse = simError.meta.data.simulationResponse ??
+          simError.meta.data;
         LOG.error("Simulation details", {
           simError: JSON.stringify(simResponse, null, 2),
         });
@@ -145,14 +217,18 @@ function submitTransactionToNetwork(
 async function createTransactionRecord(
   txHash: string,
   bundleIds: string[],
-  accountId: string = "system"
+  accountId: string = "system",
 ): Promise<void> {
   const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger();
-  
+
   await transactionRepository.create({
     id: txHash,
     status: TransactionStatus.UNVERIFIED,
-    timeout: new Date(Date.now() + EXECUTOR_CONFIG.TRANSACTION_EXPIRATION_OFFSET * STELLAR_LEDGER_CLOSE_TIME_MS),
+    timeout: new Date(
+      Date.now() +
+        EXECUTOR_CONFIG.TRANSACTION_EXPIRATION_OFFSET *
+          STELLAR_LEDGER_CLOSE_TIME_MS,
+    ),
     ledgerSequence: latestLedger.sequence.toString(),
     createdAt: new Date(),
     createdBy: accountId,
@@ -263,12 +339,15 @@ export class Executor {
         // Resolve channel context from the first bundle in the slot
         const slotBundles = slot.getBundles();
         const channelContractId = slotBundles[0]?.channelContractId;
-        if (!channelContractId) throw new Error("Bundle missing channelContractId");
+        if (!channelContractId) {
+          throw new Error("Bundle missing channelContractId");
+        }
 
         const channelCtx = await resolveChannelContext(channelContractId);
 
         // Build transaction from slot using the resolved context
-        const { txBuilder, bundleIds: buildBundleIds } = await buildTransactionFromSlot(slot, channelCtx);
+        const { txBuilder, bundleIds: buildBundleIds } =
+          await buildTransactionFromSlot(slot, channelCtx);
 
         // Use bundleIds from build result to ensure consistency
         bundleIds = buildBundleIds;
@@ -277,29 +356,45 @@ export class Executor {
         const expiration = await getTransactionExpiration();
 
         // Submit transaction to network
-        const transactionHash = await submitTransactionToNetwork(txBuilder, expiration, channelContractId);
+        const transactionHash = await submitTransactionToNetwork(
+          txBuilder,
+          expiration,
+          channelContractId,
+        );
 
-        LOG.info("Transaction submitted successfully", { 
+        LOG.info("Transaction submitted successfully", {
           transactionHash,
           bundleCount: bundleIds.length,
-          bundleIds 
+          bundleIds,
         });
 
         // Create transaction record and link bundles
         await createTransactionRecord(transactionHash, bundleIds);
 
-        LOG.info("Slot executed successfully", { 
+        LOG.info("Slot executed successfully", {
           transactionHash,
-          bundleCount: bundleIds.length 
+          bundleCount: bundleIds.length,
         });
-
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorInstance = error instanceof Error ? error : new Error(errorMessage);
+        const errorMessage = error instanceof Error
+          ? error.message
+          : String(error);
+        const errorInstance = error instanceof Error
+          ? error
+          : new Error(errorMessage);
 
         const failureContext = error instanceof ExecutionError
           ? error.failureContext
           : undefined;
+
+        // Fall back to extracting from the raw error if the inner catch didn't
+        // wrap (e.g. failures outside submitTransactionToNetwork — build,
+        // channel resolve, etc.) so Colibri envelope data is captured everywhere.
+        const networkCtx = failureContext?.network ??
+          extractNetworkErrorContext(error);
+        if (networkCtx) {
+          recordNetworkErrorOnSpan(span, networkCtx);
+        }
 
         const lastFailureReasonPayload = {
           occurredAt: new Date().toISOString(),
@@ -307,24 +402,27 @@ export class Executor {
           error: {
             name: errorInstance.name,
             message: errorInstance.message,
-            stack: errorInstance.stack ? truncate(errorInstance.stack, 4000) : undefined,
+            stack: errorInstance.stack
+              ? truncate(errorInstance.stack, 4000)
+              : undefined,
           },
           slot: slot
             ? {
-                bundleCount: slot.getBundleCount(),
-                totalWeight: slot.getTotalWeight(),
-              }
+              bundleCount: slot.getBundleCount(),
+              totalWeight: slot.getTotalWeight(),
+            }
             : undefined,
           bundleIds,
           simulation: failureContext?.simulation,
+          network: networkCtx,
         };
 
         const lastFailureReason = safeJsonStringify(lastFailureReasonPayload) ??
           truncate(errorMessage, 2000);
 
-        LOG.error("Slot execution failed", { 
+        LOG.error("Slot execution failed", {
           error: errorMessage,
-          bundleIds 
+          bundleIds,
         });
 
         // Handle failure: re-add bundles to mempool (only those still elegible) and update status
@@ -357,6 +455,5 @@ export class Executor {
         this.isProcessing = false;
       }
     });
-
   }
 }

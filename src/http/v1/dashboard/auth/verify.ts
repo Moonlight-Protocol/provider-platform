@@ -32,10 +32,15 @@ export const postVerifyHandler = async (ctx: Context) => {
 
     // providerPublicKey = publicKey skips the Horizon signer check.
     // This is intentional: any wallet can operate the dashboard.
-    const { token } = await verifyDashboardChallenge(nonce, signature, publicKey, {
-      providerPublicKey: publicKey,
-      generateToken: generateJwt,
-    });
+    const { token } = await verifyDashboardChallenge(
+      nonce,
+      signature,
+      publicKey,
+      {
+        providerPublicKey: publicKey,
+        generateToken: generateJwt,
+      },
+    );
 
     // Create user record on first sign-in
     await walletUserRepo.findOrCreate(publicKey);

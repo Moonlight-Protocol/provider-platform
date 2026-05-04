@@ -1,9 +1,9 @@
 import {
   type ConveeError,
+  type MetadataHelper,
+  type Modifier,
   Plugin,
   type Transformer,
-  type Modifier,
-  type MetadataHelper,
 } from "@fifo/convee";
 import type { Context } from "@oak/oak";
 import { LOG } from "@/config/logger.ts";
@@ -14,7 +14,7 @@ import { PIPE_APIError } from "@/http/pipelines/error-pipeline.ts";
 export const PLG_ProcessErrorResponse = () => {
   const processInput: Modifier<Context> = (
     input: Context,
-    metadataHelper?: MetadataHelper
+    metadataHelper?: MetadataHelper,
   ): Context => {
     LOG.trace("Storing input context for error plugin processing");
     if (metadataHelper) metadataHelper.add("input-context", input);
@@ -26,7 +26,7 @@ export const PLG_ProcessErrorResponse = () => {
     ConveeError<Error> | Context
   > = async (
     error: ConveeError<Error>,
-    metadataHelper?: MetadataHelper
+    metadataHelper?: MetadataHelper,
   ): Promise<ConveeError<Error> | Context> => {
     LOG.error("Plugin captured an error: ", error.message);
 

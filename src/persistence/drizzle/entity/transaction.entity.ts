@@ -1,4 +1,4 @@
-import { pgTable, text, pgEnum, timestamp } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
@@ -32,4 +32,3 @@ export const transactionRelations = relations(transaction, ({ many }) => ({
 
 export type Transaction = typeof transaction.$inferSelect;
 export type NewTransaction = typeof transaction.$inferInsert;
-

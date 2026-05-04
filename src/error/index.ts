@@ -35,7 +35,7 @@ export class PlatformError<M = undefined | unknown> extends Error {
   }
 
   static unexpected(
-    args?: Partial<PlatformErrorShape<unknown>>
+    args?: Partial<PlatformErrorShape<unknown>>,
   ): PlatformError<unknown> {
     return new PlatformError<unknown>({
       source: args?.source ?? "@general/unexpected",
@@ -50,7 +50,7 @@ export class PlatformError<M = undefined | unknown> extends Error {
 
   static fromUnknown(
     error: unknown,
-    ctx?: Partial<PlatformErrorShape<unknown>>
+    ctx?: Partial<PlatformErrorShape<unknown>>,
   ): PlatformError<unknown> {
     if (error instanceof PlatformError) return error;
     if (error instanceof Error) {
@@ -87,13 +87,14 @@ export class PlatformError<M = undefined | unknown> extends Error {
   }
 
   getAPIError(): ApiError {
-    if (this.hasAPIError())
+    if (this.hasAPIError()) {
       return {
         code: this.code,
         status: this.api.status,
         message: this.api.message,
         details: this.api.details,
       };
+    }
 
     return {
       code: this.code,

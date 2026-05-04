@@ -20,26 +20,28 @@ export async function traceContextMiddleware(ctx: Context, next: Next) {
   const method = ctx.request.method;
   const path = new URL(ctx.request.url).pathname;
 
-  await context.with(extractedContext, () =>
-    tracer.startActiveSpan(`${method} ${path}`, async (span) => {
-      span.setAttribute("http.request.method", method);
-      span.setAttribute("url.path", path);
-      try {
-        await next();
-        span.setAttribute("http.response.status_code", ctx.response.status);
-      } catch (error) {
-        span.setAttribute("http.response.status_code", 500);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
-        span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
-        );
-        throw error;
-      } finally {
-        span.end();
-      }
-    })
+  await context.with(
+    extractedContext,
+    () =>
+      tracer.startActiveSpan(`${method} ${path}`, async (span) => {
+        span.setAttribute("http.request.method", method);
+        span.setAttribute("url.path", path);
+        try {
+          await next();
+          span.setAttribute("http.response.status_code", ctx.response.status);
+        } catch (error) {
+          span.setAttribute("http.response.status_code", 500);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          span.recordException(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+          throw error;
+        } finally {
+          span.end();
+        }
+      }),
   );
 }

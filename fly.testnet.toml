@@ -1,7 +1,4 @@
-# fly.toml app configuration file generated for moonlight-beta-privacy-provider-a on 2026-01-29T20:55:21Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
+# fly.testnet.toml — provider-platform testnet config
 
 app = 'moonlight-beta-privacy-provider-a'
 primary_region = 'ams'
@@ -31,7 +28,7 @@ primary_region = 'ams'
 
   # OPENTELEMETRY
   OTEL_DENO = 'true'
-  OTEL_SERVICE_NAME = 'provider-platform'
+  OTEL_SERVICE_NAME = 'provider-platform-testnet'
   OTEL_EXPORTER_OTLP_PROTOCOL = 'http/protobuf'
   # OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS set in fly.io secrets
 

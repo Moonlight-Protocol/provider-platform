@@ -1,17 +1,19 @@
 import type { Context } from "@oak/oak";
+import { MODE } from "@/config/env.ts";
 
 export async function appendResponseHeadersMiddleware(
   ctx: Context,
-  next: () => Promise<unknown>
+  next: () => Promise<unknown>,
 ) {
+  const isDev = MODE === "development";
   ctx.response.headers.set("Access-Control-Allow-Origin", "*");
   ctx.response.headers.set(
     "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, OPTIONS"
+    "GET, POST, PUT, DELETE, OPTIONS",
   );
   ctx.response.headers.set(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
+    isDev ? "*" : "Content-Type, Authorization",
   );
 
   if (ctx.request.method === "OPTIONS") {
