@@ -9,6 +9,7 @@ import {
   bundleTransaction,
   operationsBundle,
   transaction,
+  waitlistRequest,
 } from "@/persistence/drizzle/entity/index.ts";
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ export async function resetDb(): Promise<void> {
   await db.delete(bundleTransaction);
   await db.delete(transaction);
   await db.delete(operationsBundle);
+  await db.delete(waitlistRequest);
 }
 
 // ---------------------------------------------------------------------------
