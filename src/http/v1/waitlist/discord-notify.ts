@@ -1,6 +1,8 @@
 /**
  * Fire-and-forget Discord webhook notification for waitlist requests.
- * Silently skips if DISCORD_WEBHOOK_URL is not set.
+ * Logs a warning and skips if DISCORD_WEBHOOK_URL is not set — the
+ * disappearance of that warning is the operational signal that the
+ * dormant path flipped to live once the secret is provided.
  */
 export function notifyDiscord(
   email: string,
@@ -8,7 +10,12 @@ export function notifyDiscord(
   source: string,
 ): void {
   const webhookUrl = Deno.env.get("DISCORD_WEBHOOK_URL");
-  if (!webhookUrl) return;
+  if (!webhookUrl) {
+    console.warn(
+      "[waitlist] DISCORD_WEBHOOK_URL unset — skipping Discord notification",
+    );
+    return;
+  }
 
   // Fire-and-forget — do not await
   fetch(webhookUrl, {
