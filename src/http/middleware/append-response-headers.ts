@@ -13,7 +13,7 @@ export async function appendResponseHeadersMiddleware(
   );
   ctx.response.headers.set(
     "Access-Control-Allow-Headers",
-    isDev ? "*" : "Content-Type, Authorization",
+    isDev ? "*" : "Content-Type, Authorization, Traceparent, Tracestate",
   );
 
   if (ctx.request.method === "OPTIONS") {
