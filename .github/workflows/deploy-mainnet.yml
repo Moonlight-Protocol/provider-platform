@@ -74,3 +74,9 @@ jobs:
           flyctl machines list -a "$APP"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Capture Fly app logs on failure
+        if: failure()
+        run: flyctl logs -a "$APP" --no-tail
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
