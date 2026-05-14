@@ -19,6 +19,17 @@ import { withSpan } from "@/core/tracing.ts";
 import {
   handleVerificationFailure as _handleVerificationFailure,
 } from "@/core/service/verifier/verifier-failure.helpers.ts";
+import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+
+async function findFirstBundleChannel(
+  bundleIds: string[],
+): Promise<string | null> {
+  for (const bundleId of bundleIds) {
+    const bundle = await operationsBundleRepository.findById(bundleId);
+    if (bundle?.channelContractId) return bundle.channelContractId;
+  }
+  return null;
+}
 
 const VERIFIER_CONFIG = {
   INTERVAL_MS: MEMPOOL_VERIFIER_INTERVAL_MS,
@@ -76,6 +87,8 @@ async function handleVerificationSuccess(
     bundleCount: bundleIds.length,
   });
 
+  const channelContractId = await findFirstBundleChannel(bundleIds);
+
   // Update transaction status to VERIFIED
   await updateTransactionStatus(txId, TransactionStatus.VERIFIED);
 
@@ -88,6 +101,15 @@ async function handleVerificationSuccess(
     } catch (error) {
       LOG.error(`Failed to update bundle ${bundleId} status`, { error });
     }
+  }
+
+  if (channelContractId) {
+    await emitForChannel(channelContractId, (scope) => ({
+      kind: "verifier.bundle_completed",
+      ts: Date.now(),
+      scope,
+      payload: { txId, bundleIds, channelContractId },
+    }));
   }
 }
 
@@ -205,7 +227,21 @@ export class Verifier {
         if (result.status === "VERIFIED") {
           await handleVerificationSuccess(txId, bundleIds);
         } else if (result.status === "FAILED") {
+          const channelContractId = await findFirstBundleChannel(bundleIds);
           await handleVerificationFailure(txId, result.reason, bundleIds);
+          if (channelContractId) {
+            await emitForChannel(channelContractId, (scope) => ({
+              kind: "verifier.bundle_failed",
+              ts: Date.now(),
+              scope,
+              payload: {
+                txId,
+                bundleIds,
+                channelContractId,
+                reason: result.reason,
+              },
+            }));
+          }
         } else {
           LOG.debug(`Transaction ${txId} still pending verification`);
         }

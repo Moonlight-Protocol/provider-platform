@@ -29,6 +29,7 @@ import {
   type NetworkErrorContext,
   recordNetworkErrorOnSpan,
 } from "@/core/service/executor/error-extraction.ts";
+import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -375,6 +376,17 @@ export class Executor {
           transactionHash,
           bundleCount: bundleIds.length,
         });
+
+        await emitForChannel(channelContractId, (scope) => ({
+          kind: "executor.transaction_submitted",
+          ts: Date.now(),
+          scope,
+          payload: {
+            txHash: transactionHash,
+            bundleIds,
+            channelContractId,
+          },
+        }));
       } catch (error) {
         const errorMessage = error instanceof Error
           ? error.message
@@ -424,6 +436,21 @@ export class Executor {
           error: errorMessage,
           bundleIds,
         });
+
+        const failedChannelContractId = slot?.getBundles()[0]
+          ?.channelContractId ?? null;
+        if (failedChannelContractId) {
+          await emitForChannel(failedChannelContractId, (scope) => ({
+            kind: "executor.execution_failed",
+            ts: Date.now(),
+            scope,
+            payload: {
+              bundleIds,
+              channelContractId: failedChannelContractId,
+              reason: errorMessage,
+            },
+          }));
+        }
 
         // Handle failure: re-add bundles to mempool (only those still elegible) and update status
         if (slot && !slot.isEmpty() && bundleIds.length > 0) {

@@ -7,6 +7,7 @@ import payRouter from "@/http/v1/pay/routes.ts";
 import healthRouter from "@/http/v1/health/routes.ts";
 import waitlistRouter from "@/http/v1/waitlist/routes.ts";
 import councilRouter from "@/http/v1/council/routes.ts";
+import eventsRouter from "@/http/v1/events/routes.ts";
 
 const apiRouter = new Router();
 
@@ -33,5 +34,6 @@ apiRouter.use(
   waitlistRouter.routes(),
   waitlistRouter.allowedMethods(),
 );
+apiRouter.use("/api/v1", eventsRouter.routes(), eventsRouter.allowedMethods());
 
 export default apiRouter;

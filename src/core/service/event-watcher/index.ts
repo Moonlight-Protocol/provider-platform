@@ -7,6 +7,7 @@ import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts"
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
 import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { LOG } from "@/config/logger.ts";
+import { emitForPp } from "@/core/service/events/emit-helpers.ts";
 
 // Wire env CHALLENGE_TTL (seconds) to dashboard auth (ms)
 setChallengeTtlMs(CHALLENGE_TTL * 1000);
@@ -80,6 +81,12 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
         registeredProviders.has(event.address)
       ) {
         await activateMembership(event.address, channelAuthId);
+        await emitForPp(event.address, (scope) => ({
+          kind: "channel.provider_added",
+          ts: Date.now(),
+          scope,
+          payload: { channelContractId: channelAuthId },
+        }));
       }
 
       // When a registered PP is removed on-chain, update its membership
@@ -88,6 +95,12 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
         registeredProviders.has(event.address)
       ) {
         await deactivateMembership(event.address, channelAuthId);
+        await emitForPp(event.address, (scope) => ({
+          kind: "channel.provider_removed",
+          ts: Date.now(),
+          scope,
+          payload: { channelContractId: channelAuthId },
+        }));
       }
     } else {
       LOG.debug("Ignoring event for unregistered provider", {
