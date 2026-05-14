@@ -557,6 +557,28 @@ export class Mempool {
   }
 
   /**
+   * Aggregate stats restricted to the given channels. Used by the
+   * per-PP metrics collector — counts only slots/bundles whose
+   * channelContractId is in the provided set.
+   */
+  getStatsForChannels(
+    channelContractIds: string[],
+  ): { queueDepth: number; slotCount: number } {
+    if (channelContractIds.length === 0) {
+      return { queueDepth: 0, slotCount: 0 };
+    }
+    const allowed = new Set(channelContractIds);
+    let slotCount = 0;
+    let queueDepth = 0;
+    for (const slot of this.slots) {
+      if (!allowed.has(slot.channelContractId)) continue;
+      slotCount++;
+      queueDepth += slot.getBundleCount();
+    }
+    return { queueDepth, slotCount };
+  }
+
+  /**
    * Gets total number of bundles across all slots
    */
   private getTotalBundles(): number {

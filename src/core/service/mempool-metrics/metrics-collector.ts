@@ -1,6 +1,9 @@
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
+import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
+import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
+import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import { LOG } from "@/config/logger.ts";
@@ -12,11 +15,15 @@ export class MetricsCollector {
   private intervalId: number | null = null;
   private metricRepo: MempoolMetricRepository;
   private bundleRepo: OperationsBundleRepository;
+  private ppRepo: PpRepository;
+  private membershipRepo: CouncilMembershipRepository;
   private platformVersion: string;
 
   constructor(platformVersion: string) {
     this.metricRepo = new MempoolMetricRepository(drizzleClient);
     this.bundleRepo = new OperationsBundleRepository(drizzleClient);
+    this.ppRepo = new PpRepository(drizzleClient);
+    this.membershipRepo = new CouncilMembershipRepository(drizzleClient);
     this.platformVersion = platformVersion;
   }
 
@@ -47,59 +54,71 @@ export class MetricsCollector {
   private async collect(): Promise<void> {
     try {
       const mempool = getMempool();
-      const stats = mempool.getStats();
-
-      // Get bundles that transitioned to COMPLETED/EXPIRED in the last window
-      // Uses updatedAt (when status changed), not createdAt
       const windowStart = new Date(Date.now() - COLLECTION_INTERVAL_MS);
-      const completed = await this.bundleRepo.findByStatusUpdatedSince(
-        BundleStatus.COMPLETED,
-        windowStart,
-      );
-      const expired = await this.bundleRepo.findByStatusUpdatedSince(
-        BundleStatus.EXPIRED,
-        windowStart,
-      );
+      const pps = await this.ppRepo.listActive();
 
-      // Compute processing times from completed bundles (createdAt → updatedAt)
-      const processingTimesMs = completed
-        .filter((b) => b.createdAt && b.updatedAt)
-        .map((b) =>
-          new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime()
-        )
-        .filter((t) => t >= 0);
+      let recorded = 0;
+      for (const pp of pps) {
+        const memberships = await this.membershipRepo.listAllForPp(
+          pp.publicKey,
+        );
+        const activeChannels = memberships
+          .filter((m) => m.status === CouncilMembershipStatus.ACTIVE)
+          .map((m) => m.channelAuthId);
+        if (activeChannels.length === 0) continue;
 
-      const avgProcessingMs = processingTimesMs.length > 0
-        ? processingTimesMs.reduce((a, b) => a + b, 0) /
-          processingTimesMs.length
-        : null;
+        const { queueDepth, slotCount } = mempool.getStatsForChannels(
+          activeChannels,
+        );
+        const completed = await this.bundleRepo
+          .findByStatusUpdatedSinceForChannels(
+            BundleStatus.COMPLETED,
+            windowStart,
+            activeChannels,
+          );
+        const expired = await this.bundleRepo
+          .findByStatusUpdatedSinceForChannels(
+            BundleStatus.EXPIRED,
+            windowStart,
+            activeChannels,
+          );
 
-      const p95ProcessingMs = processingTimesMs.length > 0
-        ? percentile(processingTimesMs, 0.95)
-        : null;
+        const processingTimesMs = completed
+          .filter((b) => b.createdAt && b.updatedAt)
+          .map((b) =>
+            new Date(b.updatedAt).getTime() - new Date(b.createdAt).getTime()
+          )
+          .filter((t) => t >= 0);
 
-      const windowMinutes = COLLECTION_INTERVAL_MS / 60_000;
-      const throughputPerMin = completed.length / windowMinutes;
+        const avgProcessingMs = processingTimesMs.length > 0
+          ? processingTimesMs.reduce((a, b) => a + b, 0) /
+            processingTimesMs.length
+          : null;
+        const p95ProcessingMs = processingTimesMs.length > 0
+          ? percentile(processingTimesMs, 0.95)
+          : null;
 
-      await this.metricRepo.insert({
-        platformVersion: this.platformVersion,
-        queueDepth: stats.totalBundles,
-        slotCount: stats.totalSlots,
-        bundlesCompleted: completed.length,
-        bundlesExpired: expired.length,
-        avgProcessingMs,
-        p95ProcessingMs,
-        throughputPerMin,
+        const windowMinutes = COLLECTION_INTERVAL_MS / 60_000;
+        const throughputPerMin = completed.length / windowMinutes;
+
+        await this.metricRepo.insert({
+          platformVersion: this.platformVersion,
+          ppPublicKey: pp.publicKey,
+          queueDepth,
+          slotCount,
+          bundlesCompleted: completed.length,
+          bundlesExpired: expired.length,
+          avgProcessingMs,
+          p95ProcessingMs,
+          throughputPerMin,
+        });
+        recorded++;
+      }
+
+      LOG.debug("Per-PP metrics snapshot recorded", {
+        ppsRecorded: recorded,
       });
 
-      LOG.debug("Metrics snapshot recorded", {
-        queueDepth: stats.totalBundles,
-        completed: completed.length,
-        avgProcessingMs,
-        throughputPerMin,
-      });
-
-      // Cleanup: delete metrics older than retention period
       const retentionCutoff = new Date(
         Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000,
       );

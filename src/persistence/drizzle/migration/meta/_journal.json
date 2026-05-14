@@ -71,6 +71,13 @@
       "when": 1778073633927,
       "tag": "0009_add_waitlist_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1779120000000,
+      "tag": "0010_add_pp_public_key_to_mempool_metrics",
+      "breakpoints": true
     }
   ]
 }
