@@ -28,6 +28,7 @@ import {
 import type { MempoolStats } from "@/core/service/mempool/mempool.types.ts";
 import * as E from "@/core/service/mempool/mempool.errors.ts";
 import { withSpan } from "@/core/tracing.ts";
+import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
 
 const MEMPOOL_CONFIG = {
   SLOT_CAPACITY: MEMPOOL_SLOT_CAPACITY,
@@ -298,6 +299,15 @@ export class Mempool {
           status: BundleStatus.EXPIRED,
           updatedAt: new Date(),
         });
+        await emitForChannel(bundleData.channelContractId, (scope) => ({
+          kind: "mempool.bundle_expired",
+          ts: Date.now(),
+          scope,
+          payload: {
+            bundleId: bundleData.bundleId,
+            channelContractId: bundleData.channelContractId,
+          },
+        }));
         return;
       }
 
@@ -314,6 +324,17 @@ export class Mempool {
           bundleToAdd = null;
           span.addEvent("added_to_existing_slot");
           LOG.debug(`Bundle ${bundleData.bundleId} added to existing slot`);
+          await emitForChannel(channel, (scope) => ({
+            kind: "mempool.bundle_added",
+            ts: Date.now(),
+            scope,
+            payload: {
+              bundleId: bundleData.bundleId,
+              weight: bundleData.weight,
+              channelContractId: channel,
+              newSlot: false,
+            },
+          }));
         } else if (removed !== bundleToAdd) {
           bundleToAdd = removed;
         }
@@ -326,6 +347,17 @@ export class Mempool {
           this.slots.push(newSlot);
           span.addEvent("added_to_new_slot");
           LOG.debug(`Bundle ${bundleData.bundleId} added to new slot`);
+          await emitForChannel(channel, (scope) => ({
+            kind: "mempool.bundle_added",
+            ts: Date.now(),
+            scope,
+            payload: {
+              bundleId: bundleData.bundleId,
+              weight: bundleData.weight,
+              channelContractId: channel,
+              newSlot: true,
+            },
+          }));
         } else {
           span.addEvent("slot_full", {
             "bundle.weight": bundleData.weight,
@@ -423,7 +455,8 @@ export class Mempool {
    */
   expireBundles(): Promise<void> {
     return withSpan("Mempool.expireBundles", async (span) => {
-      const expiredBundleIds: string[] = [];
+      const expired: Array<{ bundleId: string; channelContractId: string }> =
+        [];
 
       for (let i = this.slots.length - 1; i >= 0; i--) {
         const slot = this.slots[i];
@@ -431,7 +464,10 @@ export class Mempool {
 
         for (const bundle of bundles) {
           if (isBundleExpired(bundle)) {
-            expiredBundleIds.push(bundle.bundleId);
+            expired.push({
+              bundleId: bundle.bundleId,
+              channelContractId: bundle.channelContractId,
+            });
             this.removeBundleFromSlot(slot, bundle.bundleId);
           }
         }
@@ -441,18 +477,24 @@ export class Mempool {
         }
       }
 
-      if (expiredBundleIds.length > 0) {
+      if (expired.length > 0) {
         span.addEvent("expiring_bundles", {
-          "expired.count": expiredBundleIds.length,
+          "expired.count": expired.length,
         });
       }
 
-      for (const bundleId of expiredBundleIds) {
+      for (const { bundleId, channelContractId } of expired) {
         await operationsBundleRepository.update(bundleId, {
           status: BundleStatus.EXPIRED,
           updatedAt: new Date(),
         });
         LOG.info(`Bundle ${bundleId} expired and marked as EXPIRED`);
+        await emitForChannel(channelContractId, (scope) => ({
+          kind: "mempool.bundle_expired",
+          ts: Date.now(),
+          scope,
+          payload: { bundleId, channelContractId },
+        }));
       }
     });
   }
