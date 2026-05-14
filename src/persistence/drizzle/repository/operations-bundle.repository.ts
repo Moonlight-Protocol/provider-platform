@@ -127,6 +127,32 @@ export class OperationsBundleRepository extends BaseRepository<
   }
 
   /**
+   * Same as findByStatusUpdatedSince but restricted to bundles whose
+   * channelContractId is in the given set. Returns [] for an empty set.
+   */
+  async findByStatusUpdatedSinceForChannels(
+    status: BundleStatus,
+    since: Date,
+    channelContractIds: string[],
+    limit = 10000,
+  ): Promise<OperationsBundle[]> {
+    if (channelContractIds.length === 0) return [];
+    return await this.db
+      .select()
+      .from(operationsBundle)
+      .where(
+        and(
+          eq(operationsBundle.status, status),
+          gte(operationsBundle.updatedAt, since),
+          inArray(operationsBundle.channelContractId, channelContractIds),
+          isNull(operationsBundle.deletedAt),
+        ),
+      )
+      .orderBy(desc(operationsBundle.updatedAt))
+      .limit(limit);
+  }
+
+  /**
    * Bulk-expires bundles matching the given statuses that were created before `olderThan`.
    * When `limit` is provided the update is bounded via a subquery so at most `limit` rows
    * are affected in a single atomic statement.

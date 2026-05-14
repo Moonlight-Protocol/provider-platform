@@ -15,6 +15,10 @@ export const mempoolMetric = pgTable("mempool_metrics", {
     .defaultNow(),
   platformVersion: text("platform_version").notNull(),
 
+  // Per-PP attribution. Nullable so historical rows (pre-0010 migration) remain
+  // visible to the schema but are excluded from per-PP dashboard queries.
+  ppPublicKey: text("pp_public_key"),
+
   // Snapshot of queue state at recording time
   queueDepth: integer("queue_depth").notNull(),
   slotCount: integer("slot_count").notNull(),
@@ -32,6 +36,10 @@ export const mempoolMetric = pgTable("mempool_metrics", {
 }, (table) => [
   index("idx_mempool_metrics_recorded_at").on(table.recordedAt),
   index("idx_mempool_metrics_version").on(table.platformVersion),
+  index("idx_mempool_metrics_pp_recorded").on(
+    table.ppPublicKey,
+    table.recordedAt,
+  ),
 ]);
 
 export type MempoolMetric = typeof mempoolMetric.$inferSelect;

@@ -14,6 +14,7 @@ import {
 } from "./council.ts";
 import { deletePpHandler, listPpsHandler, registerPpHandler } from "./pp.ts";
 import { postExpireBundlesHandler } from "./bundle-admin.ts";
+import { getMetricsHandler } from "./metrics.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 
 const dashboardRouter = new Router();
@@ -43,6 +44,7 @@ dashboardRouter.get(
   jwtMiddleware,
   getAuditExportHandler,
 );
+dashboardRouter.get("/dashboard/metrics", jwtMiddleware, getMetricsHandler);
 
 // --- PP management ---
 dashboardRouter.post(

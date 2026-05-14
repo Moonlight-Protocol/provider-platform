@@ -1,4 +1,4 @@
-import { avg, count, desc, gte, lt } from "drizzle-orm";
+import { and, avg, count, desc, eq, gte, lt } from "drizzle-orm";
 import type { DrizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   type MempoolMetric,
@@ -24,6 +24,29 @@ export class MempoolMetricRepository {
     return await this.db
       .select()
       .from(mempoolMetric)
+      .orderBy(desc(mempoolMetric.recordedAt))
+      .limit(limit);
+  }
+
+  /**
+   * Returns metrics for a single PP within a time window, newest first.
+   * Rows with NULL pp_public_key (pre-0010 historical snapshots) are excluded
+   * by the equality filter.
+   */
+  async findRecentForPp(
+    ppPublicKey: string,
+    since: Date,
+    limit = 60,
+  ): Promise<MempoolMetric[]> {
+    return await this.db
+      .select()
+      .from(mempoolMetric)
+      .where(
+        and(
+          eq(mempoolMetric.ppPublicKey, ppPublicKey),
+          gte(mempoolMetric.recordedAt, since),
+        ),
+      )
       .orderBy(desc(mempoolMetric.recordedAt))
       .limit(limit);
   }

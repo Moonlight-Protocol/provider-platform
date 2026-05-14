@@ -2,6 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@colibri/core@~0.20.2": "0.20.2",
+    "jsr:@fifo/convee@0.10": "0.10.0",
     "jsr:@fifo/convee@1.0.0": "1.0.0",
     "jsr:@moonlight/moonlight-sdk@0.8": "0.8.0",
     "jsr:@noble/curves@^1.8.0": "1.9.0",
@@ -43,11 +44,14 @@
     "@colibri/core@0.20.2": {
       "integrity": "2cf091a7d0045b542a9b45097a57d068c5388542243c24d7804fdbc08f5a74e1",
       "dependencies": [
-        "jsr:@fifo/convee",
+        "jsr:@fifo/convee@1.0.0",
         "jsr:@std/toml",
         "npm:@stellar/stellar-sdk",
         "npm:buffer@^6.0.3"
       ]
+    },
+    "@fifo/convee@0.10.0": {
+      "integrity": "d1e85f9d6a8288f2e267a80dc21ac45e899ecf33558c5dd596ceebb556253276"
     },
     "@fifo/convee@1.0.0": {
       "integrity": "b61bfa222b9b8a53f0f2af1f35148fd54d86afc2fc3d6b5d073d56aaa369d9a3"
