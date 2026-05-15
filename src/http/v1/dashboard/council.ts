@@ -196,8 +196,13 @@ export const joinCouncilHandler = async (ctx: Context) => {
       ppPublicKey,
       label: _label,
       contactEmail: _contactEmail,
-      jurisdictions: _jurisdictions,
+      jurisdictions,
     } = body;
+
+    const claimedJurisdictions: string | null =
+      Array.isArray(jurisdictions) && jurisdictions.length > 0
+        ? JSON.stringify(jurisdictions)
+        : null;
 
     if (!councilUrl || typeof councilUrl !== "string") {
       ctx.response.status = Status.BadRequest;
@@ -347,6 +352,7 @@ export const joinCouncilHandler = async (ctx: Context) => {
       councilPublicKey: councilPublicKey ?? "",
       channelAuthId: councilId,
       status: CouncilMembershipStatus.PENDING,
+      claimedJurisdictions,
       joinRequestId: responseData?.id ?? null,
       ppPublicKey,
       createdAt: new Date(),

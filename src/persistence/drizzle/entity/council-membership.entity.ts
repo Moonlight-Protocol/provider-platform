@@ -21,6 +21,7 @@ export const councilMembership = pgTable("council_memberships", {
   channelAuthId: text("channel_auth_id").notNull(),
   status: councilMembershipStatusEnum("status").notNull(),
   configJson: text("config_json"),
+  claimedJurisdictions: text("claimed_jurisdictions"),
   joinRequestId: text("join_request_id"),
   ppPublicKey: text("pp_public_key").notNull(),
   ...createBaseColumns(),

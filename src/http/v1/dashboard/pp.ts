@@ -110,6 +110,30 @@ export const listPpsHandler = async (ctx: Context) => {
 
     const data = await Promise.all(pps.map(async (pp) => {
       const membership = await membershipRepo.getCurrentForPp(pp.publicKey);
+
+      let claimedJurisdictions: string[] | null = null;
+      if (membership?.claimedJurisdictions) {
+        try {
+          claimedJurisdictions = JSON.parse(membership.claimedJurisdictions);
+        } catch {
+          claimedJurisdictions = null;
+        }
+      }
+
+      let councilJurisdictions: string[] | null = null;
+      if (membership?.configJson) {
+        try {
+          const cfg = JSON.parse(membership.configJson) as {
+            jurisdictions?: Array<{ countryCode: string }>;
+          };
+          councilJurisdictions = (cfg.jurisdictions || []).map((j) =>
+            j.countryCode
+          );
+        } catch {
+          councilJurisdictions = null;
+        }
+      }
+
       return {
         publicKey: pp.publicKey,
         derivationIndex: pp.derivationIndex,
@@ -122,6 +146,8 @@ export const listPpsHandler = async (ctx: Context) => {
             councilName: membership.councilName,
             status: membership.status,
             channelAuthId: membership.channelAuthId,
+            claimedJurisdictions,
+            councilJurisdictions,
           }
           : null,
       };
