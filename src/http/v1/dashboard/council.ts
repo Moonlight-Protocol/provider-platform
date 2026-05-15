@@ -194,10 +194,15 @@ export const joinCouncilHandler = async (ctx: Context) => {
       councilName,
       councilPublicKey,
       ppPublicKey,
-      label: _label,
-      contactEmail: _contactEmail,
-      jurisdictions: _jurisdictions,
     } = body;
+
+    const envelopeJurisdictions = (body.signedEnvelope as
+      | { payload?: { jurisdictions?: unknown } }
+      | undefined)?.payload?.jurisdictions;
+    const claimedJurisdictions: string | null =
+      Array.isArray(envelopeJurisdictions) && envelopeJurisdictions.length > 0
+        ? JSON.stringify(envelopeJurisdictions)
+        : null;
 
     if (!councilUrl || typeof councilUrl !== "string") {
       ctx.response.status = Status.BadRequest;
@@ -347,6 +352,7 @@ export const joinCouncilHandler = async (ctx: Context) => {
       councilPublicKey: councilPublicKey ?? "",
       channelAuthId: councilId,
       status: CouncilMembershipStatus.PENDING,
+      claimedJurisdictions,
       joinRequestId: responseData?.id ?? null,
       ppPublicKey,
       createdAt: new Date(),

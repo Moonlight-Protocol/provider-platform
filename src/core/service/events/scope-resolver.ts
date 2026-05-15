@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import {
   councilMembership,
@@ -35,9 +35,11 @@ export async function resolveScopesForChannel(
     )
     .where(
       and(
-        eq(councilMembership.channelAuthId, channelContractId),
         eq(councilMembership.status, CouncilMembershipStatus.ACTIVE),
         isNull(councilMembership.deletedAt),
+        sql`${councilMembership.configJson}::jsonb -> 'channels' @> ${
+          JSON.stringify([{ channelContractId }])
+        }::jsonb`,
       ),
     );
   return rows.map((row) => ({
