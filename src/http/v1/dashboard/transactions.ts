@@ -82,7 +82,9 @@ async function buildTxDetail(txId: string) {
     if (!channelContractId && bundle.channelContractId) {
       channelContractId = bundle.channelContractId;
     }
-    if (!earliestBundleCreatedAt || bundle.createdAt < earliestBundleCreatedAt) {
+    if (
+      !earliestBundleCreatedAt || bundle.createdAt < earliestBundleCreatedAt
+    ) {
       earliestBundleCreatedAt = bundle.createdAt;
     }
     const ops = parseBundleOps(bundle.operationsMLXDR);
@@ -208,7 +210,10 @@ export const listTransactionsHandler = async (ctx: Context) => {
     }
 
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "Provider not found" };
@@ -261,12 +266,17 @@ export const getTransactionDetailHandler = async (ctx: Context) => {
     const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
     if (!ppPublicKey) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "ppPublicKey query parameter is required" };
+      ctx.response.body = {
+        message: "ppPublicKey query parameter is required",
+      };
       return;
     }
 
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "Provider not found" };

@@ -24,7 +24,9 @@ export const getUtxosHandler = async (ctx: Context) => {
 
     if (!ppPublicKey) {
       ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "ppPublicKey query parameter is required" };
+      ctx.response.body = {
+        message: "ppPublicKey query parameter is required",
+      };
       return;
     }
     if (!channelContractId) {
@@ -36,7 +38,10 @@ export const getUtxosHandler = async (ctx: Context) => {
     }
 
     const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(ppPublicKey, ownerPublicKey);
+    const pp = await ppRepo.findByPublicKeyAndOwner(
+      ppPublicKey,
+      ownerPublicKey,
+    );
     if (!pp) {
       ctx.response.status = Status.NotFound;
       ctx.response.body = { message: "Provider not found" };
