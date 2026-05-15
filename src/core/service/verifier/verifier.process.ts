@@ -20,6 +20,7 @@ import {
   handleVerificationFailure as _handleVerificationFailure,
 } from "@/core/service/verifier/verifier-failure.helpers.ts";
 import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+import { MoonlightOperation } from "@moonlight/moonlight-sdk";
 
 async function findFirstBundleChannel(
   bundleIds: string[],
@@ -110,6 +111,66 @@ async function handleVerificationSuccess(
       scope,
       payload: { txId, bundleIds, channelContractId },
     }));
+    await emitDepositAndWithdrawEvents(txId, bundleIds, channelContractId);
+  }
+}
+
+/**
+ * For each verified bundle, parse its stored operations and emit one
+ * bundle.deposit_completed / bundle.withdraw_completed event per matching
+ * operation so subscribers see the depositor / recipient address.
+ */
+async function emitDepositAndWithdrawEvents(
+  txId: string,
+  bundleIds: string[],
+  channelContractId: string,
+): Promise<void> {
+  for (const bundleId of bundleIds) {
+    const bundle = await operationsBundleRepository.findById(bundleId);
+    if (!bundle) continue;
+    for (const mlxdr of bundle.operationsMLXDR) {
+      let op;
+      try {
+        op = MoonlightOperation.fromMLXDR(mlxdr);
+      } catch (error) {
+        LOG.error("Failed to parse operation MLXDR for event emit", {
+          bundleId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      if (op.isDeposit()) {
+        const depositorAddress = op.getPublicKey().toString();
+        const amount = op.getAmount().toString();
+        await emitForChannel(channelContractId, (scope) => ({
+          kind: "bundle.deposit_completed",
+          ts: Date.now(),
+          scope,
+          payload: {
+            bundleId,
+            txId,
+            channelContractId,
+            depositorAddress,
+            amount,
+          },
+        }));
+      } else if (op.isWithdraw()) {
+        const recipientAddress = op.getPublicKey().toString();
+        const amount = op.getAmount().toString();
+        await emitForChannel(channelContractId, (scope) => ({
+          kind: "bundle.withdraw_completed",
+          ts: Date.now(),
+          scope,
+          payload: {
+            bundleId,
+            txId,
+            channelContractId,
+            recipientAddress,
+            amount,
+          },
+        }));
+      }
+    }
   }
 }
 
