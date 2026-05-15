@@ -194,14 +194,14 @@ export const joinCouncilHandler = async (ctx: Context) => {
       councilName,
       councilPublicKey,
       ppPublicKey,
-      label: _label,
-      contactEmail: _contactEmail,
-      jurisdictions,
     } = body;
 
+    const envelopeJurisdictions = (body.signedEnvelope as
+      | { payload?: { jurisdictions?: unknown } }
+      | undefined)?.payload?.jurisdictions;
     const claimedJurisdictions: string | null =
-      Array.isArray(jurisdictions) && jurisdictions.length > 0
-        ? JSON.stringify(jurisdictions)
+      Array.isArray(envelopeJurisdictions) && envelopeJurisdictions.length > 0
+        ? JSON.stringify(envelopeJurisdictions)
         : null;
 
     if (!councilUrl || typeof councilUrl !== "string") {
