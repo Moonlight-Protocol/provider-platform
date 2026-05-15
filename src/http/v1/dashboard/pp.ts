@@ -109,30 +109,55 @@ export const listPpsHandler = async (ctx: Context) => {
     const pps = await ppRepo.listByOwner(ownerPublicKey);
 
     const data = await Promise.all(pps.map(async (pp) => {
-      const membership = await membershipRepo.getCurrentForPp(pp.publicKey);
+      const memberships = await membershipRepo.listAllForPp(pp.publicKey);
 
-      let claimedJurisdictions: string[] | null = null;
-      if (membership?.claimedJurisdictions) {
-        try {
-          claimedJurisdictions = JSON.parse(membership.claimedJurisdictions);
-        } catch {
-          claimedJurisdictions = null;
+      const councilMemberships = memberships.map((membership) => {
+        let claimedJurisdictions: string[] | null = null;
+        if (membership.claimedJurisdictions) {
+          try {
+            claimedJurisdictions = JSON.parse(membership.claimedJurisdictions);
+          } catch {
+            claimedJurisdictions = null;
+          }
         }
-      }
 
-      let councilJurisdictions: string[] | null = null;
-      if (membership?.configJson) {
-        try {
-          const cfg = JSON.parse(membership.configJson) as {
-            jurisdictions?: Array<{ countryCode: string }>;
-          };
-          councilJurisdictions = (cfg.jurisdictions || []).map((j) =>
-            j.countryCode
-          );
-        } catch {
-          councilJurisdictions = null;
+        let councilJurisdictions: string[] | null = null;
+        let channels: Array<{
+          channelContractId: string;
+          assetCode: string;
+          assetContractId: string;
+          label: string | null;
+        }> = [];
+        if (membership.configJson) {
+          try {
+            const cfg = JSON.parse(membership.configJson) as {
+              jurisdictions?: Array<{ countryCode: string }>;
+              channels?: Array<{
+                channelContractId: string;
+                assetCode: string;
+                assetContractId: string;
+                label: string | null;
+              }>;
+            };
+            councilJurisdictions = (cfg.jurisdictions || []).map((j) =>
+              j.countryCode
+            );
+            channels = cfg.channels || [];
+          } catch {
+            councilJurisdictions = null;
+          }
         }
-      }
+
+        return {
+          councilUrl: membership.councilUrl,
+          councilName: membership.councilName,
+          status: membership.status,
+          channelAuthId: membership.channelAuthId,
+          claimedJurisdictions,
+          councilJurisdictions,
+          channels,
+        };
+      });
 
       return {
         publicKey: pp.publicKey,
@@ -140,16 +165,7 @@ export const listPpsHandler = async (ctx: Context) => {
         label: pp.label,
         isActive: pp.isActive,
         createdAt: pp.createdAt.toISOString(),
-        councilMembership: membership
-          ? {
-            councilUrl: membership.councilUrl,
-            councilName: membership.councilName,
-            status: membership.status,
-            channelAuthId: membership.channelAuthId,
-            claimedJurisdictions,
-            councilJurisdictions,
-          }
-          : null,
+        councilMemberships,
       };
     }));
 
