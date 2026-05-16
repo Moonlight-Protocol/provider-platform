@@ -5,6 +5,11 @@ import { getChannelsHandler } from "./channels.ts";
 import { getMempoolHandler } from "./mempool.ts";
 import { getOperationsHandler } from "./operations.ts";
 import { getTreasuryHandler } from "./treasury.ts";
+import { getUtxosHandler } from "./utxos.ts";
+import {
+  getTransactionDetailHandler,
+  listTransactionsHandler,
+} from "./transactions.ts";
 import { getAuditExportHandler } from "./audit-export.ts";
 import {
   discoverCouncilHandler,
@@ -39,6 +44,17 @@ dashboardRouter.get(
   getOperationsHandler,
 );
 dashboardRouter.get("/dashboard/treasury", jwtMiddleware, getTreasuryHandler);
+dashboardRouter.get("/dashboard/utxos", jwtMiddleware, getUtxosHandler);
+dashboardRouter.get(
+  "/dashboard/transactions",
+  jwtMiddleware,
+  listTransactionsHandler,
+);
+dashboardRouter.get(
+  "/dashboard/transactions/:id",
+  jwtMiddleware,
+  getTransactionDetailHandler,
+);
 dashboardRouter.get(
   "/dashboard/audit-export",
   jwtMiddleware,

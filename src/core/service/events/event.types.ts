@@ -51,6 +51,26 @@ export type ChannelEventPayload = {
   channelContractId: string;
 };
 
+export type BundleDepositCompletedPayload = {
+  bundleId: string;
+  txId: string;
+  channelContractId: string;
+  /** The depositor's real Stellar address (extracted from the DepositOperation). */
+  depositorAddress: string;
+  /** Amount deposited, in stroops. */
+  amount: string;
+};
+
+export type BundleWithdrawCompletedPayload = {
+  bundleId: string;
+  txId: string;
+  channelContractId: string;
+  /** The recipient's real Stellar address (extracted from the WithdrawOperation). */
+  recipientAddress: string;
+  /** Amount withdrawn, in stroops. */
+  amount: string;
+};
+
 export type ProviderEvent =
   | {
     kind: "mempool.bundle_added";
@@ -99,6 +119,18 @@ export type ProviderEvent =
     ts: number;
     scope: EventScope;
     payload: ChannelEventPayload;
+  }
+  | {
+    kind: "bundle.deposit_completed";
+    ts: number;
+    scope: EventScope;
+    payload: BundleDepositCompletedPayload;
+  }
+  | {
+    kind: "bundle.withdraw_completed";
+    ts: number;
+    scope: EventScope;
+    payload: BundleWithdrawCompletedPayload;
   };
 
 export type ProviderEventKind = ProviderEvent["kind"];

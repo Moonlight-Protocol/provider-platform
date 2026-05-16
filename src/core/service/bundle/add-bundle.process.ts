@@ -271,6 +271,8 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
       const { operationsMLXDR, channelContractId } = input.body;
+      const jurisdictionFrom = input.body.jurisdictionFrom ?? null;
+      const jurisdictionTo = input.body.jurisdictionTo ?? null;
       if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
         logAndThrow(
           new E.TOO_MANY_OPERATIONS(
@@ -333,6 +335,8 @@ export const P_AddOperationsBundle = ProcessEngine.create(
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
           retryCount: 0,
+          jurisdictionFrom,
+          jurisdictionTo,
           updatedAt: new Date(),
           updatedBy: userSession.accountId,
         });
@@ -345,6 +349,8 @@ export const P_AddOperationsBundle = ProcessEngine.create(
           ttl: calculateBundleTtl(),
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
+          jurisdictionFrom,
+          jurisdictionTo,
           createdBy: userSession.accountId,
           createdAt: new Date(),
         });

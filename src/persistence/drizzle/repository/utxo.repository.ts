@@ -5,6 +5,7 @@ import {
   type Utxo,
   utxo,
 } from "@/persistence/drizzle/entity/utxo.entity.ts";
+import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { BaseRepository } from "@/persistence/drizzle/repository/base.repository.ts";
 
 export class UtxoRepository extends BaseRepository<
@@ -72,6 +73,34 @@ export class UtxoRepository extends BaseRepository<
         and(
           eq(utxo.spentAtBundleId, bundleId),
           isNull(utxo.deletedAt),
+        ),
+      );
+  }
+
+  /**
+   * Unspent UTXOs whose creating bundle targeted the given privacy channel.
+   * Joins via operations_bundles to scope by channel since UTXOs don't carry
+   * the channel id directly.
+   */
+  async findUnspentByChannel(channelContractId: string) {
+    return await this.db
+      .select({
+        id: utxo.id,
+        amount: utxo.amount,
+        accountId: utxo.accountId,
+        createdAtBundleId: utxo.createdAtBundleId,
+        createdAt: utxo.createdAt,
+      })
+      .from(utxo)
+      .innerJoin(
+        operationsBundle,
+        eq(operationsBundle.id, utxo.createdAtBundleId),
+      )
+      .where(
+        and(
+          isNull(utxo.spentAtBundleId),
+          isNull(utxo.deletedAt),
+          eq(operationsBundle.channelContractId, channelContractId),
         ),
       );
   }
