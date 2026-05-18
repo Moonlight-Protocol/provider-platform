@@ -3,10 +3,47 @@ import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempoo
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
-import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
+import {
+  type CouncilMembership,
+  CouncilMembershipStatus,
+} from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import { LOG } from "@/config/logger.ts";
+
+/**
+ * Pull every active privacy-channel contract id out of a PP's memberships.
+ *
+ * Bundles store `channel_contract_id` (the privacy-channel contract), NOT
+ * the membership's `channel_auth_id` (which points at the council / auth
+ * contract — a different deploy). The channelContractIds live inside
+ * `membership.configJson` in the same shape `listPpsHandler` parses.
+ *
+ * Exported for direct unit-testing — the bug surfaced because the collector
+ * was filtering bundles on `channel_auth_id`, which never matches anything in
+ * `operations_bundles`.
+ */
+export function deriveActiveChannelContractIds(
+  memberships: CouncilMembership[],
+): string[] {
+  const out: string[] = [];
+  for (const m of memberships) {
+    if (m.status !== CouncilMembershipStatus.ACTIVE) continue;
+    if (!m.configJson) continue;
+    try {
+      const cfg = JSON.parse(m.configJson) as {
+        channels?: Array<{ channelContractId?: string }>;
+      };
+      for (const ch of cfg.channels ?? []) {
+        if (ch.channelContractId) out.push(ch.channelContractId);
+      }
+    } catch {
+      // Skip memberships whose configJson is unparseable rather than
+      // crashing the whole tick.
+    }
+  }
+  return out;
+}
 
 const COLLECTION_INTERVAL_MS = 60_000; // 1 minute
 const RETENTION_DAYS = 7;
@@ -62,9 +99,7 @@ export class MetricsCollector {
         const memberships = await this.membershipRepo.listAllForPp(
           pp.publicKey,
         );
-        const activeChannels = memberships
-          .filter((m) => m.status === CouncilMembershipStatus.ACTIVE)
-          .map((m) => m.channelAuthId);
+        const activeChannels = deriveActiveChannelContractIds(memberships);
         if (activeChannels.length === 0) continue;
 
         const { queueDepth, slotCount } = mempool.getStatsForChannels(
