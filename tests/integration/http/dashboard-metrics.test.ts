@@ -68,7 +68,9 @@ async function seedDb(): Promise<void> {
 async function seedSnapshot(
   ppPublicKey: string | null,
   recordedAt: Date,
-  values: Partial<{ queueDepth: number; bundlesCompleted: number }> = {},
+  values: Partial<
+    { queueDepth: number; bundlesCompleted: number; bundlesFailed: number }
+  > = {},
 ): Promise<void> {
   const db = getTestDb();
   await db.insert(mempoolMetric).values({
@@ -79,6 +81,7 @@ async function seedSnapshot(
     slotCount: 2,
     bundlesCompleted: values.bundlesCompleted ?? 3,
     bundlesExpired: 1,
+    bundlesFailed: values.bundlesFailed ?? 0,
     avgProcessingMs: 200,
     p95ProcessingMs: 500,
     throughputPerMin: 3,
@@ -206,6 +209,27 @@ Deno.test("excludes snapshots outside the rangeMin window", async () => {
   const body = await res.json();
   assertEquals(body.data.snapshots.length, 1);
   assertEquals(body.data.snapshots[0].queueDepth, 1);
+});
+
+Deno.test("snapshot payload exposes bundlesFailed for the error-rate counter", async () => {
+  const app = await setup();
+  const now = Date.now();
+  await seedSnapshot(PP_PUBLIC_KEY, new Date(now - 30_000), {
+    bundlesCompleted: 7,
+    bundlesFailed: 2,
+  });
+
+  const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
+  const res = await request(
+    app,
+    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}&rangeMin=60`,
+    jwt,
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.data.snapshots.length, 1);
+  assertEquals(body.data.snapshots[0].bundlesFailed, 2);
+  assertEquals(body.data.snapshots[0].bundlesCompleted, 7);
 });
 
 Deno.test("defaults rangeMin to 60 when omitted", async () => {

@@ -70,6 +70,7 @@ export async function getMetricsHandler(ctx: Context): Promise<void> {
         slotCount: row.slotCount,
         bundlesCompleted: row.bundlesCompleted,
         bundlesExpired: row.bundlesExpired,
+        bundlesFailed: row.bundlesFailed,
         avgProcessingMs: row.avgProcessingMs,
         p95ProcessingMs: row.p95ProcessingMs,
         throughputPerMin: row.throughputPerMin,

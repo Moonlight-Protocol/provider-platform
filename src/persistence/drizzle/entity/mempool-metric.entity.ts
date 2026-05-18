@@ -26,6 +26,7 @@ export const mempoolMetric = pgTable("mempool_metrics", {
   // Counts within the collection window
   bundlesCompleted: integer("bundles_completed").notNull().default(0),
   bundlesExpired: integer("bundles_expired").notNull().default(0),
+  bundlesFailed: integer("bundles_failed").notNull().default(0),
 
   // Timing averages (ms) for bundles completed in the window
   avgProcessingMs: doublePrecision("avg_processing_ms"),

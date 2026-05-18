@@ -82,6 +82,12 @@ export class MetricsCollector {
             windowStart,
             activeChannels,
           );
+        const failed = await this.bundleRepo
+          .findByStatusUpdatedSinceForChannels(
+            BundleStatus.FAILED,
+            windowStart,
+            activeChannels,
+          );
 
         const processingTimesMs = completed
           .filter((b) => b.createdAt && b.updatedAt)
@@ -108,6 +114,7 @@ export class MetricsCollector {
           slotCount,
           bundlesCompleted: completed.length,
           bundlesExpired: expired.length,
+          bundlesFailed: failed.length,
           avgProcessingMs,
           p95ProcessingMs,
           throughputPerMin,
