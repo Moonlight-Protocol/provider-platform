@@ -92,6 +92,13 @@
       "when": 1779465600000,
       "tag": "0012_add_bundle_jurisdictions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1779724800000,
+      "tag": "0013_add_bundles_failed_to_mempool_metrics",
+      "breakpoints": true
     }
   ]
 }
