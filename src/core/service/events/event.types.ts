@@ -15,6 +15,12 @@ export type MempoolBundleAddedPayload = {
   weight: number;
   channelContractId: string;
   newSlot: boolean;
+  /** Submitter entity's display name (looked up via createdBy → account → entity). */
+  entityName: string | null;
+  /** Submitter entity's jurisdictions (one or more ISO codes). */
+  jurisdictions: string[];
+  /** Aggregated bundle amount in stroops (sum of deposit / withdraw / spend ops). */
+  amount: string | null;
 };
 
 export type MempoolBundleExpiredPayload = {

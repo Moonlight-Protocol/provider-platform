@@ -54,6 +54,14 @@ export type SlotBundle = {
   priorityScore: number;
   retryCount: number;
   lastFailureReason?: string | null;
+  /** PP that owns this bundle (URL-scoped at submission). */
+  ppPublicKey: string;
+  /** Submitter entity display name (looked up from createdBy → account → entity). */
+  entityName: string | null;
+  /** Submitter entity's jurisdictions. */
+  jurisdictions: string[];
+  /** Aggregated bundle amount in stroops (sum of dominant op kind). */
+  amount: string | null;
 };
 
 /**

@@ -19,6 +19,7 @@ import {
 } from "./council.ts";
 import { deletePpHandler, listPpsHandler, registerPpHandler } from "./pp.ts";
 import { postExpireBundlesHandler } from "./bundle-admin.ts";
+import { getBundleDetailHandler, listRecentBundlesHandler } from "./bundles.ts";
 import { getMetricsHandler } from "./metrics.ts";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
 
@@ -54,6 +55,16 @@ dashboardRouter.get(
   "/dashboard/transactions/:id",
   jwtMiddleware,
   getTransactionDetailHandler,
+);
+dashboardRouter.get(
+  "/dashboard/bundles",
+  jwtMiddleware,
+  listRecentBundlesHandler,
+);
+dashboardRouter.get(
+  "/dashboard/bundles/:id",
+  jwtMiddleware,
+  getBundleDetailHandler,
 );
 dashboardRouter.get(
   "/dashboard/audit-export",

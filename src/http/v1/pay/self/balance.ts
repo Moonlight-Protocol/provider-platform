@@ -5,7 +5,7 @@ import {
   MAX_UTXO_SLOTS,
   queryBalances,
 } from "@/core/service/pay/channel.service.ts";
-import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
+import { resolveChannelClient } from "@/core/service/executor/channel-resolver.ts";
 import { LOG } from "@/config/logger.ts";
 
 /**
@@ -67,10 +67,10 @@ export const postSelfBalanceHandler = async (ctx: Context) => {
       (hexKey: string) => new Uint8Array(Buffer.from(hexKey, "hex")),
     );
 
-    const channelCtx = await resolveChannelContext(channelContractId);
+    const { channelClient } = await resolveChannelClient(channelContractId);
     const balances = await queryBalances(
       utxoPublicKeys,
-      channelCtx.channelClient,
+      channelClient,
     );
 
     const totalBalance = balances.reduce((sum, b) => sum + b, 0n);

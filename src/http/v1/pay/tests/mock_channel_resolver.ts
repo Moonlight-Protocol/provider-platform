@@ -17,3 +17,11 @@ export async function resolveChannelContext(_channelContractId: string) {
     txConfig: null,
   };
 }
+
+// deno-lint-ignore require-await -- mock satisfies resolveChannelClient async contract
+export async function resolveChannelClient(_channelContractId: string) {
+  return {
+    channelClient: stubChannelClient,
+    channelAuthId: "",
+  };
+}
