@@ -99,6 +99,13 @@
       "when": 1779724800000,
       "tag": "0013_add_bundles_failed_to_mempool_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780000000000,
+      "tag": "0014_rename_users_to_entities",
+      "breakpoints": true
     }
   ]
 }

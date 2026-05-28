@@ -1,14 +1,14 @@
 import { ProcessEngine } from "@fifo/convee";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
-import { UserRepository } from "@/persistence/drizzle/repository/user.repository.ts";
+import { EntityRepository } from "@/persistence/drizzle/repository/entity.repository.ts";
 import { AccountRepository } from "@/persistence/drizzle/repository/account.repository.ts";
 import {
   ChallengeStatus,
+  EntityStatus,
   type NewAccount,
   type NewChallenge,
-  type NewUser,
-  UserStatus,
+  type NewEntity,
 } from "@/persistence/drizzle/entity/index.ts";
 import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
@@ -16,7 +16,7 @@ import * as E from "@/core/service/auth/challenge/store/error.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
-const userRepository = new UserRepository(drizzleClient);
+const entityRepository = new EntityRepository(drizzleClient);
 const accountRepository = new AccountRepository(drizzleClient);
 
 export const P_CreateChallengeDB = ProcessEngine.create(
@@ -31,18 +31,18 @@ export const P_CreateChallengeDB = ProcessEngine.create(
           challengeData.clientAccount,
         );
 
-        let user: NewUser | undefined;
+        let entity: NewEntity | undefined;
         if (!account) {
-          span.addEvent("creating_new_user_and_account");
-          user = await userRepository.create({
+          span.addEvent("creating_new_entity_and_account");
+          entity = await entityRepository.create({
             id: crypto.randomUUID(),
-            status: UserStatus.UNVERIFIED,
-          } as NewUser);
+            status: EntityStatus.UNVERIFIED,
+          } as NewEntity);
 
           account = await accountRepository.create({
             id: challengeData.clientAccount,
             type: "USER",
-            userId: user.id,
+            entityId: entity.id,
           } as NewAccount);
         } else {
           span.addEvent("account_exists");

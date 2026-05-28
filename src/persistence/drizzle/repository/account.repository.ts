@@ -18,15 +18,15 @@ export class AccountRepository extends BaseRepository<
   }
 
   /**
-   * Finds accounts by user_id
+   * Finds accounts by entity_id
    */
-  async findByUserId(userId: string) {
+  async findByEntityId(entityId: string) {
     return await this.db
       .select()
       .from(account)
       .where(
         and(
-          eq(account.userId, userId),
+          eq(account.entityId, entityId),
           isNull(account.deletedAt),
         ),
       );

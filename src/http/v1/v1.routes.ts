@@ -8,6 +8,7 @@ import healthRouter from "@/http/v1/health/routes.ts";
 import waitlistRouter from "@/http/v1/waitlist/routes.ts";
 import councilRouter from "@/http/v1/council/routes.ts";
 import eventsRouter from "@/http/v1/events/routes.ts";
+import entitiesRouter from "@/http/v1/entities/routes.ts";
 
 const apiRouter = new Router();
 
@@ -35,5 +36,10 @@ apiRouter.use(
   waitlistRouter.allowedMethods(),
 );
 apiRouter.use("/api/v1", eventsRouter.routes(), eventsRouter.allowedMethods());
+apiRouter.use(
+  "/api/v1",
+  entitiesRouter.routes(),
+  entitiesRouter.allowedMethods(),
+);
 
 export default apiRouter;
