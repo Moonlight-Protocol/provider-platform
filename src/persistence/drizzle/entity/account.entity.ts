@@ -1,7 +1,7 @@
 import { pgEnum, pgTable, text } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
-import { user } from "@/persistence/drizzle/entity/user.entity.ts";
+import { entity } from "@/persistence/drizzle/entity/entity.entity.ts";
 import { utxo } from "@/persistence/drizzle/entity/utxo.entity.ts";
 
 export enum AccountType {
@@ -17,17 +17,17 @@ export const accountTypeEnum = pgEnum("account_type", [
 export const account = pgTable("accounts", {
   id: text("id").primaryKey(),
   type: accountTypeEnum("type").notNull(),
-  userId: text("user_id")
+  entityId: text("entity_id")
     .notNull()
-    .references(() => user.id),
+    .references(() => entity.id),
   ...createBaseColumns(),
 });
 
 // Relations
 export const accountRelations = relations(account, ({ one, many }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id],
+  entity: one(entity, {
+    fields: [account.entityId],
+    references: [entity.id],
   }),
   utxos: many(utxo),
 }));

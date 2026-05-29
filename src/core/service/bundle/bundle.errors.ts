@@ -11,9 +11,105 @@ export enum BUNDLE_ERROR_CODES {
   BUNDLE_NOT_FOUND = "BND_008",
   BUNDLE_ACCESS_FORBIDDEN = "BND_009",
   TOO_MANY_OPERATIONS = "BND_010",
+  SUBMITTER_NOT_APPROVED = "BND_011",
+  PP_PUBLIC_KEY_REQUIRED = "BND_012",
+  PP_NOT_FOUND = "BND_013",
+  PP_NOT_MEMBER_OF_CHANNEL = "BND_014",
 }
 
 const source = "@service/bundle";
+
+/**
+ * Error thrown when the request has no ppPublicKey path param.
+ */
+export class PP_PUBLIC_KEY_REQUIRED
+  extends PlatformError<Record<never, never>> {
+  constructor() {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.PP_PUBLIC_KEY_REQUIRED,
+      message: "PP public key is required",
+      details:
+        "Bundle submission requires the route /providers/:ppPublicKey/bundles. No default PP exists.",
+      api: {
+        status: 400,
+        message: "PP public key is required",
+        details:
+          "Submit the bundle to /api/v1/providers/<ppPublicKey>/bundles. The PP must be specified explicitly.",
+      },
+      meta: {},
+    });
+  }
+}
+
+/**
+ * Error thrown when the addressed PP doesn't exist or isn't active.
+ */
+export class PP_NOT_FOUND extends PlatformError<{ ppPublicKey: string }> {
+  constructor(ppPublicKey: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.PP_NOT_FOUND,
+      message: "PP not found",
+      details:
+        `No active Privacy Provider was found with public key '${ppPublicKey}'.`,
+      api: {
+        status: 404,
+        message: "PP not found",
+        details:
+          `The PP '${ppPublicKey}' does not exist or isn't active on this provider-platform.`,
+      },
+      meta: { ppPublicKey },
+    });
+  }
+}
+
+/**
+ * Error thrown when the addressed PP isn't a member of the bundle's channel.
+ */
+export class PP_NOT_MEMBER_OF_CHANNEL extends PlatformError<{
+  ppPublicKey: string;
+  channelContractId: string;
+}> {
+  constructor(ppPublicKey: string, channelContractId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.PP_NOT_MEMBER_OF_CHANNEL,
+      message: "PP is not a member of the channel",
+      details:
+        `PP '${ppPublicKey}' has no active membership that includes channel '${channelContractId}'.`,
+      api: {
+        status: 403,
+        message: "PP is not a member of the channel",
+        details:
+          "The addressed Privacy Provider is not authorized to process bundles for this channel.",
+      },
+      meta: { ppPublicKey, channelContractId },
+    });
+  }
+}
+
+/**
+ * Error thrown when the submitter has no APPROVED entity record.
+ */
+export class SUBMITTER_NOT_APPROVED extends PlatformError<{ pubkey: string }> {
+  constructor(pubkey: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.SUBMITTER_NOT_APPROVED,
+      message: "Submitter not approved",
+      details:
+        `No APPROVED entity record exists for the submitter pubkey '${pubkey}'. Submit KYC/KYB info via POST /api/v1/entities first.`,
+      api: {
+        status: 403,
+        message: "Submitter not approved",
+        details:
+          "The submitter has not completed KYC/KYB. POST your entity info to /api/v1/entities before submitting bundles.",
+      },
+      meta: { pubkey },
+    });
+  }
+}
 
 /**
  * Error thrown when session is invalid or not found

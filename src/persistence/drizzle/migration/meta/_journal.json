@@ -99,6 +99,27 @@
       "when": 1779724800000,
       "tag": "0013_add_bundles_failed_to_mempool_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780000000000,
+      "tag": "0014_rename_users_to_entities",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1780100000000,
+      "tag": "0015_drop_bundle_jurisdictions",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780200000000,
+      "tag": "0016_bundle_pp_public_key",
+      "breakpoints": true
     }
   ]
 }

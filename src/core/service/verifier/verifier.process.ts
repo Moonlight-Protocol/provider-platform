@@ -19,7 +19,7 @@ import { withSpan } from "@/core/tracing.ts";
 import {
   handleVerificationFailure as _handleVerificationFailure,
 } from "@/core/service/verifier/verifier-failure.helpers.ts";
-import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+import { emitForBundles } from "@/core/service/events/emit-helpers.ts";
 import { MoonlightOperation } from "@moonlight/moonlight-sdk";
 
 async function findFirstBundleChannel(
@@ -105,7 +105,7 @@ async function handleVerificationSuccess(
   }
 
   if (channelContractId) {
-    await emitForChannel(channelContractId, (scope) => ({
+    await emitForBundles(bundleIds, (scope) => ({
       kind: "verifier.bundle_completed",
       ts: Date.now(),
       scope,
@@ -142,7 +142,7 @@ async function emitDepositAndWithdrawEvents(
       if (op.isDeposit()) {
         const depositorAddress = op.getPublicKey().toString();
         const amount = op.getAmount().toString();
-        await emitForChannel(channelContractId, (scope) => ({
+        await emitForBundles([bundleId], (scope) => ({
           kind: "bundle.deposit_completed",
           ts: Date.now(),
           scope,
@@ -157,7 +157,7 @@ async function emitDepositAndWithdrawEvents(
       } else if (op.isWithdraw()) {
         const recipientAddress = op.getPublicKey().toString();
         const amount = op.getAmount().toString();
-        await emitForChannel(channelContractId, (scope) => ({
+        await emitForBundles([bundleId], (scope) => ({
           kind: "bundle.withdraw_completed",
           ts: Date.now(),
           scope,
@@ -291,7 +291,7 @@ export class Verifier {
           const channelContractId = await findFirstBundleChannel(bundleIds);
           await handleVerificationFailure(txId, result.reason, bundleIds);
           if (channelContractId) {
-            await emitForChannel(channelContractId, (scope) => ({
+            await emitForBundles(bundleIds, (scope) => ({
               kind: "verifier.bundle_failed",
               ts: Date.now(),
               scope,

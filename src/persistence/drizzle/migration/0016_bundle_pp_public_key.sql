@@ -1,0 +1,1 @@
+ALTER TABLE "operations_bundles" ADD COLUMN "pp_public_key" text;

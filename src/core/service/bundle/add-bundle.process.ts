@@ -34,14 +34,19 @@ import type { ClassifiedOperations } from "@/core/service/bundle/bundle.types.ts
 import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import {
+  AccountRepository,
+  EntityRepository,
   OperationsBundleRepository,
   SessionRepository,
   UtxoRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { EntityStatus } from "@/persistence/drizzle/entity/index.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 // Repositories
 const sessionRepository = new SessionRepository(drizzleClient);
+const accountRepository = new AccountRepository(drizzleClient);
+const entityRepository = new EntityRepository(drizzleClient);
 const utxoRepository = new UtxoRepository(drizzleClient);
 const operationsBundleRepository = new OperationsBundleRepository(
   drizzleClient,
@@ -239,9 +244,27 @@ function persistSpendOperations(
 /**
  * Creates a SlotBundle from bundle data
  */
+function aggregateBundleAmount(
+  classified: ClassifiedOperations,
+): string | null {
+  const sum = (
+    list: Array<{ getAmount: () => bigint }>,
+  ): bigint => list.reduce((acc, op) => acc + op.getAmount(), 0n);
+  if (classified.deposit.length > 0) return sum(classified.deposit).toString();
+  if (classified.withdraw.length > 0) {
+    return sum(classified.withdraw).toString();
+  }
+  // Sends: spend ops don't carry amounts (they reference UTXOs), but the
+  // create outputs do. Sum of created amounts ≈ amount being moved.
+  if (classified.create.length > 0) return sum(classified.create).toString();
+  return null;
+}
+
 function createSlotBundle(
   bundleEntity: OperationsBundle,
   classified: ClassifiedOperations,
+  entityName: string | null,
+  jurisdictions: string[],
 ): SlotBundle {
   const weight = calculateBundleWeight(classified, MEMPOOL_WEIGHT_CONFIG);
   const priorityScore = calculatePriorityScore({
@@ -262,6 +285,10 @@ function createSlotBundle(
     priorityScore,
     retryCount: bundleEntity.retryCount ?? 0,
     lastFailureReason: bundleEntity.lastFailureReason ?? null,
+    ppPublicKey: bundleEntity.ppPublicKey ?? "",
+    entityName,
+    jurisdictions,
+    amount: aggregateBundleAmount(classified),
   };
 }
 
@@ -271,8 +298,6 @@ export const P_AddOperationsBundle = ProcessEngine.create(
   (input: PostEndpointInput<typeof requestSchema>) => {
     return withSpan("P_AddOperationsBundle", async (span) => {
       const { operationsMLXDR, channelContractId } = input.body;
-      const jurisdictionFrom = input.body.jurisdictionFrom ?? null;
-      const jurisdictionTo = input.body.jurisdictionTo ?? null;
       if (operationsMLXDR.length > BUNDLE_MAX_OPERATIONS) {
         logAndThrow(
           new E.TOO_MANY_OPERATIONS(
@@ -283,13 +308,46 @@ export const P_AddOperationsBundle = ProcessEngine.create(
       }
       const sessionData = input.ctx.state.session as JwtSessionData;
 
-      // Resolve channel client for on-chain reads (UTXO balances)
-      const channelCtx = await resolveChannelContext(channelContractId);
+      // URL-scoped: the route is /providers/:ppPublicKey/bundles. Extract
+      // the PP identifier here — the executor uses THIS specific PP, not
+      // a default or first-match across the platform.
+      const params = (input.ctx as unknown as {
+        params?: { ppPublicKey?: string };
+      }).params;
+      const ppPublicKey = params?.ppPublicKey;
+      if (!ppPublicKey) {
+        logAndThrow(new E.PP_PUBLIC_KEY_REQUIRED());
+      }
+      span.setAttribute("pp.publicKey", ppPublicKey);
+
+      // Resolve channel client for on-chain reads (UTXO balances). The
+      // resolver returns the PP-specific signer + channel client.
+      const channelCtx = await resolveChannelContext(
+        channelContractId,
+        ppPublicKey,
+      );
       const channelClient = channelCtx.channelClient;
 
       // 1. Session validation
       span.addEvent("validating_session");
       const userSession = await validateSession(sessionData.sessionId);
+
+      // 1b. Entity (KYC/KYB) gate — submitter must have an APPROVED entity.
+      span.addEvent("validating_entity_approval", {
+        "account.id": userSession.accountId,
+      });
+      const submitterAccount = await accountRepository.findById(
+        userSession.accountId,
+      );
+      const submitterEntity = submitterAccount
+        ? await entityRepository.findById(submitterAccount.entityId)
+        : null;
+      if (
+        !submitterEntity ||
+        submitterEntity.status !== EntityStatus.APPROVED
+      ) {
+        logAndThrow(new E.SUBMITTER_NOT_APPROVED(userSession.accountId));
+      }
 
       // 2. Bundle ID generation and validation
       span.addEvent("generating_bundle_id");
@@ -335,8 +393,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
           retryCount: 0,
-          jurisdictionFrom,
-          jurisdictionTo,
+          ppPublicKey,
           updatedAt: new Date(),
           updatedBy: userSession.accountId,
         });
@@ -349,8 +406,7 @@ export const P_AddOperationsBundle = ProcessEngine.create(
           ttl: calculateBundleTtl(),
           operationsMLXDR: operationsMLXDR,
           fee: feeCalculation.fee,
-          jurisdictionFrom,
-          jurisdictionTo,
+          ppPublicKey,
           createdBy: userSession.accountId,
           createdAt: new Date(),
         });
@@ -375,9 +431,14 @@ export const P_AddOperationsBundle = ProcessEngine.create(
         channelClient,
       );
 
-      // 7. Create SlotBundle and add to Mempool
+      // 7. Create SlotBundle (with submitter entity info) and add to Mempool
       span.addEvent("adding_to_mempool");
-      const slotBundle = createSlotBundle(bundleEntity, classified);
+      const slotBundle = createSlotBundle(
+        bundleEntity,
+        classified,
+        submitterEntity?.name ?? null,
+        submitterEntity?.jurisdictions ?? [],
+      );
       const mempool = getMempool();
       await mempool.addBundle(slotBundle);
 

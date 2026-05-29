@@ -37,8 +37,7 @@ export const operationsBundle = pgTable("operations_bundles", {
   fee: bigint("fee", { mode: "bigint" }).notNull(),
   retryCount: integer("retry_count").notNull().default(0),
   lastFailureReason: text("last_failure_reason"),
-  jurisdictionFrom: text("jurisdiction_from"),
-  jurisdictionTo: text("jurisdiction_to"),
+  ppPublicKey: text("pp_public_key"),
   ...createBaseColumns(),
 }, (table) => [
   index("idx_bundles_status_deleted_created").on(

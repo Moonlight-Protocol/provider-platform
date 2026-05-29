@@ -68,3 +68,23 @@ export async function resolveScopeForPp(
   if (!row) return null;
   return { ppPublicKey: row.ppPublicKey, ppLabel: row.ppLabel };
 }
+
+/**
+ * Returns one EventScope per PP known to this instance. Used by emission
+ * sites that should fan out to every dashboard regardless of channel — e.g.
+ * FAILED / EXPIRED bundle events, which all operators want visibility into.
+ */
+export async function resolveAllPpScopes(
+  deps: ScopeResolverDeps = defaultDeps,
+): Promise<EventScope[]> {
+  const rows = await deps.db
+    .select({
+      ppPublicKey: paymentProvider.publicKey,
+      ppLabel: paymentProvider.label,
+    })
+    .from(paymentProvider);
+  return rows.map((row) => ({
+    ppPublicKey: row.ppPublicKey,
+    ppLabel: row.ppLabel,
+  }));
+}

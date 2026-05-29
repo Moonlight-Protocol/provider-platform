@@ -4,31 +4,33 @@ import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
 import { challenge } from "@/persistence/drizzle/entity/challenge.entity.ts";
 
-export enum UserStatus {
+export enum EntityStatus {
   UNVERIFIED = "UNVERIFIED",
   APPROVED = "APPROVED",
   PENDING = "PENDING",
   BLOCKED = "BLOCKED",
 }
 
-export const userStatusEnum = pgEnum("user_status", [
-  UserStatus.UNVERIFIED,
-  UserStatus.APPROVED,
-  UserStatus.PENDING,
-  UserStatus.BLOCKED,
+export const entityStatusEnum = pgEnum("entity_status", [
+  EntityStatus.UNVERIFIED,
+  EntityStatus.APPROVED,
+  EntityStatus.PENDING,
+  EntityStatus.BLOCKED,
 ]);
 
-export const user = pgTable("users", {
+export const entity = pgTable("entities", {
   id: text("id").primaryKey(),
-  status: userStatusEnum("status").notNull(),
+  status: entityStatusEnum("status").notNull(),
+  name: text("name"),
+  jurisdictions: text("jurisdictions").array(),
   ...createBaseColumns(),
 });
 
 // Relations
-export const userRelations = relations(user, ({ many }) => ({
+export const entityRelations = relations(entity, ({ many }) => ({
   accounts: many(account),
   challenges: many(challenge),
 }));
 
-export type User = typeof user.$inferSelect;
-export type NewUser = typeof user.$inferInsert;
+export type Entity = typeof entity.$inferSelect;
+export type NewEntity = typeof entity.$inferInsert;

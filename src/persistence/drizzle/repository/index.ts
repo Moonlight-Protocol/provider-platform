@@ -1,5 +1,5 @@
 export * from "@/persistence/drizzle/repository/base.repository.ts";
-export * from "@/persistence/drizzle/repository/user.repository.ts";
+export * from "@/persistence/drizzle/repository/entity.repository.ts";
 export * from "@/persistence/drizzle/repository/account.repository.ts";
 export * from "@/persistence/drizzle/repository/session.repository.ts";
 export * from "@/persistence/drizzle/repository/challenge.repository.ts";

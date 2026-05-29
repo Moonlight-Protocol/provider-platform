@@ -2,7 +2,11 @@ import { LOG } from "@/config/logger.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
-import { OperationsBundleRepository } from "@/persistence/drizzle/repository/index.ts";
+import {
+  AccountRepository,
+  EntityRepository,
+  OperationsBundleRepository,
+} from "@/persistence/drizzle/repository/index.ts";
 import {
   MEMPOOL_CHEAP_OP_WEIGHT,
   MEMPOOL_EXPENSIVE_OP_WEIGHT,
@@ -15,6 +19,7 @@ import {
   classifyOperations,
 } from "@/core/service/bundle/bundle.service.ts";
 import type {
+  ClassifiedOperations,
   SlotBundle,
   WeightConfig,
 } from "@/core/service/bundle/bundle.types.ts";
@@ -28,7 +33,7 @@ import {
 import type { MempoolStats } from "@/core/service/mempool/mempool.types.ts";
 import * as E from "@/core/service/mempool/mempool.errors.ts";
 import { withSpan } from "@/core/tracing.ts";
-import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+import { emitForPp } from "@/core/service/events/emit-helpers.ts";
 
 const MEMPOOL_CONFIG = {
   SLOT_CAPACITY: MEMPOOL_SLOT_CAPACITY,
@@ -41,6 +46,8 @@ const MEMPOOL_CONFIG = {
 const operationsBundleRepository = new OperationsBundleRepository(
   drizzleClient,
 );
+const accountRepository = new AccountRepository(drizzleClient);
+const entityRepository = new EntityRepository(drizzleClient);
 
 /**
  * Parses MLXDR operations from a bundle entity
@@ -70,6 +77,31 @@ async function parseOperationsFromBundle(
 /**
  * Creates a SlotBundle from an OperationsBundle entity
  */
+function aggregateBundleAmount(
+  classified: ClassifiedOperations,
+): string | null {
+  const sum = (
+    list: Array<{ getAmount: () => bigint }>,
+  ): bigint => list.reduce((acc, op) => acc + op.getAmount(), 0n);
+  if (classified.deposit.length > 0) return sum(classified.deposit).toString();
+  if (classified.withdraw.length > 0) {
+    return sum(classified.withdraw).toString();
+  }
+  if (classified.create.length > 0) return sum(classified.create).toString();
+  return null;
+}
+
+async function lookupSubmitter(
+  pubkey: string | null,
+): Promise<{ name: string | null; jurisdictions: string[] }> {
+  if (!pubkey) return { name: null, jurisdictions: [] };
+  const account = await accountRepository.findById(pubkey);
+  if (!account) return { name: null, jurisdictions: [] };
+  const entity = await entityRepository.findById(account.entityId);
+  if (!entity) return { name: null, jurisdictions: [] };
+  return { name: entity.name, jurisdictions: entity.jurisdictions ?? [] };
+}
+
 export async function createSlotBundleFromEntity(
   bundle: OperationsBundle,
 ): Promise<SlotBundle> {
@@ -85,6 +117,8 @@ export async function createSlotBundleFromEntity(
     createdAt: bundle.createdAt,
   });
 
+  const submitter = await lookupSubmitter(bundle.createdBy);
+
   return {
     bundleId: bundle.id,
     channelContractId: bundle.channelContractId ?? "",
@@ -97,6 +131,10 @@ export async function createSlotBundleFromEntity(
     priorityScore,
     retryCount: bundle.retryCount ?? 0,
     lastFailureReason: bundle.lastFailureReason ?? null,
+    ppPublicKey: bundle.ppPublicKey ?? "",
+    entityName: submitter.name,
+    jurisdictions: submitter.jurisdictions,
+    amount: aggregateBundleAmount(classified),
   };
 }
 
@@ -299,7 +337,7 @@ export class Mempool {
           status: BundleStatus.EXPIRED,
           updatedAt: new Date(),
         });
-        await emitForChannel(bundleData.channelContractId, (scope) => ({
+        await emitForPp(bundleData.ppPublicKey, (scope) => ({
           kind: "mempool.bundle_expired",
           ts: Date.now(),
           scope,
@@ -324,7 +362,7 @@ export class Mempool {
           bundleToAdd = null;
           span.addEvent("added_to_existing_slot");
           LOG.debug(`Bundle ${bundleData.bundleId} added to existing slot`);
-          await emitForChannel(channel, (scope) => ({
+          await emitForPp(bundleData.ppPublicKey, (scope) => ({
             kind: "mempool.bundle_added",
             ts: Date.now(),
             scope,
@@ -333,6 +371,9 @@ export class Mempool {
               weight: bundleData.weight,
               channelContractId: channel,
               newSlot: false,
+              entityName: bundleData.entityName,
+              jurisdictions: bundleData.jurisdictions,
+              amount: bundleData.amount,
             },
           }));
         } else if (removed !== bundleToAdd) {
@@ -347,7 +388,7 @@ export class Mempool {
           this.slots.push(newSlot);
           span.addEvent("added_to_new_slot");
           LOG.debug(`Bundle ${bundleData.bundleId} added to new slot`);
-          await emitForChannel(channel, (scope) => ({
+          await emitForPp(bundleData.ppPublicKey, (scope) => ({
             kind: "mempool.bundle_added",
             ts: Date.now(),
             scope,
@@ -356,6 +397,9 @@ export class Mempool {
               weight: bundleData.weight,
               channelContractId: channel,
               newSlot: true,
+              entityName: bundleData.entityName,
+              jurisdictions: bundleData.jurisdictions,
+              amount: bundleData.amount,
             },
           }));
         } else {
@@ -455,8 +499,11 @@ export class Mempool {
    */
   expireBundles(): Promise<void> {
     return withSpan("Mempool.expireBundles", async (span) => {
-      const expired: Array<{ bundleId: string; channelContractId: string }> =
-        [];
+      const expired: Array<{
+        bundleId: string;
+        channelContractId: string;
+        ppPublicKey: string;
+      }> = [];
 
       for (let i = this.slots.length - 1; i >= 0; i--) {
         const slot = this.slots[i];
@@ -467,6 +514,7 @@ export class Mempool {
             expired.push({
               bundleId: bundle.bundleId,
               channelContractId: bundle.channelContractId,
+              ppPublicKey: bundle.ppPublicKey,
             });
             this.removeBundleFromSlot(slot, bundle.bundleId);
           }
@@ -483,13 +531,13 @@ export class Mempool {
         });
       }
 
-      for (const { bundleId, channelContractId } of expired) {
+      for (const { bundleId, channelContractId, ppPublicKey } of expired) {
         await operationsBundleRepository.update(bundleId, {
           status: BundleStatus.EXPIRED,
           updatedAt: new Date(),
         });
         LOG.info(`Bundle ${bundleId} expired and marked as EXPIRED`);
-        await emitForChannel(channelContractId, (scope) => ({
+        await emitForPp(ppPublicKey, (scope) => ({
           kind: "mempool.bundle_expired",
           ts: Date.now(),
           scope,

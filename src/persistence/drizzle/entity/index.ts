@@ -1,6 +1,6 @@
 // Export all entities and their relations
 export * from "@/persistence/drizzle/entity/base.entity.ts";
-export * from "@/persistence/drizzle/entity/user.entity.ts";
+export * from "@/persistence/drizzle/entity/entity.entity.ts";
 export * from "@/persistence/drizzle/entity/account.entity.ts";
 export * from "@/persistence/drizzle/entity/session.entity.ts";
 export * from "@/persistence/drizzle/entity/challenge.entity.ts";

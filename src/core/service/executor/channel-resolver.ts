@@ -1,6 +1,10 @@
 /**
- * Resolves the PP signer and channel client for a given channel contract ID.
- * Used by the executor to sign and submit transactions per-PP.
+ * Resolves the PP signer and channel client for a (channel, PP) pair.
+ *
+ * Bundles are submitted to /providers/:ppPublicKey/bundles, so the PP is
+ * always explicit. The resolver loads exactly that PP, verifies it is an
+ * active member of the requested channel, and returns its signer. There is
+ * no default / first-match across the fleet.
  */
 import { LocalSigner, type TransactionConfig } from "@colibri/core";
 import { Keypair } from "stellar-sdk";
@@ -19,26 +23,22 @@ export interface ChannelContext {
   txConfig: TransactionConfig;
 }
 
-const ppRepo = new PpRepository(drizzleClient);
-const membershipRepo = new CouncilMembershipRepository(drizzleClient);
-
 /**
- * Given a channelContractId, find the PP that operates it,
- * decrypt its key, and build the channel client + tx config.
+ * Returns a channel client suitable for READS only (no signer, no txConfig).
+ * For writes use resolveChannelContext(channelContractId, ppPublicKey).
+ *
+ * Uses any active membership that references the channel to find the
+ * channelAuthId + assetContractId — these are immutable per-channel.
  */
-export async function resolveChannelContext(
+export async function resolveChannelClient(
   channelContractId: string,
-): Promise<ChannelContext> {
-  // N+1: listActive() then one query per PP for its active membership.
-  // Acceptable for now since PP count is small; could be optimized with a join.
+): Promise<{ channelClient: PrivacyChannel; channelAuthId: string }> {
   const pps = await ppRepo.listActive();
-
   for (const pp of pps) {
     const membership = await membershipRepo.getActiveForPp(pp.publicKey);
     if (!membership?.configJson) continue;
-
     let config: {
-      council?: { channelAuthId?: string; councilPublicKey?: string };
+      council?: { channelAuthId?: string };
       channels?: Array<
         {
           channelContractId: string;
@@ -52,42 +52,102 @@ export async function resolveChannelContext(
     } catch {
       continue;
     }
-
     const channel = config.channels?.find((ch) =>
       ch.channelContractId === channelContractId
     );
     if (!channel) continue;
-
     const channelAuthId = config.council?.channelAuthId ??
       membership.channelAuthId;
-
-    // Decrypt the PP's secret key
-    const sk = await decryptSk(pp.encryptedSk, SERVICE_AUTH_SECRET);
-    if (!sk.startsWith("S")) {
-      throw new Error(
-        `Decrypted secret key for PP ${pp.publicKey} does not start with 'S' — the stored key may be corrupt or the decryption passphrase may have changed`,
-      );
-    }
-    const keypair = Keypair.fromSecret(sk);
-    const signer = LocalSigner.fromSecret(sk as `S${string}`);
-
-    // Build channel client
-    const client = getChannelClient(
-      channelContractId,
+    return {
+      channelClient: getChannelClient(
+        channelContractId,
+        channelAuthId,
+        channel.assetContractId ?? "",
+      ),
       channelAuthId,
-      channel.assetContractId ?? "",
-    );
-
-    // Build TX config — the PP's public key is the source (fee payer)
-    const txConfig: TransactionConfig = {
-      source: keypair.publicKey() as `G${string}`,
-      fee: NETWORK_FEE,
-      timeout: 30,
-      signers: [signer],
     };
+  }
+  throw new Error(
+    `resolveChannelClient: no active membership references channel ${channelContractId}`,
+  );
+}
 
-    return { signer, ppSecretKey: sk, channelClient: client, txConfig };
+const ppRepo = new PpRepository(drizzleClient);
+const membershipRepo = new CouncilMembershipRepository(drizzleClient);
+
+export async function resolveChannelContext(
+  channelContractId: string,
+  ppPublicKey: string,
+): Promise<ChannelContext> {
+  if (!ppPublicKey) {
+    throw new Error("resolveChannelContext: ppPublicKey is required");
   }
 
-  throw new Error(`No active PP found for channel ${channelContractId}`);
+  const pp = await ppRepo.findByPublicKey(ppPublicKey);
+  if (!pp || !pp.isActive) {
+    throw new Error(
+      `resolveChannelContext: PP ${ppPublicKey} not found or inactive`,
+    );
+  }
+
+  const membership = await membershipRepo.getActiveForPp(ppPublicKey);
+  if (!membership?.configJson) {
+    throw new Error(
+      `resolveChannelContext: PP ${ppPublicKey} has no active membership`,
+    );
+  }
+
+  let config: {
+    council?: { channelAuthId?: string; councilPublicKey?: string };
+    channels?: Array<
+      {
+        channelContractId: string;
+        assetCode: string;
+        assetContractId?: string;
+      }
+    >;
+  };
+  try {
+    config = JSON.parse(membership.configJson);
+  } catch {
+    throw new Error(
+      `resolveChannelContext: PP ${ppPublicKey} has malformed configJson`,
+    );
+  }
+
+  const channel = config.channels?.find((ch) =>
+    ch.channelContractId === channelContractId
+  );
+  if (!channel) {
+    throw new Error(
+      `resolveChannelContext: PP ${ppPublicKey} is not a member of channel ${channelContractId}`,
+    );
+  }
+
+  const channelAuthId = config.council?.channelAuthId ??
+    membership.channelAuthId;
+
+  const sk = await decryptSk(pp.encryptedSk, SERVICE_AUTH_SECRET);
+  if (!sk.startsWith("S")) {
+    throw new Error(
+      `Decrypted secret key for PP ${pp.publicKey} does not start with 'S' — the stored key may be corrupt or the decryption passphrase may have changed`,
+    );
+  }
+  const keypair = Keypair.fromSecret(sk);
+  const signer = LocalSigner.fromSecret(sk as `S${string}`);
+
+  const client = getChannelClient(
+    channelContractId,
+    channelAuthId,
+    channel.assetContractId ?? "",
+  );
+
+  const txConfig: TransactionConfig = {
+    source: keypair.publicKey() as `G${string}`,
+    fee: NETWORK_FEE,
+    timeout: 30,
+    signers: [signer],
+  };
+
+  return { signer, ppSecretKey: sk, channelClient: client, txConfig };
 }

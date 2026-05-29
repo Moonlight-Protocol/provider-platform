@@ -73,8 +73,6 @@ async function buildTxDetail(txId: string) {
   const aggregatedWithdraws: Array<
     { recipientAddress: string; amount: string }
   > = [];
-  const jurisdictionsFrom = new Set<string>();
-  const jurisdictionsTo = new Set<string>();
 
   for (const link of bundleLinks) {
     const bundle = await bundleRepo.findById(link.bundleId);
@@ -90,13 +88,9 @@ async function buildTxDetail(txId: string) {
     const ops = parseBundleOps(bundle.operationsMLXDR);
     aggregatedDeposits.push(...ops.deposits);
     aggregatedWithdraws.push(...ops.withdraws);
-    if (bundle.jurisdictionFrom) jurisdictionsFrom.add(bundle.jurisdictionFrom);
-    if (bundle.jurisdictionTo) jurisdictionsTo.add(bundle.jurisdictionTo);
     bundles.push({
       id: bundle.id,
       createdAt: bundle.createdAt.toISOString(),
-      jurisdictionFrom: bundle.jurisdictionFrom,
-      jurisdictionTo: bundle.jurisdictionTo,
       deposits: ops.deposits,
       withdraws: ops.withdraws,
       spendCount: ops.spendCount,
@@ -128,10 +122,6 @@ async function buildTxDetail(txId: string) {
       mempoolAt: earliestBundleCreatedAt?.toISOString() ?? null,
       submittedAt: tx.createdAt.toISOString(),
       verifiedAt: isVerified ? tx.updatedAt.toISOString() : null,
-    },
-    jurisdictions: {
-      from: Array.from(jurisdictionsFrom),
-      to: Array.from(jurisdictionsTo),
     },
     senders: aggregatedDeposits.map((d) => d.depositorAddress),
     receivers: aggregatedWithdraws.map((w) => w.recipientAddress),

@@ -29,7 +29,7 @@ import {
   type NetworkErrorContext,
   recordNetworkErrorOnSpan,
 } from "@/core/service/executor/error-extraction.ts";
-import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+import { emitForBundles } from "@/core/service/events/emit-helpers.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -90,11 +90,14 @@ function submitTransactionToNetwork(
   txBuilder: MoonlightTransactionBuilder,
   expiration: number,
   channelContractId: string,
+  ppPublicKey: string,
 ): Promise<string> {
   return withSpan("Executor.submitTransactionToNetwork", async (span) => {
     const { signer, channelClient, txConfig } = await resolveChannelContext(
       channelContractId,
+      ppPublicKey,
     );
+    span.setAttribute("pp.publicKey", ppPublicKey);
 
     span.setAttribute("tx.source", txConfig.source);
     try {
@@ -337,14 +340,24 @@ export class Executor {
           bundleIds,
         });
 
-        // Resolve channel context from the first bundle in the slot
+        // Resolve channel context from the first bundle in the slot. All
+        // bundles in a slot must target the same (channel, PP) pair —
+        // mempool slots are partitioned by channel, and each bundle carries
+        // its own ppPublicKey from the URL-scoped submission.
         const slotBundles = slot.getBundles();
         const channelContractId = slotBundles[0]?.channelContractId;
+        const ppPublicKey = slotBundles[0]?.ppPublicKey;
         if (!channelContractId) {
           throw new Error("Bundle missing channelContractId");
         }
+        if (!ppPublicKey) {
+          throw new Error("Bundle missing ppPublicKey");
+        }
 
-        const channelCtx = await resolveChannelContext(channelContractId);
+        const channelCtx = await resolveChannelContext(
+          channelContractId,
+          ppPublicKey,
+        );
 
         // Build transaction from slot using the resolved context
         const { txBuilder, bundleIds: buildBundleIds } =
@@ -361,6 +374,7 @@ export class Executor {
           txBuilder,
           expiration,
           channelContractId,
+          ppPublicKey,
         );
 
         LOG.info("Transaction submitted successfully", {
@@ -377,7 +391,7 @@ export class Executor {
           bundleCount: bundleIds.length,
         });
 
-        await emitForChannel(channelContractId, (scope) => ({
+        await emitForBundles(bundleIds, (scope) => ({
           kind: "executor.transaction_submitted",
           ts: Date.now(),
           scope,
@@ -440,7 +454,7 @@ export class Executor {
         const failedChannelContractId = slot?.getBundles()[0]
           ?.channelContractId ?? null;
         if (failedChannelContractId) {
-          await emitForChannel(failedChannelContractId, (scope) => ({
+          await emitForBundles(bundleIds, (scope) => ({
             kind: "executor.execution_failed",
             ts: Date.now(),
             scope,
