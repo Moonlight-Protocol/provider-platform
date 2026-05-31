@@ -10,81 +10,95 @@ import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { extractOperationFromChallengeTx } from "./extract-nonce-from-tx.ts";
 import { isTransaction } from "@colibri/core";
 import { withSpan } from "@/core/tracing.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
-export const P_CompareChallenge = ProcessEngine.create(
-  (
-    input: PostChallengeInput,
-    _metadataHelper?: MetadataHelper,
-  ): Promise<PostChallengeInput> => {
-    return withSpan("P_CompareChallenge", async (span) => {
-      const { signedChallenge } = input.body;
-      const tx = new Transaction(
-        signedChallenge,
-        NETWORK_CONFIG.networkPassphrase,
-      );
-      assertOrThrow(isTransaction(tx), new E.CHALLENGE_IS_NOT_TRANSACTION(tx));
+export const P_CompareChallenge = (deps: { log: Logger }) =>
+  ProcessEngine.create(
+    (
+      input: PostChallengeInput,
+      _metadataHelper?: MetadataHelper,
+    ): Promise<PostChallengeInput> => {
+      return withSpan("P_CompareChallenge", async (span) => {
+        const log = deps.log.scope("P_CompareChallenge");
+        log.info("P_CompareChallenge");
+        const { signedChallenge } = input.body;
+        const tx = new Transaction(
+          signedChallenge,
+          NETWORK_CONFIG.networkPassphrase,
+        );
+        assertOrThrow(
+          isTransaction(tx),
+          new E.CHALLENGE_IS_NOT_TRANSACTION(tx),
+        );
 
-      const incomingTtl = extractChallengeTtl(tx);
-      const txHash = tx.hash().toString("hex");
+        const incomingTtl = extractChallengeTtl(tx);
+        const txHash = tx.hash().toString("hex");
+        log.debug("txHash", txHash);
 
-      span.addEvent("looking_up_stored_challenge", {
-        "challenge.txHash": txHash,
+        span.addEvent("looking_up_stored_challenge", {
+          "challenge.txHash": txHash,
+        });
+        log.event("looking up stored challenge");
+        const localChallenge = await challengeRepository.findOneByTxHash(
+          txHash,
+        );
+
+        assertOrThrow(
+          isDefined(localChallenge),
+          new E.CHALLENGE_NOT_FOUND(txHash),
+        );
+
+        const localChallengeTx = TransactionBuilder.fromXDR(
+          localChallenge.txXDR,
+          NETWORK_CONFIG.networkPassphrase,
+        );
+
+        assertOrThrow(
+          isTransaction(localChallengeTx),
+          new E.CHALLENGE_IS_NOT_TRANSACTION(localChallengeTx),
+        );
+
+        span.addEvent("comparing_nonce_and_account");
+        log.event("comparing nonce and account");
+        const {
+          clientAccount: localChallengeClientAccount,
+          nonce: localChallengeNonce,
+        } = extractOperationFromChallengeTx(localChallengeTx);
+
+        const { nonce: incomingNonce, clientAccount: incomingClientAccount } =
+          extractOperationFromChallengeTx(tx);
+
+        assertOrThrow(
+          localChallengeNonce === incomingNonce,
+          new E.NONCE_MISMATCH(localChallengeNonce, incomingNonce),
+        );
+
+        assertOrThrow(
+          localChallengeClientAccount === incomingClientAccount,
+          new E.CLIENT_ACCOUNT_MISMATCH(
+            localChallengeClientAccount,
+            incomingClientAccount,
+          ),
+        );
+
+        span.addEvent("comparing_ttl");
+        log.event("comparing TTL");
+        assertOrThrow(
+          localChallenge.ttl.toDateString() === incomingTtl.toDateString(),
+          new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, incomingTtl),
+        );
+
+        span.addEvent("challenge_comparison_passed");
+        log.event("challenge comparison passed");
+        return input;
       });
-      const localChallenge = await challengeRepository.findOneByTxHash(txHash);
-
-      assertOrThrow(
-        isDefined(localChallenge),
-        new E.CHALLENGE_NOT_FOUND(txHash),
-      );
-
-      const localChallengeTx = TransactionBuilder.fromXDR(
-        localChallenge.txXDR,
-        NETWORK_CONFIG.networkPassphrase,
-      );
-
-      assertOrThrow(
-        isTransaction(localChallengeTx),
-        new E.CHALLENGE_IS_NOT_TRANSACTION(localChallengeTx),
-      );
-
-      span.addEvent("comparing_nonce_and_account");
-      const {
-        clientAccount: localChallengeClientAccount,
-        nonce: localChallengeNonce,
-      } = extractOperationFromChallengeTx(localChallengeTx);
-
-      const { nonce: incomingNonce, clientAccount: incomingClientAccount } =
-        extractOperationFromChallengeTx(tx);
-
-      assertOrThrow(
-        localChallengeNonce === incomingNonce,
-        new E.NONCE_MISMATCH(localChallengeNonce, incomingNonce),
-      );
-
-      assertOrThrow(
-        localChallengeClientAccount === incomingClientAccount,
-        new E.CLIENT_ACCOUNT_MISMATCH(
-          localChallengeClientAccount,
-          incomingClientAccount,
-        ),
-      );
-
-      span.addEvent("comparing_ttl");
-      assertOrThrow(
-        localChallenge.ttl.toDateString() === incomingTtl.toDateString(),
-        new E.CHALLENGE_TTL_MISMATCH(localChallenge.ttl, incomingTtl),
-      );
-
-      span.addEvent("challenge_comparison_passed");
-      return input;
-    });
-  },
-  {
-    name: "CompareChallengeProcessEngine",
-  },
-);
+    },
+    {
+      name: "CompareChallengeProcessEngine",
+    },
+  );
 
 const extractChallengeTtl = (tx: Transaction): Date => {
   const maxTime = tx.timeBounds?.maxTime ? parseInt(tx.timeBounds.maxTime) : 0;

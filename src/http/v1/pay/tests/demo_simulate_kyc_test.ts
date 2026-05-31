@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/demo_simulate_kyc_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { postSimulateKycHandler } from "@/http/v1/pay/demo/simulate-kyc.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handlePostSimulateKyc } from "@/http/v1/pay/demo/simulate-kyc.ts";
 import {
   createTestAccount,
   createTestEscrow,
@@ -33,7 +34,7 @@ type MockResponse = { status: number; body: unknown };
 function createMockContext(
   body: unknown,
 ): {
-  ctx: Parameters<typeof postSimulateKycHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostSimulateKyc>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -82,7 +83,7 @@ Deno.test("demo simulate-kyc - creates VERIFIED KYC record for new address", asy
     jurisdiction: "US",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -121,7 +122,7 @@ Deno.test("demo simulate-kyc - updates existing PENDING KYC record to VERIFIED",
     jurisdiction: "EU",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -160,7 +161,7 @@ Deno.test("demo simulate-kyc - claims held custodial escrow after KYC simulation
     jurisdiction: "US",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -226,7 +227,7 @@ Deno.test("demo simulate-kyc - claims multiple held escrows", async () => {
     jurisdiction: "US",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -263,7 +264,7 @@ Deno.test("demo simulate-kyc - self-custodial escrow is claimed but no balance c
     jurisdiction: "US",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -299,7 +300,7 @@ Deno.test("demo simulate-kyc - missing address returns 400", async () => {
     jurisdiction: "US",
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -317,7 +318,7 @@ Deno.test("demo simulate-kyc - missing jurisdiction returns 400", async () => {
     address: testAddress(),
   });
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -333,7 +334,7 @@ Deno.test("demo simulate-kyc - empty body returns 400", async () => {
 
   const { ctx, getResponse } = createMockContext({});
 
-  await postSimulateKycHandler(ctx);
+  await handlePostSimulateKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);

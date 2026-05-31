@@ -6,8 +6,9 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_register_test.ts
  */
 import { assert, assertEquals } from "@std/assert";
+import { newNoop } from "@/utils/logger/index.ts";
 import { StrKey } from "@colibri/core";
-import { postCustodialRegisterHandler } from "@/http/v1/pay/custodial/register.ts";
+import { handlePostCustodialRegister } from "@/http/v1/pay/custodial/register.ts";
 import {
   createTestAccount,
   ensureInitialized,
@@ -24,7 +25,7 @@ type MockResponse = { status: number; body: unknown };
 function createMockContext(
   body: unknown,
 ): {
-  ctx: Parameters<typeof postCustodialRegisterHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostCustodialRegister>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -72,7 +73,7 @@ Deno.test("custodial register - successful registration returns token and deposi
     password: "secure-password-123",
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -110,7 +111,7 @@ Deno.test("custodial register - duplicate username returns 400", async () => {
     password: "another-password-123",
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -133,7 +134,7 @@ Deno.test("custodial register - username too short returns 400", async () => {
     password: "secure-password-123",
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -156,7 +157,7 @@ Deno.test("custodial register - password too short returns 400", async () => {
     password: "short",
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -178,7 +179,7 @@ Deno.test("custodial register - missing username returns 400", async () => {
     password: "secure-password-123",
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -196,7 +197,7 @@ Deno.test("custodial register - missing password returns 400", async () => {
     username: testUsername(),
   });
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -212,7 +213,7 @@ Deno.test("custodial register - empty body returns 400", async () => {
 
   const { ctx, getResponse } = createMockContext({});
 
-  await postCustodialRegisterHandler(ctx);
+  await handlePostCustodialRegister({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);

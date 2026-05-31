@@ -1,18 +1,10 @@
-import { Logger, LogLevel } from "@/utils/logger/index.ts";
-import { loadOptionalEnv } from "@/utils/env/loadEnv.ts";
+import { type Logger, newLogger, parseLevel } from "@/utils/logger/index.ts";
 
-export const LOG_LEVEL = loadOptionalEnv("LOG_LEVEL") as keyof typeof LogLevel;
-
-let LOG: Logger;
-
-if (LOG_LEVEL !== undefined && LOG_LEVEL in LogLevel) {
-  LOG = new Logger(LogLevel[LOG_LEVEL]);
-} else {
-  LOG = new Logger(LogLevel.INFO);
-
-  LOG.warn(
-    `LOG_LEVEL is not set or invalid. Defaulting to INFO. Received: ${LOG_LEVEL}`,
-  );
+/**
+ * Creates the root logger from `LOG_LEVEL` env var. Called once in main.ts;
+ * the returned logger is threaded through to every service and route handler
+ * via dependency injection. There is no module-level singleton.
+ */
+export function createLogger(): Logger {
+  return newLogger(parseLevel(Deno.env.get("LOG_LEVEL")));
 }
-
-export { LOG };

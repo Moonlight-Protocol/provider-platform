@@ -12,42 +12,50 @@ import * as E from "@/core/service/auth/challenge/store/error.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { withSpan } from "@/core/tracing.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const challengeRepository = new ChallengeRepository(drizzleClient);
 
-export const P_UpdateChallengeDB = ProcessEngine.create(
-  (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
-    return withSpan("P_UpdateChallengeDB", async (span) => {
-      const { signedChallenge } = input.body;
-      const tx = new Transaction(
-        signedChallenge,
-        NETWORK_CONFIG.networkPassphrase,
-      );
-      const hash = tx.hash().toString("hex");
+export const P_UpdateChallengeDB = (deps: { log: Logger }) =>
+  ProcessEngine.create(
+    (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
+      return withSpan("P_UpdateChallengeDB", async (span) => {
+        const log = deps.log.scope("P_UpdateChallengeDB");
+        log.info("P_UpdateChallengeDB");
 
-      span.addEvent("finding_challenge", { "challenge.txHash": hash });
-      const challenge = await challengeRepository.findOneByTxHash(hash);
-      assertOrThrow(
-        isDefined(challenge),
-        new E.CHALLENGE_NOT_FOUND_IN_DATABASE(hash),
-      );
+        const { signedChallenge } = input.body;
+        const tx = new Transaction(
+          signedChallenge,
+          NETWORK_CONFIG.networkPassphrase,
+        );
+        const hash = tx.hash().toString("hex");
+        log.debug("txHash", hash);
 
-      challenge.status = ChallengeStatus.VERIFIED;
+        span.addEvent("finding_challenge", { "challenge.txHash": hash });
+        log.event("finding challenge");
+        const challenge = await challengeRepository.findOneByTxHash(hash);
+        assertOrThrow(
+          isDefined(challenge),
+          new E.CHALLENGE_NOT_FOUND_IN_DATABASE(hash),
+        );
 
-      span.addEvent("updating_challenge_status", {
-        "challenge.status": ChallengeStatus.VERIFIED,
+        challenge.status = ChallengeStatus.VERIFIED;
+
+        span.addEvent("updating_challenge_status", {
+          "challenge.status": ChallengeStatus.VERIFIED,
+        });
+        log.event("marking challenge verified");
+        await challengeRepository.update(challenge.id, {
+          ...challenge,
+        });
+
+        return {
+          ctx: input.ctx,
+          jwt: input.jwt!,
+        };
       });
-      await challengeRepository.update(challenge.id, {
-        ...challenge,
-      });
-
-      return {
-        ctx: input.ctx,
-        jwt: input.jwt!,
-      };
-    });
-  },
-  {
-    name: "UpdateChallengeDB",
-  },
-);
+    },
+    {
+      name: "UpdateChallengeDB",
+    },
+  );

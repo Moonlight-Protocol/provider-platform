@@ -17,70 +17,81 @@ import type {
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import * as E from "@/core/service/auth/challenge/create/error.ts";
-import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { withSpan } from "@/core/tracing.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
-export const P_CreateChallenge = ProcessEngine.create(
-  (input: GetChallengeInput): Promise<ChallengeData> => {
-    return withSpan("P_CreateChallenge", async (span) => {
-      const { ctx, query } = input;
-      const clientAccount = query.account;
+export const P_CreateChallenge = (deps: { log: Logger }) =>
+  ProcessEngine.create(
+    (input: GetChallengeInput): Promise<ChallengeData> => {
+      return withSpan("P_CreateChallenge", async (span) => {
+        const log = deps.log.scope("P_CreateChallenge");
+        log.info("P_CreateChallenge");
+        const { ctx, query } = input;
+        const clientAccount = query.account;
+        log.debug("clientAccount", clientAccount);
 
-      span.addEvent("validating_client_account", {
-        "client.account": clientAccount ?? "undefined",
+        span.addEvent("validating_client_account", {
+          "client.account": clientAccount ?? "undefined",
+        });
+        log.event("validating client account");
+        assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
+
+        try {
+          span.addEvent("building_challenge_transaction");
+          log.event("building challenge transaction");
+          const { tx, nonce, minTime, maxTime } = getChallengeTransaction(
+            clientAccount,
+          );
+
+          const xdr = tx.toXDR();
+          const txHash = tx.hash().toString("hex");
+
+          const dateCreated = new Date(minTime * 1000);
+          const expiresAt = new Date(maxTime * 1000);
+
+          const { clientIp, userAgent, requestId } = extractRequestMetadata(
+            ctx,
+          );
+
+          span.addEvent("challenge_created", {
+            "challenge.txHash": txHash,
+            "challenge.clientAccount": clientAccount,
+            "challenge.requestId": requestId,
+          });
+          log.debug("txHash", txHash);
+          log.event("challenge created");
+
+          const output: ChallengeData = {
+            ctx,
+            challengeData: {
+              txHash: txHash,
+              clientAccount: clientAccount,
+              xdr,
+              nonce,
+              dateCreated: dateCreated,
+              requestId,
+              clientIp,
+              userAgent,
+              expiresAt,
+            },
+          };
+
+          return await output;
+        } catch (error) {
+          span.addEvent("challenge_creation_failed", {
+            "error.message": error instanceof Error
+              ? error.message
+              : String(error),
+          });
+          log.error(error, "challenge creation failed");
+          throw new E.FAILED_TO_CREATE_CHALLENGE(error);
+        }
       });
-      assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
-
-      try {
-        span.addEvent("building_challenge_transaction");
-        const { tx, nonce, minTime, maxTime } = getChallengeTransaction(
-          clientAccount,
-        );
-
-        const xdr = tx.toXDR();
-        const txHash = tx.hash().toString("hex");
-
-        const dateCreated = new Date(minTime * 1000);
-        const expiresAt = new Date(maxTime * 1000);
-
-        const { clientIp, userAgent, requestId } = extractRequestMetadata(ctx);
-
-        span.addEvent("challenge_created", {
-          "challenge.txHash": txHash,
-          "challenge.clientAccount": clientAccount,
-          "challenge.requestId": requestId,
-        });
-
-        const output: ChallengeData = {
-          ctx,
-          challengeData: {
-            txHash: txHash,
-            clientAccount: clientAccount,
-            xdr,
-            nonce,
-            dateCreated: dateCreated,
-            requestId,
-            clientIp,
-            userAgent,
-            expiresAt,
-          },
-        };
-
-        return await output;
-      } catch (error) {
-        span.addEvent("challenge_creation_failed", {
-          "error.message": error instanceof Error
-            ? error.message
-            : String(error),
-        });
-        logAndThrow(new E.FAILED_TO_CREATE_CHALLENGE(error));
-      }
-    });
-  },
-  {
-    name: "CreateChallengeProcessEngine",
-  },
-);
+    },
+    {
+      name: "CreateChallengeProcessEngine",
+    },
+  );
 
 const getChallengeTransaction = (
   clientAccount: string,

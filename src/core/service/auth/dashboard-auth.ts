@@ -1,6 +1,6 @@
 import { Keypair } from "stellar-sdk";
 import { Buffer } from "buffer";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { withSpan } from "@/core/tracing.ts";
 
 /**
@@ -32,8 +32,15 @@ const pendingChallenges = new Map<string, PendingChallenge>();
  * @param publicKey - The Ed25519 public key of the operator requesting auth
  * @returns The nonce to be signed
  */
-export function createDashboardChallenge(publicKey: string): { nonce: string } {
-  cleanupExpiredChallenges();
+export function createDashboardChallenge(
+  publicKey: string,
+  deps: { log: Logger },
+): { nonce: string } {
+  const log = deps.log.scope("createDashboardChallenge");
+  log.info("createDashboardChallenge");
+  log.debug("publicKey", publicKey);
+
+  cleanupExpiredChallenges(deps);
 
   if (pendingChallenges.size >= MAX_PENDING_CHALLENGES) {
     throw new Error("Too many pending challenges. Try again later.");
@@ -48,7 +55,7 @@ export function createDashboardChallenge(publicKey: string): { nonce: string } {
     createdAt: Date.now(),
   });
 
-  LOG.debug("Dashboard challenge created", { publicKey });
+  log.event("dashboard challenge created");
 
   return { nonce };
 }
@@ -77,7 +84,12 @@ export function verifyDashboardChallenge(
   signature: string,
   publicKey: string,
   config: DashboardAuthConfig,
+  deps: { log: Logger },
 ): Promise<{ token: string }> {
+  const log = deps.log.scope("verifyDashboardChallenge");
+  log.info("verifyDashboardChallenge");
+  log.debug("publicKey", publicKey);
+
   return withSpan("DashboardAuth.verify", async (span) => {
     span.addEvent("verifying_challenge", { "signer.publicKey": publicKey });
 
@@ -160,6 +172,7 @@ export function verifyDashboardChallenge(
       publicKey,
       config.providerPublicKey,
       config.horizonUrl,
+      log,
     );
     if (!isAuth) {
       throw new Error("Signer is not authorized on the provider account");
@@ -175,7 +188,7 @@ export function verifyDashboardChallenge(
       .join("");
     const token = await config.generateToken(publicKey, hashedSessionId);
 
-    LOG.info("Dashboard auth successful", { publicKey });
+    log.event("dashboard auth successful");
     return { token };
   });
 }
@@ -186,7 +199,8 @@ export function verifyDashboardChallenge(
 async function isAuthorizedSigner(
   signerKey: string,
   accountId: string,
-  horizonUrl?: string,
+  horizonUrl: string | undefined,
+  log: Logger,
 ): Promise<boolean> {
   // Direct match — the signer is the account itself
   if (signerKey === accountId) {
@@ -194,8 +208,8 @@ async function isAuthorizedSigner(
   }
 
   if (!horizonUrl) {
-    LOG.warn(
-      "No Horizon URL configured, falling back to direct key match only",
+    log.event(
+      "no Horizon URL configured, falling back to direct key match only",
     );
     return false;
   }
@@ -204,10 +218,12 @@ async function isAuthorizedSigner(
     const baseUrl = horizonUrl.replace(/\/+$/, "");
     const response = await fetch(`${baseUrl}/accounts/${accountId}`);
     if (!response.ok) {
-      LOG.error("Failed to fetch account from Horizon", {
-        status: response.status,
-        accountId,
-      });
+      log.debug("status", response.status);
+      log.debug("accountId", accountId);
+      log.error(
+        new Error(`HTTP ${response.status}`),
+        "failed to fetch account from Horizon",
+      );
       return false;
     }
 
@@ -218,18 +234,21 @@ async function isAuthorizedSigner(
 
     return signers.some((s) => s.key === signerKey && s.weight > 0);
   } catch (error) {
-    LOG.error("Failed to verify signer authorization", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    log.error(error, "failed to verify signer authorization");
     return false;
   }
 }
 
-function cleanupExpiredChallenges(): void {
+function cleanupExpiredChallenges(deps: { log: Logger }): void {
+  const log = deps.log.scope("cleanupExpiredChallenges");
+  log.info("cleanupExpiredChallenges");
   const now = Date.now();
+  let removed = 0;
   for (const [nonce, challenge] of pendingChallenges) {
     if (now - challenge.createdAt > challengeTtlMs) {
       pendingChallenges.delete(nonce);
+      removed++;
     }
   }
+  log.debug("removed", removed);
 }

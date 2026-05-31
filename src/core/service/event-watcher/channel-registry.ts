@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import type { ChannelAuthEvent } from "./event-watcher.types.ts";
 
 /**
@@ -40,9 +40,11 @@ export class ChannelRegistry {
   private channels: Map<string, ChannelRecord> = new Map();
   private configuredChannels: Set<string>;
   private kv: Deno.Kv | null = null;
+  private log: Logger;
 
-  constructor(configuredChannelIds: string[]) {
+  constructor(configuredChannelIds: string[], deps: { log: Logger }) {
     this.configuredChannels = new Set(configuredChannelIds);
+    this.log = deps.log.scope("ChannelRegistry");
   }
 
   /**
@@ -59,13 +61,8 @@ export class ChannelRegistry {
       for (const record of stored.value) {
         this.channels.set(record.contractId, record);
       }
-      LOG.info("ChannelRegistry restored from KV", {
-        count: stored.value.length,
-        channels: stored.value.map((r) => ({
-          contractId: r.contractId,
-          state: r.state,
-        })),
-      });
+      this.log.debug("count", stored.value.length);
+      this.log.event("ChannelRegistry restored from KV");
     }
 
     // Seed configured channels that aren't already tracked
@@ -76,7 +73,8 @@ export class ChannelRegistry {
           state: "active",
           registeredAtLedger: 0,
         });
-        LOG.info("Seeded configured channel as active", { contractId });
+        this.log.debug("contractId", contractId);
+        this.log.event("seeded configured channel as active");
       }
     }
 
@@ -85,6 +83,8 @@ export class ChannelRegistry {
 
   /** Dynamically add a channel to track (e.g., when a PP joins a new council). */
   addChannel(contractId: string): void {
+    this.log.info("addChannel");
+    this.log.debug("contractId", contractId);
     this.configuredChannels.add(contractId);
     if (!this.channels.has(contractId)) {
       this.channels.set(contractId, {
@@ -92,6 +92,9 @@ export class ChannelRegistry {
         state: "active",
         registeredAtLedger: 0,
       });
+      this.log.event("channel registered as active");
+    } else {
+      this.log.event("channel already tracked");
     }
   }
 
@@ -107,10 +110,9 @@ export class ChannelRegistry {
         await this.onProviderRemoved(event);
         break;
       case "contract_initialized":
-        LOG.debug("Channel Auth contract initialized", {
-          contractId: event.contractId,
-          admin: event.address,
-        });
+        this.log.debug("contractId", event.contractId);
+        this.log.debug("admin", event.address);
+        this.log.event("Channel Auth contract initialized");
         break;
     }
   }
@@ -125,11 +127,10 @@ export class ChannelRegistry {
       registeredAtLedger: event.ledger,
     });
 
-    LOG.info("Provider registered in channel", {
-      contractId: event.contractId,
-      state,
-      ledger: event.ledger,
-    });
+    this.log.debug("contractId", event.contractId);
+    this.log.debug("state", state);
+    this.log.debug("ledger", event.ledger);
+    this.log.event("provider registered in channel");
 
     await this.persist();
   }
@@ -148,10 +149,9 @@ export class ChannelRegistry {
       });
     }
 
-    LOG.info("Provider removed from channel", {
-      contractId: event.contractId,
-      ledger: event.ledger,
-    });
+    this.log.debug("contractId", event.contractId);
+    this.log.debug("ledger", event.ledger);
+    this.log.event("provider removed from channel");
 
     await this.persist();
   }
@@ -164,9 +164,7 @@ export class ChannelRegistry {
     try {
       await this.kv.set(REGISTRY_KV_KEY, this.getAll());
     } catch (error) {
-      LOG.error("Failed to persist channel registry", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.log.error(error, "failed to persist channel registry");
     }
   }
 
@@ -195,10 +193,13 @@ export class ChannelRegistry {
    * Mark a channel as configured (operator activated it).
    */
   async activateChannel(contractId: string): Promise<void> {
+    this.log.info("activateChannel");
+    this.log.debug("contractId", contractId);
     this.configuredChannels.add(contractId);
     const channel = this.channels.get(contractId);
     if (channel && channel.state === "pending") {
       channel.state = "active";
+      this.log.event("channel transitioned to active");
       await this.persist();
     }
   }
@@ -207,10 +208,13 @@ export class ChannelRegistry {
    * Mark a channel as no longer configured by the operator.
    */
   async deactivateChannel(contractId: string): Promise<void> {
+    this.log.info("deactivateChannel");
+    this.log.debug("contractId", contractId);
     this.configuredChannels.delete(contractId);
     const channel = this.channels.get(contractId);
     if (channel && channel.state === "active") {
       channel.state = "pending";
+      this.log.event("channel transitioned to pending");
       await this.persist();
     }
   }
@@ -219,9 +223,11 @@ export class ChannelRegistry {
    * Close the KV handle. Call on shutdown.
    */
   close(): void {
+    this.log.info("close");
     if (this.kv) {
       this.kv.close();
       this.kv = null;
+      this.log.event("KV handle closed");
     }
   }
 }

@@ -1,6 +1,5 @@
 import { ProcessEngine } from "@fifo/convee";
 import type { Context } from "@oak/oak";
-import { LOG } from "@/config/logger.ts";
 import type { GetEndpointInput } from "@/http/pipelines/types.ts";
 import type { requestSchema } from "@/http/v1/bundle/get.ts";
 import { responseSchema } from "@/http/v1/bundle/get.ts";
@@ -10,8 +9,8 @@ import { SessionRepository } from "@/persistence/drizzle/repository/session.repo
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import * as E from "@/core/service/bundle/bundle.errors.ts";
-import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { toBundleDTO } from "@/core/service/bundle/bundle.service.ts";
 import { withSpan } from "@/core/tracing.ts";
 
@@ -22,11 +21,20 @@ const sessionRepository = new SessionRepository(drizzleClient);
 
 // ========== HELPER FUNCTIONS ==========
 
-async function findBundleOrThrow(bundleId: string): Promise<OperationsBundle> {
+async function findBundleOrThrow(
+  bundleId: string,
+  deps: { log: Logger },
+): Promise<OperationsBundle> {
+  const log = deps.log.scope("findBundleOrThrow");
+  log.info("findBundleOrThrow");
+  log.debug("bundleId", bundleId);
+
+  log.event("looking up bundle");
   const bundle = await operationsBundleRepository.findById(bundleId);
 
   if (!bundle) {
-    logAndThrow(new E.BUNDLE_NOT_FOUND(bundleId));
+    log.event("bundle not found");
+    throw new E.BUNDLE_NOT_FOUND(bundleId);
   }
 
   return bundle;
@@ -35,51 +43,61 @@ async function findBundleOrThrow(bundleId: string): Promise<OperationsBundle> {
 async function assertBundleOwnership(
   ctx: Context,
   bundle: OperationsBundle,
+  deps: { log: Logger },
 ): Promise<void> {
+  const log = deps.log.scope("assertBundleOwnership");
+  log.info("assertBundleOwnership");
+  log.debug("bundleId", bundle.id);
+
   const sessionData = ctx.state.session as JwtSessionData;
+  log.event("loading session");
   const userSession = await sessionRepository.findById(sessionData.sessionId);
 
   if (!userSession) {
-    logAndThrow(new E.INVALID_SESSION(sessionData.sessionId));
+    log.event("session invalid");
+    throw new E.INVALID_SESSION(sessionData.sessionId);
   }
 
   if (bundle.createdBy !== userSession.accountId) {
-    logAndThrow(
-      new E.BUNDLE_ACCESS_FORBIDDEN(bundle.id, userSession.accountId),
-    );
+    log.event("bundle ownership mismatch");
+    throw new E.BUNDLE_ACCESS_FORBIDDEN(bundle.id, userSession.accountId);
   }
+  log.event("ownership verified");
 }
 
 // ========== MAIN PROCESS ==========
 
-export const P_GetBundleById = ProcessEngine.create(
-  (
-    input: GetEndpointInput<typeof requestSchema>,
-  ): Promise<BundleGetProcessOutput> => {
-    return withSpan("P_GetBundleById", async (span) => {
-      const { ctx, query } = input;
-      const { bundleId } = query;
+export const P_GetBundleById = (deps: { log: Logger }) =>
+  ProcessEngine.create(
+    (
+      input: GetEndpointInput<typeof requestSchema>,
+    ): Promise<BundleGetProcessOutput> => {
+      return withSpan("P_GetBundleById", async (span) => {
+        const log = deps.log.scope("P_GetBundleById");
+        const { ctx, query } = input;
+        const { bundleId } = query;
 
-      span.setAttribute("bundle.id", bundleId);
-      LOG.debug("Fetching bundle by ID", { bundleId });
+        span.setAttribute("bundle.id", bundleId);
+        log.debug("bundleId", bundleId);
+        log.event("fetching bundle by ID");
 
-      span.addEvent("finding_bundle");
-      const bundle = await findBundleOrThrow(bundleId);
+        span.addEvent("finding_bundle");
+        const bundle = await findBundleOrThrow(bundleId, deps);
 
-      span.addEvent("checking_ownership");
-      await assertBundleOwnership(ctx as Context, bundle);
+        span.addEvent("checking_ownership");
+        await assertBundleOwnership(ctx as Context, bundle, deps);
 
-      const dto = toBundleDTO(bundle);
-      const parsed = responseSchema.parse(dto);
+        const dto = toBundleDTO(bundle);
+        const parsed = responseSchema.parse(dto);
 
-      span.addEvent("bundle_retrieved", { "bundle.status": bundle.status });
-      return {
-        ctx: ctx as Context,
-        bundle: parsed,
-      };
-    });
-  },
-  {
-    name: "GetBundleByIdProcessEngine",
-  },
-);
+        span.addEvent("bundle_retrieved", { "bundle.status": bundle.status });
+        return {
+          ctx: ctx as Context,
+          bundle: parsed,
+        };
+      });
+    },
+    {
+      name: "GetBundleByIdProcessEngine",
+    },
+  );

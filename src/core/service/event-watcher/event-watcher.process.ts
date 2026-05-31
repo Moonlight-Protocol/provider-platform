@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { NETWORK_RPC_SERVER } from "@/config/env.ts";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
 import type {
@@ -33,12 +33,17 @@ export class EventWatcher {
   private config: EventWatcherConfig;
   private handlers: EventHandler[] = [];
   private kv: Deno.Kv | null = null;
+  private log: Logger;
 
-  constructor(config: { contractId: string; intervalMs?: number }) {
+  constructor(
+    config: { contractId: string; intervalMs?: number },
+    deps: { log: Logger },
+  ) {
     this.config = {
       contractId: config.contractId,
       intervalMs: config.intervalMs ?? 30_000,
     };
+    this.log = deps.log.scope("EventWatcher");
   }
 
   /**
@@ -53,7 +58,7 @@ export class EventWatcher {
    */
   async start(): Promise<void> {
     if (this.isRunning) {
-      LOG.warn("EventWatcher is already running");
+      this.log.event("EventWatcher is already running");
       return;
     }
 
@@ -69,17 +74,15 @@ export class EventWatcher {
     );
     if (stored.value !== null) {
       this.lastLedger = stored.value;
-      LOG.info("EventWatcher restored cursor from KV", {
-        contractId: this.config.contractId,
-        startLedger: this.lastLedger,
-      });
+      this.log.debug("contractId", this.config.contractId);
+      this.log.debug("startLedger", this.lastLedger);
+      this.log.event("EventWatcher restored cursor from KV");
     } else {
       const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger();
       this.lastLedger = latestLedger.sequence;
-      LOG.info("EventWatcher initialized from network (no saved cursor)", {
-        contractId: this.config.contractId,
-        startLedger: this.lastLedger,
-      });
+      this.log.debug("contractId", this.config.contractId);
+      this.log.debug("startLedger", this.lastLedger);
+      this.log.event("EventWatcher initialized from network (no saved cursor)");
     }
 
     // Start the self-scheduling loop
@@ -101,7 +104,7 @@ export class EventWatcher {
       this.kv.close();
       this.kv = null;
     }
-    LOG.info("EventWatcher stopped");
+    this.log.event("EventWatcher stopped");
   }
 
   /**
@@ -116,12 +119,14 @@ export class EventWatcher {
    * Prevents concurrent polls when RPC is slow.
    */
   private async scheduleNext(): Promise<void> {
+    this.log.info("scheduleNext");
     await this.poll();
     if (this.isRunning) {
       this.timeoutId = setTimeout(
         () => this.scheduleNext(),
         this.config.intervalMs,
       ) as unknown as number;
+      this.log.event("next poll scheduled");
     }
   }
 
@@ -137,15 +142,16 @@ export class EventWatcher {
           NETWORK_RPC_SERVER,
           this.config.contractId,
           this.lastLedger,
+          { log: this.log },
         );
 
         if (events.length > 0) {
           span.addEvent("dispatching_events", {
             "events.count": events.length,
           });
-          LOG.info(`EventWatcher found ${events.length} new event(s)`, {
-            types: events.map((e) => e.type).join(", "),
-          });
+          this.log.debug("count", events.length);
+          this.log.debug("types", events.map((e) => e.type).join(", "));
+          this.log.event("EventWatcher found new events");
 
           for (const event of events) {
             await this.dispatch(event);
@@ -168,9 +174,7 @@ export class EventWatcher {
             ? error.message
             : String(error),
         });
-        LOG.error("EventWatcher poll error", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.log.error(error, "EventWatcher poll error");
       }
     });
   }
@@ -183,10 +187,8 @@ export class EventWatcher {
       try {
         await handler(event);
       } catch (error) {
-        LOG.error("EventWatcher handler error", {
-          eventType: event.type,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.log.debug("eventType", event.type);
+        this.log.error(error, "EventWatcher handler error");
       }
     }
   }

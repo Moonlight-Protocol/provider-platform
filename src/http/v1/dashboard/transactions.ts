@@ -10,7 +10,7 @@ import { UtxoRepository } from "@/persistence/drizzle/repository/utxo.repository
 import { transaction } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const ppRepo = new PpRepository(drizzleClient);
 const txRepo = new TransactionRepository();
@@ -27,7 +27,7 @@ type ParsedOps = {
   createCount: number;
 };
 
-function parseBundleOps(operationsMLXDR: string[]): ParsedOps {
+function parseBundleOps(operationsMLXDR: string[], log: Logger): ParsedOps {
   const deposits: ParsedOps["deposits"] = [];
   const withdraws: ParsedOps["withdraws"] = [];
   let spendCount = 0;
@@ -51,17 +51,20 @@ function parseBundleOps(operationsMLXDR: string[]): ParsedOps {
         createCount++;
       }
     } catch (error) {
-      LOG.warn("Skipping unparseable operation MLXDR", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      log.error(error, "skipping unparseable operation MLXDR");
     }
   }
   return { deposits, withdraws, spendCount, createCount };
 }
 
-async function buildTxDetail(txId: string) {
+async function buildTxDetail(txId: string, log: Logger) {
+  log.info("buildTxDetail");
+  log.debug("txId", txId);
+  log.event("loading transaction");
   const tx = await txRepo.findById(txId);
   if (!tx) return null;
+
+  log.event("aggregating bundle/utxo details");
 
   const bundleLinks = await bundleTxRepo.findByTransactionId(txId);
   const bundles = [];
@@ -85,7 +88,7 @@ async function buildTxDetail(txId: string) {
     ) {
       earliestBundleCreatedAt = bundle.createdAt;
     }
-    const ops = parseBundleOps(bundle.operationsMLXDR);
+    const ops = parseBundleOps(bundle.operationsMLXDR, log);
     aggregatedDeposits.push(...ops.deposits);
     aggregatedWithdraws.push(...ops.withdraws);
     bundles.push({
@@ -132,16 +135,17 @@ async function buildTxDetail(txId: string) {
   };
 }
 
-/**
- * Find tx ids whose linked bundles target the given channel AND whose
- * tx.createdAt falls inside the range. Ordered newest-first.
- */
 async function findTxIdsInRange(
   channelContractId: string,
   from: Date,
   to: Date,
   limit: number,
+  log: Logger,
 ): Promise<string[]> {
+  log.info("findTxIdsInRange");
+  log.debug("channelContractId", channelContractId);
+  log.debug("limit", limit);
+  log.event("querying transactions by channel + time range");
   const rows = await drizzleClient
     .selectDistinct({ id: transaction.id, createdAt: transaction.createdAt })
     .from(transaction)
@@ -167,126 +171,125 @@ async function findTxIdsInRange(
 
 type RouteParams = { id?: string };
 
-/**
- * GET /dashboard/transactions?ppPublicKey=...&channelContractId=...&fromIso=...&toIso=...
- *
- * Lists transactions in the given range scoped to the channel. Each entry
- * has the same shape as the single-tx detail endpoint so the client can
- * fan it out across the dashboard columns.
- */
-export const listTransactionsHandler = async (ctx: Context) => {
-  try {
-    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-    const channelContractId = ctx.request.url.searchParams.get(
-      "channelContractId",
-    );
-    const fromIso = ctx.request.url.searchParams.get("fromIso");
-    const toIso = ctx.request.url.searchParams.get("toIso");
+export function handleListDashboardTransactions(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> {
+  const log = deps.log.scope("listDashboardTransactions");
 
-    if (!ppPublicKey || !channelContractId || !fromIso || !toIso) {
-      ctx.response.status = Status.BadRequest;
+  return async (ctx) => {
+    log.info("listDashboardTransactions");
+    try {
+      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+      const channelContractId = ctx.request.url.searchParams.get(
+        "channelContractId",
+      );
+      const fromIso = ctx.request.url.searchParams.get("fromIso");
+      const toIso = ctx.request.url.searchParams.get("toIso");
+
+      if (!ppPublicKey || !channelContractId || !fromIso || !toIso) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = {
+          message: "ppPublicKey, channelContractId, fromIso, toIso required",
+        };
+        return;
+      }
+
+      const from = new Date(fromIso);
+      const to = new Date(toIso);
+      if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "fromIso/toIso must be ISO datetimes" };
+        return;
+      }
+
+      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+      const pp = await ppRepo.findByPublicKeyAndOwner(
+        ppPublicKey,
+        ownerPublicKey,
+      );
+      if (!pp) {
+        ctx.response.status = Status.NotFound;
+        ctx.response.body = { message: "Provider not found" };
+        return;
+      }
+
+      const txIds = await findTxIdsInRange(
+        channelContractId,
+        from,
+        to,
+        MAX_LIST_RESULTS,
+        log,
+      );
+
+      const items = [];
+      for (const txId of txIds) {
+        const detail = await buildTxDetail(txId, log);
+        if (detail) items.push(detail);
+      }
+
+      ctx.response.status = Status.OK;
       ctx.response.body = {
-        message: "ppPublicKey, channelContractId, fromIso, toIso required",
+        message: "Transactions retrieved",
+        data: items,
+        truncated: txIds.length >= MAX_LIST_RESULTS,
       };
-      return;
+    } catch (error) {
+      log.error(error, "failed to list transactions");
+      ctx.response.status = Status.InternalServerError;
+      ctx.response.body = { message: "Failed to list transactions" };
     }
+  };
+}
 
-    const from = new Date(fromIso);
-    const to = new Date(toIso);
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "fromIso/toIso must be ISO datetimes" };
-      return;
+export function handleGetTransactionDetail(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> {
+  const log = deps.log.scope("getTransactionDetail");
+
+  return async (ctx) => {
+    log.info("getTransactionDetail");
+    try {
+      const params = (ctx as unknown as { params?: RouteParams }).params;
+      const txId = params?.id;
+      if (!txId) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "Transaction id is required" };
+        return;
+      }
+
+      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+      if (!ppPublicKey) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = {
+          message: "ppPublicKey query parameter is required",
+        };
+        return;
+      }
+
+      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+      const pp = await ppRepo.findByPublicKeyAndOwner(
+        ppPublicKey,
+        ownerPublicKey,
+      );
+      if (!pp) {
+        ctx.response.status = Status.NotFound;
+        ctx.response.body = { message: "Provider not found" };
+        return;
+      }
+
+      const detail = await buildTxDetail(txId, log);
+      if (!detail) {
+        ctx.response.status = Status.NotFound;
+        ctx.response.body = { message: "Transaction not found" };
+        return;
+      }
+
+      ctx.response.status = Status.OK;
+      ctx.response.body = { message: "Transaction detail", data: detail };
+    } catch (error) {
+      log.error(error, "failed to fetch transaction detail");
+      ctx.response.status = Status.InternalServerError;
+      ctx.response.body = { message: "Failed to fetch transaction detail" };
     }
-
-    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(
-      ppPublicKey,
-      ownerPublicKey,
-    );
-    if (!pp) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Provider not found" };
-      return;
-    }
-
-    const txIds = await findTxIdsInRange(
-      channelContractId,
-      from,
-      to,
-      MAX_LIST_RESULTS,
-    );
-
-    const items = [];
-    for (const txId of txIds) {
-      const detail = await buildTxDetail(txId);
-      if (detail) items.push(detail);
-    }
-
-    ctx.response.status = Status.OK;
-    ctx.response.body = {
-      message: "Transactions retrieved",
-      data: items,
-      truncated: txIds.length >= MAX_LIST_RESULTS,
-    };
-  } catch (error) {
-    LOG.error("Failed to list transactions", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    ctx.response.status = Status.InternalServerError;
-    ctx.response.body = { message: "Failed to list transactions" };
-  }
-};
-
-/**
- * GET /dashboard/transactions/:id?ppPublicKey=G...
- *
- * Returns the full lifecycle picture of one tx.
- */
-export const getTransactionDetailHandler = async (ctx: Context) => {
-  try {
-    const params = (ctx as unknown as { params?: RouteParams }).params;
-    const txId = params?.id;
-    if (!txId) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "Transaction id is required" };
-      return;
-    }
-
-    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-    if (!ppPublicKey) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = {
-        message: "ppPublicKey query parameter is required",
-      };
-      return;
-    }
-
-    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(
-      ppPublicKey,
-      ownerPublicKey,
-    );
-    if (!pp) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Provider not found" };
-      return;
-    }
-
-    const detail = await buildTxDetail(txId);
-    if (!detail) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Transaction not found" };
-      return;
-    }
-
-    ctx.response.status = Status.OK;
-    ctx.response.body = { message: "Transaction detail", data: detail };
-  } catch (error) {
-    LOG.error("Failed to fetch transaction detail", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    ctx.response.status = Status.InternalServerError;
-    ctx.response.body = { message: "Failed to fetch transaction detail" };
-  }
-};
+  };
+}

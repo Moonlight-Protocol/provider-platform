@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/transactions_list_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { listTransactionsHandler } from "@/http/v1/pay/transactions/list.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handleListTransactions } from "@/http/v1/pay/transactions/list.ts";
 import {
   createTestAccount,
   createTestTransaction,
@@ -27,7 +28,7 @@ function createMockContext(
   session: unknown,
   searchParams?: Record<string, string>,
 ): {
-  ctx: Parameters<typeof listTransactionsHandler>[0];
+  ctx: Parameters<ReturnType<typeof handleListTransactions>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -108,7 +109,7 @@ Deno.test("transactions list - returns transactions for account", async () => {
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -150,7 +151,7 @@ Deno.test("transactions list - pagination limit works", async () => {
     { limit: "2" },
   );
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -182,7 +183,7 @@ Deno.test("transactions list - pagination offset works", async () => {
     { limit: "2", offset: "3" },
   );
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -226,7 +227,7 @@ Deno.test("transactions list - status filter returns only matching transactions"
     { status: "PENDING" },
   );
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -255,7 +256,7 @@ Deno.test("transactions list - invalid status returns 400", async () => {
     { status: "INVALID_STATUS" },
   );
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -279,7 +280,7 @@ Deno.test("transactions list - empty result returns empty array", async () => {
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -310,7 +311,7 @@ Deno.test("transactions list - returns correct transaction data shape", async ()
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await listTransactionsHandler(ctx);
+  await handleListTransactions({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);

@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
@@ -12,6 +12,7 @@ export type VerifierFailureDeps = {
   createSlotBundleFn: (bundle: OperationsBundle) => Promise<SlotBundle>;
   reAddBundlesFn: (bundles: SlotBundle[]) => Promise<void>;
   maxRetryAttempts: number;
+  log: Logger;
 };
 
 /**
@@ -28,8 +29,14 @@ export async function handleVerificationFailure(
   bundleIds: string[],
   deps: VerifierFailureDeps,
 ): Promise<void> {
-  LOG.warn("Transaction verification failed", { txId, reason, bundleIds });
+  const log = deps.log.scope("handleVerificationFailure");
+  log.info("handleVerificationFailure");
+  log.debug("txId", txId);
+  log.debug("reason", reason);
+  log.debug("bundleIdCount", bundleIds.length);
+  log.event("transaction verification failed");
 
+  log.event("marking transaction FAILED");
   await deps.updateTxStatus(txId, TransactionStatus.FAILED);
 
   const retryableBundleIds: string[] = [];
@@ -38,9 +45,8 @@ export async function handleVerificationFailure(
     try {
       const bundle = await deps.operationsBundleRepository.findById(bundleId);
       if (!bundle) {
-        LOG.warn(
-          `Bundle ${bundleId} not found while handling verification failure`,
-        );
+        log.debug("bundleId", bundleId);
+        log.event("bundle not found while handling verification failure");
         continue;
       }
 
@@ -67,16 +73,15 @@ export async function handleVerificationFailure(
       if (!hasReachedMaxAttempts) {
         retryableBundleIds.push(bundleId);
       } else {
-        LOG.warn(
-          "Bundle moved to dead-letter after max verification retry attempts reached",
-          {
-            bundleId,
-            retryCount: nextRetryCount,
-          },
+        log.debug("bundleId", bundleId);
+        log.debug("retryCount", nextRetryCount);
+        log.event(
+          "bundle moved to dead-letter after max verification retry attempts reached",
         );
       }
     } catch (error) {
-      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
+      log.debug("bundleId", bundleId);
+      log.error(error, "failed to update bundle status");
     }
   }
 
@@ -92,10 +97,8 @@ export async function handleVerificationFailure(
           if (!updated) return null;
           return await deps.createSlotBundleFn(updated);
         } catch (error) {
-          LOG.error(
-            `Failed to build SlotBundle for retry of bundle ${bundleId}`,
-            { error },
-          );
+          log.debug("bundleId", bundleId);
+          log.error(error, "failed to build SlotBundle for retry");
           return null;
         }
       }),
@@ -104,8 +107,7 @@ export async function handleVerificationFailure(
 
   if (slotBundles.length > 0) {
     await deps.reAddBundlesFn(slotBundles);
-    LOG.info("Bundles re-added to mempool after verification failure", {
-      bundleIds: slotBundles.map((b) => b.bundleId),
-    });
+    log.debug("bundleIds", slotBundles.map((b) => b.bundleId));
+    log.event("bundles re-added to mempool after verification failure");
   }
 }

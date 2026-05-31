@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import type { ProviderEvent } from "@/core/service/events/event.types.ts";
 
 export type EventListener = (event: ProviderEvent) => void;
@@ -10,23 +10,31 @@ export type EventListener = (event: ProviderEvent) => void;
  */
 export class EventBus {
   private listeners = new Set<EventListener>();
+  private log: Logger;
+
+  constructor(deps: { log: Logger }) {
+    this.log = deps.log.scope("EventBus");
+  }
 
   subscribe(listener: EventListener): () => void {
+    this.log.info("subscribe");
     this.listeners.add(listener);
+    this.log.debug("listenerCount", this.listeners.size);
     return () => {
+      this.log.info("unsubscribe");
       this.listeners.delete(listener);
     };
   }
 
   emit(event: ProviderEvent): void {
+    this.log.info("emit");
+    this.log.debug("kind", event.kind);
+    this.log.debug("listenerCount", this.listeners.size);
     for (const listener of this.listeners) {
       try {
         listener(event);
       } catch (error) {
-        LOG.error("EventBus listener error", {
-          kind: event.kind,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.log.error(error, "EventBus listener error");
       }
     }
   }
@@ -36,4 +44,16 @@ export class EventBus {
   }
 }
 
-export const eventBus = new EventBus();
+let _eventBus: EventBus | null = null;
+
+/**
+ * Lazy singleton accessor. The first caller wires up the logger; subsequent
+ * callers receive the same instance. main.ts must call this once before any
+ * publisher/subscriber so the bus exists.
+ */
+export function getEventBus(deps: { log: Logger }): EventBus {
+  if (!_eventBus) {
+    _eventBus = new EventBus(deps);
+  }
+  return _eventBus;
+}

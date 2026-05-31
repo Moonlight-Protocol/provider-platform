@@ -10,6 +10,7 @@ import {
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { createEscrow } from "@/core/service/pay/escrow.service.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const txRepo = new PayTransactionRepository(drizzleClient);
 const kycRepo = new PayKycRepository(drizzleClient);
@@ -20,10 +21,17 @@ const kycRepo = new PayKycRepository(drizzleClient);
  * Send from self-custodial wallet. Checks receiver KYC — if unverified,
  * creates an escrow record instead of direct UTXO transfer.
  */
-export const postSelfSendHandler = async (ctx: Context) => {
+export const handlePostSelfSend = (
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> =>
+async (ctx) => {
+  const log = deps.log.scope("postSelfSend");
+  log.info("postSelfSend");
   try {
     const body = await ctx.request.body.json();
     const { to, amount } = body;
+    log.debug("to", to);
+    log.debug("amount", amount);
 
     if (!to || !amount) {
       ctx.response.status = Status.BadRequest;
@@ -31,7 +39,6 @@ export const postSelfSendHandler = async (ctx: Context) => {
       return;
     }
 
-    // Validate `to` is a valid Stellar public key
     if (typeof to !== "string" || !StrKey.isValidEd25519PublicKey(to)) {
       ctx.response.status = Status.BadRequest;
       ctx.response.body = {
@@ -40,7 +47,6 @@ export const postSelfSendHandler = async (ctx: Context) => {
       return;
     }
 
-    // Validate amount is a valid positive integer string
     if (typeof amount !== "string" || !/^\d+$/.test(amount)) {
       ctx.response.status = Status.BadRequest;
       ctx.response.body = {
@@ -58,7 +64,6 @@ export const postSelfSendHandler = async (ctx: Context) => {
 
     const session = ctx.state.session as JwtSessionData;
 
-    // Reject custodial JWTs — this endpoint is for self-custodial (SEP-10) users only
     if (session.type === "custodial") {
       ctx.response.status = Status.Forbidden;
       ctx.response.body = {
@@ -68,13 +73,16 @@ export const postSelfSendHandler = async (ctx: Context) => {
     }
 
     const accountId = session.sub;
+    log.debug("accountId", accountId);
 
-    // Check receiver KYC status
+    log.event("checking receiver KYC status");
     const receiverKyc = await kycRepo.findByAddress(to);
     const isVerified = receiverKyc?.status === PayKycStatus.VERIFIED;
+    log.debug("receiverVerified", isVerified);
 
-    // Create transaction record
     const txId = crypto.randomUUID();
+    log.debug("txId", txId);
+    log.event("creating transaction record");
     await txRepo.create({
       id: txId,
       type: PayTransactionType.SEND,
@@ -93,17 +101,15 @@ export const postSelfSendHandler = async (ctx: Context) => {
 
     let escrowId: string | undefined;
     if (!isVerified) {
-      // Receiver not KYC'd — create escrow
+      log.event("creating escrow for unverified receiver");
       escrowId = await createEscrow({
         senderAddress: accountId,
         receiverAddress: to,
         amount: sendAmount,
         mode: "self",
         bundleId: txId,
-      });
+      }, deps);
     }
-
-    // TODO: Build privacy operations and submit bundle to mempool
 
     ctx.response.status = Status.OK;
     ctx.response.body = {
@@ -116,7 +122,9 @@ export const postSelfSendHandler = async (ctx: Context) => {
         escrowId,
       },
     };
-  } catch {
+    log.event("self send succeeded");
+  } catch (error) {
+    log.error(error, "self send failed");
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "Invalid request body" };
   }

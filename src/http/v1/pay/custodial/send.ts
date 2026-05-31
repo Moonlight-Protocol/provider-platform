@@ -15,13 +15,21 @@ import {
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
 import { createEscrow } from "@/core/service/pay/escrow.service.ts";
 import type { JwtSessionData } from "@/http/middleware/auth/index.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const kycRepo = new PayKycRepository(drizzleClient);
 
-export const postCustodialSendHandler = async (ctx: Context) => {
+export const handlePostCustodialSend = (
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> =>
+async (ctx) => {
+  const log = deps.log.scope("postCustodialSend");
+  log.info("postCustodialSend");
   try {
     const body = await ctx.request.body.json();
     const { to, amount } = body;
+    log.debug("to", to);
+    log.debug("amount", amount);
 
     if (!to || !amount) {
       ctx.response.status = Status.BadRequest;
@@ -64,14 +72,14 @@ export const postCustodialSendHandler = async (ctx: Context) => {
     }
 
     const accountId = session.sub;
+    log.debug("accountId", accountId);
 
-    // Check receiver KYC before entering transaction (read doesn't need the lock,
-    // and using the module-level kycRepo inside a drizzleClient.transaction()
-    // uses a separate connection — not part of the transaction)
+    log.event("checking receiver KYC status");
     const receiverKyc = await kycRepo.findByAddress(to);
     const receiverIsVerified = receiverKyc?.status === PayKycStatus.VERIFIED;
+    log.debug("receiverVerified", receiverIsVerified);
 
-    // Atomic balance debit within a DB transaction with row-level locking
+    log.event("executing atomic debit transaction");
     const result = await drizzleClient.transaction(async (tx) => {
       // SELECT with FOR UPDATE to lock the row
       const [account] = await tx
@@ -133,25 +141,27 @@ export const postCustodialSendHandler = async (ctx: Context) => {
     });
 
     if ("error" in result) {
+      log.event("debit rejected");
+      log.debug("rejectionReason", result.error);
       ctx.response.status = result.status!;
       ctx.response.body = { message: result.error };
       return;
     }
 
     const { txId, isVerified, depositAddress } = result;
+    log.debug("txId", txId);
 
     let escrowId: string | undefined;
     if (!isVerified) {
+      log.event("creating escrow for unverified receiver");
       escrowId = await createEscrow({
         senderAddress: depositAddress,
         receiverAddress: to,
         amount: sendAmount,
         mode: "custodial",
         bundleId: txId,
-      });
+      }, deps);
     }
-
-    // TODO: Build privacy bundle and submit to mempool
 
     ctx.response.status = Status.OK;
     ctx.response.body = {
@@ -164,7 +174,9 @@ export const postCustodialSendHandler = async (ctx: Context) => {
         escrowId,
       },
     };
-  } catch {
+    log.event("custodial send succeeded");
+  } catch (error) {
+    log.error(error, "custodial send failed");
     ctx.response.status = Status.BadRequest;
     ctx.response.body = { message: "Invalid request body" };
   }

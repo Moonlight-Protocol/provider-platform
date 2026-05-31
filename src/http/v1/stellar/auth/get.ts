@@ -7,7 +7,7 @@ import { P_CreateChallenge } from "@/core/service/auth/challenge/create/create-c
 import { PIPE_GetEndpoint } from "@/http/pipelines/get-endpoint.ts";
 import type { GetEndpointOutput } from "@/http/pipelines/types.ts";
 import type { ChallengeData } from "@/core/service/auth/challenge/types.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 export const requestSchema = z.object({
   account: z.string().regex(regex.ed25519PublicKey),
@@ -18,36 +18,41 @@ export const responseSchema = z.object({
   challenge: z.string(),
 });
 
-const assembleResponse = (
-  input: ChallengeData,
-): GetEndpointOutput<typeof responseSchema> => {
-  const message = "Auth challenge successfully created";
+export function handleGetAuth(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<unknown> {
+  const log = deps.log.scope("getAuth");
 
-  LOG.info(message);
+  const assembleResponse = (
+    input: ChallengeData,
+  ): GetEndpointOutput<typeof responseSchema> => {
+    log.event("auth challenge successfully created");
 
-  return {
-    ctx: input.ctx,
-    status: Status.OK,
-    message,
-    data: {
-      hash: input.challengeData.txHash,
-      challenge: input.challengeData.xdr,
-    },
+    return {
+      ctx: input.ctx,
+      status: Status.OK,
+      message: "Auth challenge successfully created",
+      data: {
+        hash: input.challengeData.txHash,
+        challenge: input.challengeData.xdr,
+      },
+    };
   };
-};
 
-export const getAuthHandler = (ctx: Context) => {
-  const handler = PIPE_GetEndpoint({
-    name: "GetAuthEndpointPipeline",
-    requestSchema: requestSchema,
-    responseSchema: responseSchema,
-    steps: [
-      P_CreateChallenge,
-      P_CreateChallengeDB,
-      P_CreateChallengeMemory,
-      assembleResponse,
-    ],
-  });
+  return (ctx) => {
+    log.info("getAuth");
+    const handler = PIPE_GetEndpoint({
+      name: "GetAuthEndpointPipeline",
+      requestSchema: requestSchema,
+      responseSchema: responseSchema,
+      steps: [
+        P_CreateChallenge(deps),
+        P_CreateChallengeDB(deps),
+        P_CreateChallengeMemory(deps),
+        assembleResponse,
+      ],
+    }, deps);
 
-  return handler.run(ctx);
-};
+    return handler.run(ctx);
+  };
+}

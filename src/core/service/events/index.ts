@@ -1,4 +1,4 @@
-export { EventBus, eventBus, type EventListener } from "./event-bus.ts";
+export { EventBus, type EventListener, getEventBus } from "./event-bus.ts";
 export {
   emitForAllPps,
   emitForBundles,

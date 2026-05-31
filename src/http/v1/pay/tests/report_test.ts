@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/report_test.ts
  */
 import { assertEquals, assertExists } from "@std/assert";
-import { postReportHandler } from "@/http/v1/pay/report/post.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handlePostReport } from "@/http/v1/pay/report/post.ts";
 
 // ---------------------------------------------------------------------------
 // Mock Oak Context helper
@@ -16,7 +17,7 @@ type MockResponse = { status: number; body: unknown };
 function createMockContext(
   body: unknown,
 ): {
-  ctx: Parameters<typeof postReportHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostReport>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -65,7 +66,7 @@ Deno.test("report post - valid report returns 200 and id", async () => {
     },
   });
 
-  await postReportHandler(ctx);
+  await handlePostReport({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -87,7 +88,7 @@ Deno.test("report post - minimal valid report (description only) returns 200", a
     description: "Error occurred",
   });
 
-  await postReportHandler(ctx);
+  await handlePostReport({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -104,7 +105,7 @@ Deno.test("report post - missing description returns 400", async () => {
     steps: "Some steps",
   });
 
-  await postReportHandler(ctx);
+  await handlePostReport({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -117,7 +118,7 @@ Deno.test("report post - missing description returns 400", async () => {
 Deno.test("report post - empty body returns 400", async () => {
   const { ctx, getResponse } = createMockContext({});
 
-  await postReportHandler(ctx);
+  await handlePostReport({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -132,7 +133,7 @@ Deno.test("report post - empty string description returns 400", async () => {
     description: "",
   });
 
-  await postReportHandler(ctx);
+  await handlePostReport({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -174,7 +175,7 @@ Deno.test("report post - invalid JSON body returns 400", async () => {
   };
 
   // deno-lint-ignore no-explicit-any
-  await postReportHandler(ctx as any);
+  await handlePostReport({ log: newNoop() })(ctx as any);
 
   assertEquals(responseStatus, 400);
   assertEquals(

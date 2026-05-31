@@ -15,6 +15,7 @@ import type {
   OperationAmounts,
 } from "@/core/service/bundle/bundle.types.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 /**
  * Classifies operations by type
@@ -55,11 +56,17 @@ export function classifyOperations(
 export async function fetchUtxoBalances(
   utxoPublicKeys: UTXOPublicKey[],
   channelClient: PrivacyChannel,
+  deps: { log: Logger },
 ): Promise<bigint[]> {
+  const log = deps.log.scope("fetchUtxoBalances");
+  log.info("fetchUtxoBalances");
+  log.debug("utxoCount", utxoPublicKeys.length);
+
   if (utxoPublicKeys.length === 0) {
     return [];
   }
 
+  log.event("reading on-chain UTXO balances");
   const result = await channelClient.read({
     method: ChannelReadMethods.utxo_balances,
     methodArgs: {
@@ -67,7 +74,6 @@ export async function fetchUtxoBalances(
     },
   });
 
-  // The result is an array of balances, convert to bigint
   return (result as Array<string | number | bigint>).map((balance) =>
     BigInt(balance)
   );
@@ -82,8 +88,13 @@ export async function fetchUtxoBalances(
 export async function fetchUtxoBalance(
   utxoPublicKey: UTXOPublicKey,
   channelClient: PrivacyChannel,
+  deps: { log: Logger },
 ): Promise<bigint> {
-  const balances = await fetchUtxoBalances([utxoPublicKey], channelClient);
+  const balances = await fetchUtxoBalances(
+    [utxoPublicKey],
+    channelClient,
+    deps,
+  );
   return balances[0] || BigInt(0);
 }
 
@@ -113,10 +124,19 @@ export function calculateOperationsTotal<T extends MoonlightOperation>(
 export async function calculateOperationAmounts(
   classified: ClassifiedOperations,
   channelClient: PrivacyChannel,
+  deps: { log: Logger },
 ): Promise<OperationAmounts> {
-  // Fetch spend operation amounts from the network
+  const log = deps.log.scope("calculateOperationAmounts");
+  log.info("calculateOperationAmounts");
+  log.debug("spendCount", classified.spend.length);
+
+  log.event("fetching spend balances");
   const spendUtxos = classified.spend.map((op) => op.getUtxo());
-  const spendBalances = await fetchUtxoBalances(spendUtxos, channelClient);
+  const spendBalances = await fetchUtxoBalances(
+    spendUtxos,
+    channelClient,
+    deps,
+  );
 
   const totalSpendAmount = spendBalances.reduce(
     (acc, balance) => acc + balance,

@@ -6,56 +6,23 @@ import {
   MEMPOOL_SLOT_CAPACITY,
   MEMPOOL_TTL_CHECK_INTERVAL_MS,
 } from "@/config/env.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
-/**
- * Singleton instance of the Mempool
- * Will be initialized during application startup
- */
 export let mempool: Mempool;
-
-/**
- * Singleton instance of the Executor
- * Will be initialized during application startup
- */
 export let executor: Executor;
-
-/**
- * Singleton instance of the Verifier
- * Will be initialized during application startup
- */
 export let verifier: Verifier;
-
-/**
- * Singleton instance of the MetricsCollector
- */
 export let metricsCollector: MetricsCollector;
-
-/**
- * Platform version, read once at startup from deno.json.
- */
 export let platformVersion = "unknown";
 
-/**
- * Interval ID for TTL check
- */
 let ttlCheckIntervalId: number | null = null;
 
-/**
- * Initializes the mempool singleton instance
- * Should be called during application startup
- */
-export function initializeMempool(): void {
+export function initializeMempool(deps: { log: Logger }): void {
   if (mempool) {
     throw new Error("Mempool already initialized");
   }
-  mempool = new Mempool(MEMPOOL_SLOT_CAPACITY);
+  mempool = new Mempool(MEMPOOL_SLOT_CAPACITY, deps);
 }
 
-/**
- * Gets the mempool instance
- * Throws if not initialized
- */
 export function getMempool(): Mempool {
   if (!mempool) {
     throw new Error("Mempool not initialized. Call initializeMempool() first.");
@@ -63,41 +30,37 @@ export function getMempool(): Mempool {
   return mempool;
 }
 
-/**
- * Initializes the complete mempool system
- * - Initializes Mempool and loads pending bundles from database
- * - Starts Executor service
- * - Starts Verifier service
- * - Starts periodic TTL check
- */
-export async function initializeMempoolSystem(): Promise<void> {
-  LOG.info("Initializing mempool system...");
+export async function initializeMempoolSystem(
+  deps: { log: Logger },
+): Promise<void> {
+  const log = deps.log.scope("mempoolSystem");
+  log.info("initializeMempoolSystem");
+  log.event("initializing mempool system");
 
   // Initialize Mempool
-  initializeMempool();
+  initializeMempool(deps);
   await mempool.initialize();
 
   // Initialize Executor
-  executor = new Executor();
+  executor = new Executor(deps);
   executor.start();
 
   // Initialize Verifier
-  verifier = new Verifier();
+  verifier = new Verifier(deps);
   verifier.start();
 
-  // Read platform version once at startup (import.meta.dirname resolves
-  // to the module's directory, so this works regardless of CWD)
+  // Read platform version once at startup
   try {
     const denoJsonPath =
       new URL("../../../deno.json", import.meta.url).pathname;
     const denoJson = JSON.parse(await Deno.readTextFile(denoJsonPath));
     platformVersion = denoJson.version ?? "unknown";
-  } catch {
-    LOG.warn("Could not read deno.json for platform version");
+  } catch (err) {
+    log.error(err, "could not read deno.json for platform version");
   }
 
   // Initialize MetricsCollector
-  metricsCollector = new MetricsCollector(platformVersion);
+  metricsCollector = new MetricsCollector(platformVersion, deps);
   metricsCollector.start();
 
   // Start periodic TTL check
@@ -105,21 +68,16 @@ export async function initializeMempoolSystem(): Promise<void> {
     try {
       await mempool.expireBundles();
     } catch (error) {
-      LOG.error("Error during TTL check", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      log.error(error, "error during TTL check");
     }
   }, MEMPOOL_TTL_CHECK_INTERVAL_MS) as unknown as number;
 
-  LOG.info("Mempool system initialized successfully");
+  log.event("mempool system initialized successfully");
 }
 
-/**
- * Shuts down the mempool system gracefully
- * Stops all services and clears intervals
- */
-export function shutdownMempoolSystem(): void {
-  LOG.info("Shutting down mempool system...");
+export function shutdownMempoolSystem(deps: { log: Logger }): void {
+  const log = deps.log.scope("mempoolSystem");
+  log.event("shutting down mempool system");
 
   if (executor) {
     executor.stop();
@@ -138,5 +96,5 @@ export function shutdownMempoolSystem(): void {
     ttlCheckIntervalId = null;
   }
 
-  LOG.info("Mempool system shut down successfully");
+  log.event("mempool system shut down successfully");
 }

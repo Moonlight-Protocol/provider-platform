@@ -26,7 +26,7 @@ import {
 } from "@/persistence/drizzle/entity/pay-transaction.entity.ts";
 import { payCustodialAccount } from "@/persistence/drizzle/entity/pay-custodial-account.entity.ts";
 import { PayKycStatus } from "@/persistence/drizzle/entity/pay-kyc.entity.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const escrowRepo = new PayEscrowRepository(drizzleClient);
 const kycRepo = new PayKycRepository(drizzleClient);
@@ -41,7 +41,9 @@ export async function createEscrow(opts: {
   mode: "self" | "custodial";
   bundleId?: string;
   utxoPublicKeys?: string[];
-}): Promise<string> {
+}, deps: { log: Logger }): Promise<string> {
+  const log = deps.log.scope("createEscrow");
+  log.info("createEscrow");
   const id = crypto.randomUUID();
 
   await escrowRepo.create({
@@ -59,12 +61,11 @@ export async function createEscrow(opts: {
     updatedAt: new Date(),
   });
 
-  LOG.info("Escrow created", {
-    id,
-    heldFor: opts.receiverAddress,
-    amount: opts.amount.toString(),
-    mode: opts.mode,
-  });
+  log.debug("id", id);
+  log.debug("heldFor", opts.receiverAddress);
+  log.debug("amount", opts.amount.toString());
+  log.debug("mode", opts.mode);
+  log.event("escrow created");
 
   return id;
 }
@@ -79,10 +80,17 @@ export async function createEscrow(opts: {
  *
  * Uses a DB transaction with row-level locking to prevent double-claims.
  */
-export async function claimEscrowForAddress(address: string): Promise<{
+export async function claimEscrowForAddress(
+  address: string,
+  deps: { log: Logger },
+): Promise<{
   claimed: number;
   totalAmount: bigint;
 }> {
+  const log = deps.log.scope("claimEscrowForAddress");
+  log.info("claimEscrowForAddress");
+  log?.debug("address", address);
+
   const kyc = await kycRepo.findByAddress(address);
   if (!kyc || kyc.status !== PayKycStatus.VERIFIED) {
     throw new Error("KYC not verified for this address");
@@ -158,11 +166,9 @@ export async function claimEscrowForAddress(address: string): Promise<{
       totalAmount += escrow.amount;
     }
 
-    LOG.info("Escrow claimed", {
-      address,
-      claimed: held.length,
-      totalAmount: totalAmount.toString(),
-    });
+    log?.debug("claimed", held.length);
+    log?.debug("totalAmount", totalAmount.toString());
+    log?.event("escrow claimed");
 
     return { claimed: held.length, totalAmount };
   });
@@ -171,7 +177,10 @@ export async function claimEscrowForAddress(address: string): Promise<{
 /**
  * Get pending escrow summary for an address.
  */
-export async function getEscrowSummary(address: string): Promise<{
+export async function getEscrowSummary(
+  address: string,
+  _deps: { log: Logger },
+): Promise<{
   count: number;
   totalAmount: bigint;
 }> {

@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import {
@@ -24,7 +24,12 @@ import { MoonlightOperation } from "@moonlight/moonlight-sdk";
 
 async function findFirstBundleChannel(
   bundleIds: string[],
+  deps: { log: Logger },
 ): Promise<string | null> {
+  const log = deps.log.scope("findFirstBundleChannel");
+  log.info("findFirstBundleChannel");
+  log.debug("bundleIdCount", bundleIds.length);
+  log.event("scanning bundles for channelContractId");
   for (const bundleId of bundleIds) {
     const bundle = await operationsBundleRepository.findById(bundleId);
     if (bundle?.channelContractId) return bundle.channelContractId;
@@ -48,7 +53,13 @@ const operationsBundleRepository = new OperationsBundleRepository(
 async function updateTransactionStatus(
   txId: string,
   status: TransactionStatus,
+  deps: { log: Logger },
 ): Promise<void> {
+  const log = deps.log.scope("updateTransactionStatus");
+  log.info("updateTransactionStatus");
+  log.debug("txId", txId);
+  log.debug("status", status);
+  log.event("updating transaction status in DB");
   await transactionRepository.update(txId, {
     status,
     updatedAt: new Date(),
@@ -66,13 +77,16 @@ function handleVerificationFailure(
   txId: string,
   reason: string,
   bundleIds: string[],
+  log: Logger,
 ): Promise<void> {
   return _handleVerificationFailure(txId, reason, bundleIds, {
     operationsBundleRepository,
-    updateTxStatus: (id, status) => updateTransactionStatus(id, status),
-    createSlotBundleFn: createSlotBundleFromEntity,
+    updateTxStatus: (id, status) =>
+      updateTransactionStatus(id, status, { log }),
+    createSlotBundleFn: (bundle) => createSlotBundleFromEntity(bundle, { log }),
     reAddBundlesFn: (bundles) => getMempool().reAddBundles(bundles),
     maxRetryAttempts: VERIFIER_MAX_RETRY_ATTEMPTS,
+    log,
   });
 }
 
@@ -82,16 +96,17 @@ function handleVerificationFailure(
 async function handleVerificationSuccess(
   txId: string,
   bundleIds: string[],
+  log: Logger,
 ): Promise<void> {
-  LOG.info("Transaction verified successfully", {
-    txId,
-    bundleCount: bundleIds.length,
-  });
+  log.info("handleVerificationSuccess");
+  log.debug("txId", txId);
+  log.debug("bundleCount", bundleIds.length);
+  log.event("transaction verified successfully");
 
-  const channelContractId = await findFirstBundleChannel(bundleIds);
+  const channelContractId = await findFirstBundleChannel(bundleIds, { log });
 
   // Update transaction status to VERIFIED
-  await updateTransactionStatus(txId, TransactionStatus.VERIFIED);
+  await updateTransactionStatus(txId, TransactionStatus.VERIFIED, { log });
 
   for (const bundleId of bundleIds) {
     try {
@@ -100,7 +115,8 @@ async function handleVerificationSuccess(
         updatedAt: new Date(),
       });
     } catch (error) {
-      LOG.error(`Failed to update bundle ${bundleId} status`, { error });
+      log.debug("bundleId", bundleId);
+      log.error(error, "failed to update bundle status");
     }
   }
 
@@ -110,8 +126,8 @@ async function handleVerificationSuccess(
       ts: Date.now(),
       scope,
       payload: { txId, bundleIds, channelContractId },
-    }));
-    await emitDepositAndWithdrawEvents(txId, bundleIds, channelContractId);
+    }), { log });
+    await emitDepositAndWithdrawEvents(txId, bundleIds, channelContractId, log);
   }
 }
 
@@ -124,7 +140,11 @@ async function emitDepositAndWithdrawEvents(
   txId: string,
   bundleIds: string[],
   channelContractId: string,
+  log: Logger,
 ): Promise<void> {
+  log.info("emitDepositAndWithdrawEvents");
+  log.debug("txId", txId);
+  log.debug("bundleCount", bundleIds.length);
   for (const bundleId of bundleIds) {
     const bundle = await operationsBundleRepository.findById(bundleId);
     if (!bundle) continue;
@@ -133,10 +153,8 @@ async function emitDepositAndWithdrawEvents(
       try {
         op = MoonlightOperation.fromMLXDR(mlxdr);
       } catch (error) {
-        LOG.error("Failed to parse operation MLXDR for event emit", {
-          bundleId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        log.debug("bundleId", bundleId);
+        log.error(error, "failed to parse operation MLXDR for event emit");
         continue;
       }
       if (op.isDeposit()) {
@@ -153,7 +171,7 @@ async function emitDepositAndWithdrawEvents(
             depositorAddress,
             amount,
           },
-        }));
+        }), { log });
       } else if (op.isWithdraw()) {
         const recipientAddress = op.getPublicKey().toString();
         const amount = op.getAmount().toString();
@@ -168,7 +186,7 @@ async function emitDepositAndWithdrawEvents(
             recipientAddress,
             amount,
           },
-        }));
+        }), { log });
       }
     }
   }
@@ -180,6 +198,11 @@ async function emitDepositAndWithdrawEvents(
 export class Verifier {
   private intervalId: number | null = null;
   private isRunning: boolean = false;
+  private log: Logger;
+
+  constructor(deps: { log: Logger }) {
+    this.log = deps.log.scope("Verifier");
+  }
 
   /**
    * Starts the verifier loop
@@ -190,7 +213,7 @@ export class Verifier {
     }
 
     this.isRunning = true;
-    LOG.info("Verifier started", { intervalMs: VERIFIER_CONFIG.INTERVAL_MS });
+    this.log.event("Verifier started");
 
     // Verify immediately, then on interval
     this.verifyTransactions();
@@ -213,7 +236,7 @@ export class Verifier {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    LOG.info("Verifier stopped");
+    this.log.event("Verifier stopped");
   }
 
   /**
@@ -234,7 +257,9 @@ export class Verifier {
         span.addEvent("verifying_transactions", {
           "transactions.count": unverifiedTransactions.length,
         });
-        LOG.debug(`Verifying ${unverifiedTransactions.length} transactions`);
+        this.log.event(
+          `Verifying ${unverifiedTransactions.length} transactions`,
+        );
 
         for (const transaction of unverifiedTransactions) {
           await this.verifyTransaction(transaction.id);
@@ -247,9 +272,10 @@ export class Verifier {
             ? error.message
             : String(error),
         });
-        LOG.error("Error during transaction verification", {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.log.error(
+          new Error(String("Error during transaction verification")),
+          "Error during transaction verification",
+        );
       }
     });
   }
@@ -269,16 +295,15 @@ export class Verifier {
 
         if (bundleIds.length === 0) {
           span.addEvent("no_bundles_found");
-          LOG.warn(`No bundles found for transaction ${txId}`);
+          this.log.event(`No bundles found for transaction ${txId}`);
           return;
         }
 
-        span.addEvent("verifying_on_network", {
-          "bundles.count": bundleIds.length,
-        });
+        span.addEvent("verifying_on_network");
         const result = await verifyTransactionOnNetwork(
           txId,
           NETWORK_RPC_SERVER,
+          { log: this.log },
         );
 
         span.addEvent("verification_result", {
@@ -286,10 +311,17 @@ export class Verifier {
         });
 
         if (result.status === "VERIFIED") {
-          await handleVerificationSuccess(txId, bundleIds);
+          await handleVerificationSuccess(txId, bundleIds, this.log);
         } else if (result.status === "FAILED") {
-          const channelContractId = await findFirstBundleChannel(bundleIds);
-          await handleVerificationFailure(txId, result.reason, bundleIds);
+          const channelContractId = await findFirstBundleChannel(bundleIds, {
+            log: this.log,
+          });
+          await handleVerificationFailure(
+            txId,
+            result.reason,
+            bundleIds,
+            this.log,
+          );
           if (channelContractId) {
             await emitForBundles(bundleIds, (scope) => ({
               kind: "verifier.bundle_failed",
@@ -301,10 +333,10 @@ export class Verifier {
                 channelContractId,
                 reason: result.reason,
               },
-            }));
+            }), { log: this.log });
           }
         } else {
-          LOG.debug(`Transaction ${txId} still pending verification`);
+          this.log.event(`Transaction ${txId} still pending verification`);
         }
       } catch (error) {
         span.addEvent("verification_failed", {
@@ -312,9 +344,10 @@ export class Verifier {
             ? error.message
             : String(error),
         });
-        LOG.error(`Failed to verify transaction ${txId}`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.log.error(
+          new Error(String(`Failed to verify transaction ${txId}`)),
+          `Failed to verify transaction ${txId}`,
+        );
       }
     });
   }

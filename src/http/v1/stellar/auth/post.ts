@@ -8,7 +8,7 @@ import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
 import { P_CompareChallenge } from "@/core/service/auth/challenge/verify/compare-challenge.ts";
 import type { ContextWithJWT } from "@/core/service/auth/challenge/types.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 export const requestSchema = z.object({
   signedChallenge: z.string(),
@@ -18,37 +18,42 @@ export const responseSchema = z.object({
   jwt: z.string(),
 });
 
-const assembleResponse = (
-  input: ContextWithJWT,
-): PostEndpointOutput<typeof responseSchema> => {
-  const message = "Auth challenge verified successfully";
+export function handlePostAuth(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<unknown> {
+  const log = deps.log.scope("postAuth");
 
-  LOG.info(message);
+  const assembleResponse = (
+    input: ContextWithJWT,
+  ): PostEndpointOutput<typeof responseSchema> => {
+    log.event("auth challenge verified successfully");
 
-  return {
-    ctx: input.ctx,
-    status: Status.OK,
-    message,
-    data: {
-      jwt: input.jwt,
-    },
+    return {
+      ctx: input.ctx,
+      status: Status.OK,
+      message: "Auth challenge verified successfully",
+      data: {
+        jwt: input.jwt,
+      },
+    };
   };
-};
 
-export const postAuthHandler = (ctx: Context) => {
-  const handler = PIPE_PostEndpoint({
-    name: "PostAuthEndpointPipeline",
-    requestSchema: requestSchema,
-    responseSchema: responseSchema,
-    steps: [
-      P_VerifyChallenge,
-      P_CompareChallenge,
-      P_GenerateChallengeJWT,
-      P_UpdateChallengeSession,
-      P_UpdateChallengeDB,
-      assembleResponse,
-    ],
-  });
+  return (ctx) => {
+    log.info("postAuth");
+    const handler = PIPE_PostEndpoint({
+      name: "PostAuthEndpointPipeline",
+      requestSchema: requestSchema,
+      responseSchema: responseSchema,
+      steps: [
+        P_VerifyChallenge(deps),
+        P_CompareChallenge(deps),
+        P_GenerateChallengeJWT(deps),
+        P_UpdateChallengeSession(deps),
+        P_UpdateChallengeDB(deps),
+        assembleResponse,
+      ],
+    }, deps);
 
-  return handler.run(ctx);
-};
+    return handler.run(ctx);
+  };
+}

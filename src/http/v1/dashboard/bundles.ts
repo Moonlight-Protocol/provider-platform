@@ -10,7 +10,7 @@ import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts"
 import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
 import { entity } from "@/persistence/drizzle/entity/entity.entity.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const bundleRepo = new OperationsBundleRepository(drizzleClient);
 const ppRepo = new PpRepository(drizzleClient);
@@ -49,8 +49,6 @@ function aggregateAmountFromMLXDR(mlxdrs: string[]): string | null {
         withdrawSum += op.getAmount();
         hasWithdraw = true;
       } else if (op.isCreate()) {
-        // For Send bundles, sum of create-outputs ≈ amount moved.
-        // (SpendOperation intentionally has no amount — UTXO ref only.)
         createSum += op.getAmount();
         hasCreate = true;
       }
@@ -87,166 +85,178 @@ function classify(op: ParsedOp): OpView {
 /**
  * GET /dashboard/bundles/:id
  *
- * Returns one bundle with its decoded operations (kind + addr/amount for
- * deposit/withdraw). Used by the provider-console preview table to expand
- * a row and show what's inside the bundle.
+ * Returns one bundle with its decoded operations.
  */
-export const getBundleDetailHandler = async (ctx: Context) => {
-  try {
-    const params = (ctx as unknown as { params?: RouteParams }).params;
-    const bundleId = params?.id;
-    if (!bundleId) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = { message: "Bundle id is required" };
-      return;
-    }
-    const bundle = await bundleRepo.findById(bundleId);
-    if (!bundle) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Bundle not found" };
-      return;
-    }
-    const operations: OpView[] = [];
-    for (const mlxdr of bundle.operationsMLXDR) {
-      try {
-        const op = MoonlightOperation.fromMLXDR(mlxdr);
-        operations.push(classify(op));
-      } catch (error) {
-        LOG.warn("Skipping unparseable operation MLXDR", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        operations.push({ kind: "unknown" });
+export function handleGetBundleDetail(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> {
+  const log = deps.log.scope("getBundleDetail");
+
+  return async (ctx) => {
+    log.info("getBundleDetail");
+    try {
+      const params = (ctx as unknown as { params?: RouteParams }).params;
+      const bundleId = params?.id;
+      if (!bundleId) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "Bundle id is required" };
+        return;
       }
-    }
-    let entityName: string | null = null;
-    let jurisdictions: string[] = [];
-    if (bundle.createdBy) {
-      const submitterAccount = await drizzleClient
-        .select({ entityId: account.entityId })
-        .from(account)
-        .where(eq(account.id, bundle.createdBy))
-        .limit(1);
-      const entityId = submitterAccount[0]?.entityId;
-      if (entityId) {
-        const submitterEntity = await drizzleClient
-          .select({ name: entity.name, jurisdictions: entity.jurisdictions })
-          .from(entity)
-          .where(eq(entity.id, entityId))
-          .limit(1);
-        if (submitterEntity[0]) {
-          entityName = submitterEntity[0].name ?? null;
-          jurisdictions = submitterEntity[0].jurisdictions ?? [];
+      log.debug("bundleId", bundleId);
+      log.event("loading bundle");
+      const bundle = await bundleRepo.findById(bundleId);
+      if (!bundle) {
+        ctx.response.status = Status.NotFound;
+        ctx.response.body = { message: "Bundle not found" };
+        return;
+      }
+      const operations: OpView[] = [];
+      for (const mlxdr of bundle.operationsMLXDR) {
+        try {
+          const op = MoonlightOperation.fromMLXDR(mlxdr);
+          operations.push(classify(op));
+        } catch (error) {
+          log.error(error, "skipping unparseable operation MLXDR");
+          operations.push({ kind: "unknown" });
         }
       }
+      let entityName: string | null = null;
+      let jurisdictions: string[] = [];
+      if (bundle.createdBy) {
+        log.event("loading submitter entity");
+        const submitterAccount = await drizzleClient
+          .select({ entityId: account.entityId })
+          .from(account)
+          .where(eq(account.id, bundle.createdBy))
+          .limit(1);
+        const entityId = submitterAccount[0]?.entityId;
+        if (entityId) {
+          const submitterEntity = await drizzleClient
+            .select({ name: entity.name, jurisdictions: entity.jurisdictions })
+            .from(entity)
+            .where(eq(entity.id, entityId))
+            .limit(1);
+          if (submitterEntity[0]) {
+            entityName = submitterEntity[0].name ?? null;
+            jurisdictions = submitterEntity[0].jurisdictions ?? [];
+          }
+        }
+      }
+      ctx.response.status = Status.OK;
+      ctx.response.body = {
+        message: "Bundle detail",
+        data: {
+          id: bundle.id,
+          status: bundle.status,
+          channelContractId: bundle.channelContractId,
+          operations,
+          entityName,
+          jurisdictions,
+          amount: aggregateAmountFromMLXDR(bundle.operationsMLXDR),
+        },
+      };
+      log.event("bundle detail response assembled");
+    } catch (error) {
+      log.error(error, "failed to fetch bundle detail");
+      ctx.response.status = Status.InternalServerError;
+      ctx.response.body = { message: "Failed to fetch bundle detail" };
     }
-    ctx.response.status = Status.OK;
-    ctx.response.body = {
-      message: "Bundle detail",
-      data: {
-        id: bundle.id,
-        status: bundle.status,
-        channelContractId: bundle.channelContractId,
-        operations,
-        entityName,
-        jurisdictions,
-        amount: aggregateAmountFromMLXDR(bundle.operationsMLXDR),
-      },
-    };
-  } catch (error) {
-    LOG.error("Failed to fetch bundle detail", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    ctx.response.status = Status.InternalServerError;
-    ctx.response.body = { message: "Failed to fetch bundle detail" };
-  }
-};
+  };
+}
 
 /**
- * GET /dashboard/bundles?limit=N
+ * GET /dashboard/bundles?ppPublicKey=...&limit=N
  *
- * Returns most-recent bundles (by updatedAt desc) so the dashboard can
- * populate the recent-bundles table on initial load instead of waiting
- * for new events to stream in.
+ * Returns most-recent bundles (by updatedAt desc) for the requested PP.
  */
-export const listRecentBundlesHandler = async (ctx: Context) => {
-  try {
-    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-    if (!ppPublicKey) {
-      ctx.response.status = Status.BadRequest;
+export function handleListRecentBundles(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> {
+  const log = deps.log.scope("listRecentBundles");
+
+  return async (ctx) => {
+    log.info("listRecentBundles");
+    try {
+      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+      if (!ppPublicKey) {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = {
+          message: "ppPublicKey query parameter is required",
+        };
+        return;
+      }
+      log.debug("ppPublicKey", ppPublicKey);
+
+      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
+      log.event("verifying PP ownership");
+      const pp = await ppRepo.findByPublicKeyAndOwner(
+        ppPublicKey,
+        ownerPublicKey,
+      );
+      if (!pp) {
+        ctx.response.status = Status.NotFound;
+        ctx.response.body = { message: "Provider not found" };
+        return;
+      }
+
+      const limitParam = ctx.request.url.searchParams.get("limit");
+      const limit = limitParam
+        ? Math.min(LIST_MAX_LIMIT, Math.max(1, Number(limitParam)))
+        : LIST_DEFAULT_LIMIT;
+      log.debug("limit", limit);
+
+      const windowStart = new Date(Date.now() - LIST_WINDOW_MS);
+      log.event("querying recent bundles for PP");
+      const rows = await drizzleClient
+        .select({
+          id: operationsBundle.id,
+          status: operationsBundle.status,
+          channelContractId: operationsBundle.channelContractId,
+          operationsMLXDR: operationsBundle.operationsMLXDR,
+          createdAt: operationsBundle.createdAt,
+          updatedAt: operationsBundle.updatedAt,
+          entityName: entity.name,
+          entityJurisdictions: entity.jurisdictions,
+        })
+        .from(operationsBundle)
+        .leftJoin(account, eq(operationsBundle.createdBy, account.id))
+        .leftJoin(entity, eq(account.entityId, entity.id))
+        .where(
+          and(
+            isNull(operationsBundle.deletedAt),
+            gte(operationsBundle.updatedAt, windowStart),
+            eq(operationsBundle.ppPublicKey, ppPublicKey),
+          ),
+        )
+        .orderBy(desc(operationsBundle.updatedAt))
+        .limit(limit);
+
+      log.debug("rowCount", rows.length);
+      ctx.response.status = Status.OK;
       ctx.response.body = {
-        message: "ppPublicKey query parameter is required",
+        message: "Recent bundles",
+        data: {
+          bundles: rows.map((r) => ({
+            id: r.id,
+            status: r.status,
+            channelContractId: r.channelContractId,
+            entityName: r.entityName,
+            jurisdictions: r.entityJurisdictions ?? [],
+            amount: aggregateAmountFromMLXDR(r.operationsMLXDR),
+            createdAt: r.createdAt instanceof Date
+              ? r.createdAt.toISOString()
+              : r.createdAt,
+            updatedAt: r.updatedAt instanceof Date
+              ? r.updatedAt.toISOString()
+              : r.updatedAt,
+          })),
+        },
       };
-      return;
+      log.event("recent bundles response assembled");
+    } catch (error) {
+      log.error(error, "failed to list bundles");
+      ctx.response.status = Status.InternalServerError;
+      ctx.response.body = { message: "Failed to list bundles" };
     }
-    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(
-      ppPublicKey,
-      ownerPublicKey,
-    );
-    if (!pp) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Provider not found" };
-      return;
-    }
-
-    const limitParam = ctx.request.url.searchParams.get("limit");
-    const limit = limitParam
-      ? Math.min(LIST_MAX_LIMIT, Math.max(1, Number(limitParam)))
-      : LIST_DEFAULT_LIMIT;
-
-    const windowStart = new Date(Date.now() - LIST_WINDOW_MS);
-    // URL-scoped bundles: each bundle row carries pp_public_key. A PP only
-    // sees its own traffic — every status, including FAILED and EXPIRED.
-    // No cross-PP visibility.
-    const rows = await drizzleClient
-      .select({
-        id: operationsBundle.id,
-        status: operationsBundle.status,
-        channelContractId: operationsBundle.channelContractId,
-        operationsMLXDR: operationsBundle.operationsMLXDR,
-        createdAt: operationsBundle.createdAt,
-        updatedAt: operationsBundle.updatedAt,
-        entityName: entity.name,
-        entityJurisdictions: entity.jurisdictions,
-      })
-      .from(operationsBundle)
-      .leftJoin(account, eq(operationsBundle.createdBy, account.id))
-      .leftJoin(entity, eq(account.entityId, entity.id))
-      .where(
-        and(
-          isNull(operationsBundle.deletedAt),
-          gte(operationsBundle.updatedAt, windowStart),
-          eq(operationsBundle.ppPublicKey, ppPublicKey),
-        ),
-      )
-      .orderBy(desc(operationsBundle.updatedAt))
-      .limit(limit);
-
-    ctx.response.status = Status.OK;
-    ctx.response.body = {
-      message: "Recent bundles",
-      data: {
-        bundles: rows.map((r) => ({
-          id: r.id,
-          status: r.status,
-          channelContractId: r.channelContractId,
-          entityName: r.entityName,
-          jurisdictions: r.entityJurisdictions ?? [],
-          amount: aggregateAmountFromMLXDR(r.operationsMLXDR),
-          createdAt: r.createdAt instanceof Date
-            ? r.createdAt.toISOString()
-            : r.createdAt,
-          updatedAt: r.updatedAt instanceof Date
-            ? r.updatedAt.toISOString()
-            : r.updatedAt,
-        })),
-      },
-    };
-  } catch (error) {
-    LOG.error("Failed to list bundles", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    ctx.response.status = Status.InternalServerError;
-    ctx.response.body = { message: "Failed to list bundles" };
-  }
-};
+  };
+}

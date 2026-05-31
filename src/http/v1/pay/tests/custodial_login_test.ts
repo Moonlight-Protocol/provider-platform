@@ -6,7 +6,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_login_test.ts
  */
 import { assert, assertEquals } from "@std/assert";
-import { postCustodialLoginHandler } from "@/http/v1/pay/custodial/login.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handlePostCustodialLogin } from "@/http/v1/pay/custodial/login.ts";
 import {
   createTestAccount,
   ensureInitialized,
@@ -23,7 +24,7 @@ type MockResponse = { status: number; body: unknown };
 function createMockContext(
   body: unknown,
 ): {
-  ctx: Parameters<typeof postCustodialLoginHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostCustodialLogin>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -73,7 +74,7 @@ Deno.test("custodial login - valid login returns 200 and token", async () => {
     password,
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -106,7 +107,7 @@ Deno.test("custodial login - wrong password returns 401", async () => {
     password: "wrong-password-123",
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 401);
@@ -129,7 +130,7 @@ Deno.test("custodial login - non-existent username returns 401", async () => {
     password: "some-password-123",
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 401);
@@ -159,7 +160,7 @@ Deno.test("custodial login - suspended account returns 401 (same as invalid cred
     password,
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   // Suspended accounts get the same response as invalid credentials
@@ -183,7 +184,7 @@ Deno.test("custodial login - missing username returns 400", async () => {
     password: "some-password-123",
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -201,7 +202,7 @@ Deno.test("custodial login - missing password returns 400", async () => {
     username: "some_user",
   });
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -217,7 +218,7 @@ Deno.test("custodial login - empty body returns 400", async () => {
 
   const { ctx, getResponse } = createMockContext({});
 
-  await postCustodialLoginHandler(ctx);
+  await handlePostCustodialLogin({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);

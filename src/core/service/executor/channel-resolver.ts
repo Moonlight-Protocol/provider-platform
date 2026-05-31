@@ -15,6 +15,7 @@ import { decryptSk } from "@/core/crypto/encrypt-sk.ts";
 import { getChannelClient } from "@/core/channel-client/index.ts";
 import { NETWORK_FEE, SERVICE_AUTH_SECRET } from "@/config/env.ts";
 import type { PrivacyChannel } from "@moonlight/moonlight-sdk";
+import type { Logger } from "@/utils/logger/index.ts";
 
 export interface ChannelContext {
   signer: LocalSigner;
@@ -23,16 +24,22 @@ export interface ChannelContext {
   txConfig: TransactionConfig;
 }
 
+const ppRepo = new PpRepository(drizzleClient);
+const membershipRepo = new CouncilMembershipRepository(drizzleClient);
+
 /**
  * Returns a channel client suitable for READS only (no signer, no txConfig).
  * For writes use resolveChannelContext(channelContractId, ppPublicKey).
- *
- * Uses any active membership that references the channel to find the
- * channelAuthId + assetContractId — these are immutable per-channel.
  */
 export async function resolveChannelClient(
   channelContractId: string,
+  deps: { log: Logger },
 ): Promise<{ channelClient: PrivacyChannel; channelAuthId: string }> {
+  const log = deps.log.scope("resolveChannelClient");
+  log.info("resolveChannelClient");
+  log.debug("channelContractId", channelContractId);
+
+  log.event("listing active PPs to find channel membership");
   const pps = await ppRepo.listActive();
   for (const pp of pps) {
     const membership = await membershipRepo.getActiveForPp(pp.publicKey);
@@ -72,17 +79,21 @@ export async function resolveChannelClient(
   );
 }
 
-const ppRepo = new PpRepository(drizzleClient);
-const membershipRepo = new CouncilMembershipRepository(drizzleClient);
-
 export async function resolveChannelContext(
   channelContractId: string,
   ppPublicKey: string,
+  deps: { log: Logger },
 ): Promise<ChannelContext> {
+  const log = deps.log.scope("resolveChannelContext");
+  log.info("resolveChannelContext");
+  log.debug("channelContractId", channelContractId);
+  log.debug("ppPublicKey", ppPublicKey);
+
   if (!ppPublicKey) {
     throw new Error("resolveChannelContext: ppPublicKey is required");
   }
 
+  log.event("loading PP");
   const pp = await ppRepo.findByPublicKey(ppPublicKey);
   if (!pp || !pp.isActive) {
     throw new Error(
@@ -90,6 +101,7 @@ export async function resolveChannelContext(
     );
   }
 
+  log.event("loading membership for PP");
   const membership = await membershipRepo.getActiveForPp(ppPublicKey);
   if (!membership?.configJson) {
     throw new Error(
@@ -127,6 +139,7 @@ export async function resolveChannelContext(
   const channelAuthId = config.council?.channelAuthId ??
     membership.channelAuthId;
 
+  log.event("decrypting PP secret key");
   const sk = await decryptSk(pp.encryptedSk, SERVICE_AUTH_SECRET);
   if (!sk.startsWith("S")) {
     throw new Error(

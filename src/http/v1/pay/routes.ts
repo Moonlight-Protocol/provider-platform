@@ -1,55 +1,79 @@
 import { Router } from "@oak/oak";
 import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
-import { getKycHandler } from "@/http/v1/pay/kyc/get.ts";
-import { postKycHandler } from "@/http/v1/pay/kyc/post.ts";
-import { listTransactionsHandler } from "@/http/v1/pay/transactions/list.ts";
-import { postSelfBalanceHandler } from "@/http/v1/pay/self/balance.ts";
-import { postSelfSendHandler } from "@/http/v1/pay/self/send.ts";
-import { getCustodialAccountHandler } from "@/http/v1/pay/custodial/account.ts";
-import { postCustodialSendHandler } from "@/http/v1/pay/custodial/send.ts";
-import { postCustodialLoginHandler } from "@/http/v1/pay/custodial/login.ts";
-import { postCustodialRegisterHandler } from "@/http/v1/pay/custodial/register.ts";
-import { postSimulateKycHandler } from "@/http/v1/pay/demo/simulate-kyc.ts";
-import { getEscrowSummaryHandler } from "@/http/v1/pay/escrow/summary.ts";
-import { postReportHandler } from "@/http/v1/pay/report/post.ts";
-import { LOG } from "@/config/logger.ts";
+import { handleGetKyc } from "@/http/v1/pay/kyc/get.ts";
+import { handlePostKyc } from "@/http/v1/pay/kyc/post.ts";
+import { handleListTransactions } from "@/http/v1/pay/transactions/list.ts";
+import { handlePostSelfBalance } from "@/http/v1/pay/self/balance.ts";
+import { handlePostSelfSend } from "@/http/v1/pay/self/send.ts";
+import { handleGetCustodialAccount } from "@/http/v1/pay/custodial/account.ts";
+import { handlePostCustodialSend } from "@/http/v1/pay/custodial/send.ts";
+import { handlePostCustodialLogin } from "@/http/v1/pay/custodial/login.ts";
+import { handlePostCustodialRegister } from "@/http/v1/pay/custodial/register.ts";
+import { handlePostSimulateKyc } from "@/http/v1/pay/demo/simulate-kyc.ts";
+import { handleGetEscrowSummary } from "@/http/v1/pay/escrow/summary.ts";
+import { handlePostReport } from "@/http/v1/pay/report/post.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 
-const payRouter = new Router();
+export function buildPayRouter(deps: { log: Logger }): Router {
+  const log = deps.log.scope("pay.routes");
+  const payRouter = new Router();
 
-// --- Public auth endpoints (no JWT) ---
-payRouter.post("/pay/custodial/login", postCustodialLoginHandler);
-payRouter.post("/pay/custodial/register", postCustodialRegisterHandler);
+  // --- Public auth endpoints (no JWT) ---
+  payRouter.post("/pay/custodial/login", handlePostCustodialLogin(deps));
+  payRouter.post("/pay/custodial/register", handlePostCustodialRegister(deps));
 
-// --- Authenticated endpoints ---
-payRouter.get("/pay/kyc/:address", jwtMiddleware, getKycHandler);
-payRouter.post("/pay/kyc", jwtMiddleware, postKycHandler);
-payRouter.get("/pay/transactions", jwtMiddleware, listTransactionsHandler);
-payRouter.post("/pay/self/balance", jwtMiddleware, postSelfBalanceHandler);
-payRouter.post("/pay/self/send", jwtMiddleware, postSelfSendHandler);
-payRouter.get(
-  "/pay/custodial/account",
-  jwtMiddleware,
-  getCustodialAccountHandler,
-);
-payRouter.post("/pay/custodial/send", jwtMiddleware, postCustodialSendHandler);
-payRouter.get("/pay/escrow/:address", jwtMiddleware, getEscrowSummaryHandler);
-payRouter.post("/pay/report", jwtMiddleware, postReportHandler);
-
-// --- Demo endpoints (local/standalone only) ---
-const networkEnv = loadOptionalEnv("NETWORK") ?? "";
-const demoEnabled = loadOptionalEnv("PAY_DEMO_ENABLED") === "true";
-if (networkEnv === "local" || networkEnv === "standalone" || demoEnabled) {
-  LOG.info("Pay demo routes enabled", { network: networkEnv, demoEnabled });
-  payRouter.post(
-    "/pay/demo/simulate-kyc",
-    jwtMiddleware,
-    postSimulateKycHandler,
+  // --- Authenticated endpoints ---
+  payRouter.get("/pay/kyc/:address", jwtMiddleware(deps), handleGetKyc(deps));
+  payRouter.post("/pay/kyc", jwtMiddleware(deps), handlePostKyc(deps));
+  payRouter.get(
+    "/pay/transactions",
+    jwtMiddleware(deps),
+    handleListTransactions(deps),
   );
-} else {
-  LOG.info("Pay demo routes disabled (non-local network)", {
-    network: networkEnv,
-  });
-}
+  payRouter.post(
+    "/pay/self/balance",
+    jwtMiddleware(deps),
+    handlePostSelfBalance(deps),
+  );
+  payRouter.post(
+    "/pay/self/send",
+    jwtMiddleware(deps),
+    handlePostSelfSend(deps),
+  );
+  payRouter.get(
+    "/pay/custodial/account",
+    jwtMiddleware(deps),
+    handleGetCustodialAccount(deps),
+  );
+  payRouter.post(
+    "/pay/custodial/send",
+    jwtMiddleware(deps),
+    handlePostCustodialSend(deps),
+  );
+  payRouter.get(
+    "/pay/escrow/:address",
+    jwtMiddleware(deps),
+    handleGetEscrowSummary(deps),
+  );
+  payRouter.post("/pay/report", jwtMiddleware(deps), handlePostReport(deps));
 
-export default payRouter;
+  // --- Demo endpoints (local/standalone only) ---
+  const networkEnv = loadOptionalEnv("NETWORK") ?? "";
+  const demoEnabled = loadOptionalEnv("PAY_DEMO_ENABLED") === "true";
+  if (networkEnv === "local" || networkEnv === "standalone" || demoEnabled) {
+    log.debug("network", networkEnv);
+    log.debug("demoEnabled", demoEnabled);
+    log.event("pay demo routes enabled");
+    payRouter.post(
+      "/pay/demo/simulate-kyc",
+      jwtMiddleware(deps),
+      handlePostSimulateKyc(deps),
+    );
+  } else {
+    log.debug("network", networkEnv);
+    log.event("pay demo routes disabled (non-local network)");
+  }
+
+  return payRouter;
+}

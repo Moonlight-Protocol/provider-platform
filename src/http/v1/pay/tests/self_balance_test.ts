@@ -6,7 +6,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/self_balance_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { postSelfBalanceHandler } from "@/http/v1/pay/self/balance.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handlePostSelfBalance } from "@/http/v1/pay/self/balance.ts";
 import {
   _resetMockBalances,
   _setMockBalances,
@@ -23,7 +24,7 @@ function createMockContext(
   body: unknown,
   session: unknown,
 ): {
-  ctx: Parameters<typeof postSelfBalanceHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostSelfBalance>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -90,7 +91,7 @@ Deno.test("self balance - returns balances for given public keys", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -129,7 +130,7 @@ Deno.test("self balance - returns zero balances for empty UTXOs", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -151,7 +152,7 @@ Deno.test("self balance - empty publicKeys array returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -171,7 +172,7 @@ Deno.test("self balance - non-array publicKeys returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -191,7 +192,7 @@ Deno.test("self balance - missing publicKeys returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -213,7 +214,7 @@ Deno.test("self balance - exceeding MAX_UTXO_SLOTS returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -237,7 +238,7 @@ Deno.test("self balance - single public key works", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postSelfBalanceHandler(ctx);
+  await handlePostSelfBalance({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);

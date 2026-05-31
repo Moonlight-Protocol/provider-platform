@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/kyc_post_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { postKycHandler } from "@/http/v1/pay/kyc/post.ts";
+import { handlePostKyc } from "@/http/v1/pay/kyc/post.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 import {
   createTestAccount,
   createTestKyc,
@@ -26,7 +27,7 @@ function createMockContext(
   body: unknown,
   session: unknown,
 ): {
-  ctx: Parameters<typeof postKycHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostKyc>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -97,7 +98,7 @@ Deno.test("kyc post - self-custodial user submits KYC for own address returns 20
     selfCustodialSession(address),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -133,7 +134,7 @@ Deno.test("kyc post - self-custodial user submits KYC for different address retu
     selfCustodialSession(ownAddress),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 403);
@@ -158,7 +159,7 @@ Deno.test("kyc post - custodial user submits KYC for own deposit address returns
     custodialSession(account.id),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -190,7 +191,7 @@ Deno.test("kyc post - custodial user submits KYC for wrong address returns 403",
     custodialSession(account.id),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 403);
@@ -215,7 +216,7 @@ Deno.test("kyc post - creates new KYC record if none exists", async () => {
     selfCustodialSession(address),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
 
   assertEquals(getResponse().status, 200);
 
@@ -243,7 +244,7 @@ Deno.test("kyc post - updates existing KYC record to PENDING", async () => {
     selfCustodialSession(address),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
 
   assertEquals(getResponse().status, 200);
 
@@ -268,7 +269,7 @@ Deno.test("kyc post - missing address returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -288,7 +289,7 @@ Deno.test("kyc post - missing jurisdiction returns 400", async () => {
     selfCustodialSession(address),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -307,7 +308,7 @@ Deno.test("kyc post - empty body returns 400", async () => {
     selfCustodialSession(testAddress()),
   );
 
-  await postKycHandler(ctx);
+  await handlePostKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);

@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { newNoop } from "@/utils/logger/index.ts";
 import { Keypair } from "stellar-sdk";
 import { Buffer } from "buffer";
 import {
@@ -49,14 +50,20 @@ async function signNonceSep53(
 }
 
 Deno.test("createDashboardChallenge - returns a nonce", () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   assertEquals(typeof nonce, "string");
   assertEquals(nonce.length > 0, true);
 });
 
 Deno.test("createDashboardChallenge - returns unique nonces", () => {
-  const { nonce: nonce1 } = createDashboardChallenge(TEST_PUBLIC_KEY);
-  const { nonce: nonce2 } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce: nonce1 } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
+  const { nonce: nonce2 } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   assertEquals(nonce1 !== nonce2, true);
 });
 
@@ -68,6 +75,7 @@ Deno.test("verifyDashboardChallenge - rejects unknown nonce", async () => {
         "sig",
         TEST_PUBLIC_KEY,
         SELF_SIGNER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Challenge not found",
@@ -75,18 +83,25 @@ Deno.test("verifyDashboardChallenge - rejects unknown nonce", async () => {
 });
 
 Deno.test("verifyDashboardChallenge - rejects wrong public key", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const otherKey = Keypair.random().publicKey();
 
   await assertRejects(
-    () => verifyDashboardChallenge(nonce, "sig", otherKey, SELF_SIGNER_CONFIG),
+    () =>
+      verifyDashboardChallenge(nonce, "sig", otherKey, SELF_SIGNER_CONFIG, {
+        log: newNoop(),
+      }),
     Error,
     "Public key mismatch",
   );
 });
 
 Deno.test("verifyDashboardChallenge - rejects short invalid signature", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const badSig = btoa("too-short");
 
   await assertRejects(
@@ -96,6 +111,7 @@ Deno.test("verifyDashboardChallenge - rejects short invalid signature", async ()
         badSig,
         TEST_PUBLIC_KEY,
         SELF_SIGNER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Invalid signature",
@@ -103,7 +119,9 @@ Deno.test("verifyDashboardChallenge - rejects short invalid signature", async ()
 });
 
 Deno.test("verifyDashboardChallenge - rejects valid-length but wrong signature", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   // 64-byte signature that's properly sized but wrong
   const wrongSig = signNonce(Keypair.random(), nonce);
 
@@ -114,6 +132,7 @@ Deno.test("verifyDashboardChallenge - rejects valid-length but wrong signature",
         wrongSig,
         TEST_PUBLIC_KEY,
         SELF_SIGNER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Invalid signature",
@@ -121,7 +140,9 @@ Deno.test("verifyDashboardChallenge - rejects valid-length but wrong signature",
 });
 
 Deno.test("verifyDashboardChallenge - valid signature + self signer = success", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const signature = signNonce(TEST_KEYPAIR, nonce);
 
   const { token } = await verifyDashboardChallenge(
@@ -129,6 +150,7 @@ Deno.test("verifyDashboardChallenge - valid signature + self signer = success", 
     signature,
     TEST_PUBLIC_KEY,
     SELF_SIGNER_CONFIG,
+    { log: newNoop() },
   );
 
   assertEquals(typeof token, "string");
@@ -136,7 +158,9 @@ Deno.test("verifyDashboardChallenge - valid signature + self signer = success", 
 });
 
 Deno.test("verifyDashboardChallenge - valid signature + different provider (no Horizon) = rejected", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const signature = signNonce(TEST_KEYPAIR, nonce);
 
   await assertRejects(
@@ -146,6 +170,7 @@ Deno.test("verifyDashboardChallenge - valid signature + different provider (no H
         signature,
         TEST_PUBLIC_KEY,
         DIFFERENT_PROVIDER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Signer is not authorized",
@@ -153,7 +178,9 @@ Deno.test("verifyDashboardChallenge - valid signature + different provider (no H
 });
 
 Deno.test("verifyDashboardChallenge - SEP-53 hex signature + self signer = success", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const signature = await signNonceSep53(TEST_KEYPAIR, nonce);
 
   const { token } = await verifyDashboardChallenge(
@@ -161,6 +188,7 @@ Deno.test("verifyDashboardChallenge - SEP-53 hex signature + self signer = succe
     signature,
     TEST_PUBLIC_KEY,
     SELF_SIGNER_CONFIG,
+    { log: newNoop() },
   );
 
   assertEquals(typeof token, "string");
@@ -168,7 +196,9 @@ Deno.test("verifyDashboardChallenge - SEP-53 hex signature + self signer = succe
 });
 
 Deno.test("verifyDashboardChallenge - SEP-53 wrong key rejected", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const signature = await signNonceSep53(Keypair.random(), nonce);
 
   await assertRejects(
@@ -178,6 +208,7 @@ Deno.test("verifyDashboardChallenge - SEP-53 wrong key rejected", async () => {
         signature,
         TEST_PUBLIC_KEY,
         SELF_SIGNER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Invalid signature",
@@ -185,7 +216,9 @@ Deno.test("verifyDashboardChallenge - SEP-53 wrong key rejected", async () => {
 });
 
 Deno.test("verifyDashboardChallenge - nonce is consumed after use", async () => {
-  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY);
+  const { nonce } = createDashboardChallenge(TEST_PUBLIC_KEY, {
+    log: newNoop(),
+  });
   const signature = signNonce(TEST_KEYPAIR, nonce);
 
   // First use succeeds
@@ -194,6 +227,7 @@ Deno.test("verifyDashboardChallenge - nonce is consumed after use", async () => 
     signature,
     TEST_PUBLIC_KEY,
     SELF_SIGNER_CONFIG,
+    { log: newNoop() },
   );
 
   // Second use fails
@@ -204,6 +238,7 @@ Deno.test("verifyDashboardChallenge - nonce is consumed after use", async () => 
         signature,
         TEST_PUBLIC_KEY,
         SELF_SIGNER_CONFIG,
+        { log: newNoop() },
       ),
     Error,
     "Challenge not found",
