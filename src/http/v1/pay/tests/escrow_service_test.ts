@@ -5,6 +5,7 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/escrow_service_test.ts
  */
 import { assert, assertEquals, assertExists } from "@std/assert";
+import { newNoop } from "@/utils/logger/index.ts";
 import {
   claimEscrowForAddress,
   createEscrow,
@@ -43,7 +44,7 @@ Deno.test("createEscrow - creates a HELD record in the database", async () => {
     receiverAddress,
     amount: 5000n,
     mode: "custodial",
-  });
+  }, { log: newNoop() });
 
   assertExists(escrowId, "createEscrow should return an ID");
 
@@ -80,7 +81,9 @@ Deno.test("claimEscrowForAddress - claims held escrows for custodial account", a
     mode: "custodial",
   });
 
-  const result = await claimEscrowForAddress(account.depositAddress);
+  const result = await claimEscrowForAddress(account.depositAddress, {
+    log: newNoop(),
+  });
 
   assertEquals(result.claimed, 1);
   assertEquals(result.totalAmount, 1000n);
@@ -107,7 +110,7 @@ Deno.test("claimEscrowForAddress - returns 0 when no held escrows exist", async 
   const address = testAddress();
   await createTestKyc(address, PayKycStatus.VERIFIED);
 
-  const result = await claimEscrowForAddress(address);
+  const result = await claimEscrowForAddress(address, { log: newNoop() });
   assertEquals(result.claimed, 0);
   assertEquals(result.totalAmount, 0n);
 });
@@ -131,8 +134,8 @@ Deno.test("claimEscrowForAddress - concurrent claims don't double-credit (race c
   });
 
   const results = await Promise.allSettled([
-    claimEscrowForAddress(account.depositAddress),
-    claimEscrowForAddress(account.depositAddress),
+    claimEscrowForAddress(account.depositAddress, { log: newNoop() }),
+    claimEscrowForAddress(account.depositAddress, { log: newNoop() }),
   ]);
 
   const fulfilled = results.filter(
@@ -187,7 +190,7 @@ Deno.test("getEscrowSummary - returns correct count and total for held escrows",
     mode: "custodial",
   });
 
-  const summary = await getEscrowSummary(receiverAddress);
+  const summary = await getEscrowSummary(receiverAddress, { log: newNoop() });
   assertEquals(summary.count, 2);
   assertEquals(summary.totalAmount, 10000n);
 });
@@ -195,7 +198,7 @@ Deno.test("getEscrowSummary - returns correct count and total for held escrows",
 Deno.test("getEscrowSummary - returns 0 for address with no escrows", async () => {
   await ensureInitialized();
   await resetDb();
-  const summary = await getEscrowSummary(testAddress());
+  const summary = await getEscrowSummary(testAddress(), { log: newNoop() });
   assertEquals(summary.count, 0);
   assertEquals(summary.totalAmount, 0n);
 });
@@ -222,7 +225,7 @@ Deno.test("getEscrowSummary - excludes claimed escrows", async () => {
     status: PayEscrowStatus.CLAIMED,
   });
 
-  const summary = await getEscrowSummary(receiverAddress);
+  const summary = await getEscrowSummary(receiverAddress, { log: newNoop() });
   assertEquals(summary.count, 1, "Only HELD escrows should be counted");
   assertEquals(
     summary.totalAmount,

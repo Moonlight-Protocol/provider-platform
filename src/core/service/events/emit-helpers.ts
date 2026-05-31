@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { eventBus } from "@/core/service/events/event-bus.ts";
+import { getEventBus } from "@/core/service/events/event-bus.ts";
 import {
   resolveAllPpScopes,
   resolveScopeForPp,
@@ -15,63 +15,67 @@ import type {
 
 /**
  * Resolves the active PP scopes for the given channel and emits one event
- * per scope (so single-PP-bound WebSocket subscribers see only their own
- * events). The builder is called once per scope and must return a fully
- * typed ProviderEvent. Errors during resolution are logged, never thrown,
- * so emission paths cannot crash the calling service.
+ * per scope. Errors during resolution are logged, never thrown, so emission
+ * paths cannot crash the calling service.
  */
 export async function emitForChannel(
   channelContractId: string,
   build: (scope: EventScope) => ProviderEvent,
+  deps: { log: Logger },
 ): Promise<void> {
   if (!channelContractId) return;
+  const log = deps.log.scope("emitForChannel");
+  log.info("emitForChannel");
+  log.debug("channelContractId", channelContractId);
   try {
+    log.event("resolving scopes for channel");
     const scopes = await resolveScopesForChannel(channelContractId);
     for (const scope of scopes) {
-      eventBus.emit(build(scope));
+      getEventBus(deps).emit(build(scope));
     }
   } catch (error) {
-    LOG.error("emitForChannel failed", {
-      channelContractId,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    log.error(error, "emitForChannel failed");
   }
 }
 
 /**
- * Resolves the scope for a known PP and emits a single event. Used for
- * channel.provider_* events where the watcher already knows which PP changed.
+ * Resolves the scope for a known PP and emits a single event.
  */
 export async function emitForPp(
   ppPublicKey: string,
   build: (scope: EventScope) => ProviderEvent,
+  deps: { log: Logger },
 ): Promise<void> {
   if (!ppPublicKey) return;
+  const log = deps.log.scope("emitForPp");
+  log.info("emitForPp");
+  log.debug("ppPublicKey", ppPublicKey);
   try {
+    log.event("resolving scope for PP");
     const scope = await resolveScopeForPp(ppPublicKey);
     if (!scope) return;
-    eventBus.emit(build(scope));
+    getEventBus(deps).emit(build(scope));
   } catch (error) {
-    LOG.error("emitForPp failed", {
-      ppPublicKey,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    log.error(error, "emitForPp failed");
   }
 }
 
 /**
  * Looks up the distinct PPs that own the given bundle IDs and emits one event
- * per PP scope. Used by bundle-success paths (mempool.bundle_added, executor.
- * transaction_submitted, verifier.bundle_completed) so dashboards only see
- * events for bundles that actually belong to them — and not every PP that
- * happens to share a channel.
+ * per PP scope. Used by bundle-success paths so dashboards only see events
+ * for bundles that actually belong to them.
  */
 export async function emitForBundles(
   bundleIds: string[],
   build: (scope: EventScope) => ProviderEvent,
+  deps: { log: Logger },
 ): Promise<void> {
   if (!bundleIds.length) return;
+  const log = deps.log.scope("emitForBundles");
+  log.info("emitForBundles");
+  log.debug("bundleIdCount", bundleIds.length);
   try {
+    log.event("loading distinct PPs that own these bundles");
     const rows = await drizzleClient
       .select({ ppPublicKey: operationsBundle.ppPublicKey })
       .from(operationsBundle)
@@ -80,16 +84,14 @@ export async function emitForBundles(
     for (const r of rows) {
       if (r.ppPublicKey) distinct.add(r.ppPublicKey);
     }
+    log.debug("distinctPpCount", distinct.size);
     for (const pk of distinct) {
       const scope = await resolveScopeForPp(pk);
       if (!scope) continue;
-      eventBus.emit(build(scope));
+      getEventBus(deps).emit(build(scope));
     }
   } catch (error) {
-    LOG.error("emitForBundles failed", {
-      bundleIds,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    log.error(error, "emitForBundles failed");
   }
 }
 
@@ -100,15 +102,17 @@ export async function emitForBundles(
  */
 export async function emitForAllPps(
   build: (scope: EventScope) => ProviderEvent,
+  deps: { log: Logger },
 ): Promise<void> {
+  const log = deps.log.scope("emitForAllPps");
+  log.info("emitForAllPps");
   try {
+    log.event("resolving all PP scopes");
     const scopes = await resolveAllPpScopes();
     for (const scope of scopes) {
-      eventBus.emit(build(scope));
+      getEventBus(deps).emit(build(scope));
     }
   } catch (error) {
-    LOG.error("emitForAllPps failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    log.error(error, "emitForAllPps failed");
   }
 }

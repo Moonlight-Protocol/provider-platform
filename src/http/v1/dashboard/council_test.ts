@@ -32,7 +32,8 @@ function createMockContext(body: unknown): any {
 let discoverCouncilHandler: ((ctx: any) => Promise<void>) | null = null;
 try {
   const mod = await import("./council.ts");
-  discoverCouncilHandler = mod.discoverCouncilHandler;
+  const { newNoop } = await import("@/utils/logger/index.ts");
+  discoverCouncilHandler = mod.handleDiscoverCouncil({ log: newNoop() });
 } catch {
   // DB not available — skip handler tests
 }

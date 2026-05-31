@@ -10,36 +10,45 @@ import * as E from "@/core/service/auth/challenge/create/error.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { withSpan } from "@/core/tracing.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
-export const P_GenerateChallengeJWT = ProcessEngine.create(
-  (
-    input: PostChallengeInput,
-    _metadataHelper?: MetadataHelper,
-  ): Promise<PostChallengeWithJWT> => {
-    return withSpan("P_GenerateChallengeJWT", async (span) => {
-      const { signedChallenge } = input.body;
-      const tx = new Transaction(
-        signedChallenge,
-        NETWORK_CONFIG.networkPassphrase,
-      );
+export const P_GenerateChallengeJWT = (deps: { log: Logger }) =>
+  ProcessEngine.create(
+    (
+      input: PostChallengeInput,
+      _metadataHelper?: MetadataHelper,
+    ): Promise<PostChallengeWithJWT> => {
+      return withSpan("P_GenerateChallengeJWT", async (span) => {
+        const log = deps.log.scope("P_GenerateChallengeJWT");
+        log.info("P_GenerateChallengeJWT");
 
-      const key = tx.hash().toString("hex");
+        const { signedChallenge } = input.body;
+        const tx = new Transaction(
+          signedChallenge,
+          NETWORK_CONFIG.networkPassphrase,
+        );
 
-      const clientAccount = tx.operations[0].source;
-      assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
+        const key = tx.hash().toString("hex");
+        log.debug("txHash", key);
 
-      span.addEvent("generating_jwt", { "client.account": clientAccount });
-      const jwt = await generateJwt(clientAccount, key);
-      span.addEvent("jwt_generated");
+        const clientAccount = tx.operations[0].source;
+        assertOrThrow(isDefined(clientAccount), new E.MISSING_CLIENT_ACCOUNT());
+        log.debug("clientAccount", clientAccount);
 
-      return {
-        ctx: input.ctx,
-        body: input.body,
-        jwt,
-      };
-    });
-  },
-  {
-    name: "GenerateChallengeJWT",
-  },
-);
+        span.addEvent("generating_jwt", { "client.account": clientAccount });
+        log.event("generating JWT");
+        const jwt = await generateJwt(clientAccount, key);
+        span.addEvent("jwt_generated");
+        log.event("JWT generated");
+
+        return {
+          ctx: input.ctx,
+          body: input.body,
+          jwt,
+        };
+      });
+    },
+    {
+      name: "GenerateChallengeJWT",
+    },
+  );

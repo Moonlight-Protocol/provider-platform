@@ -1,7 +1,6 @@
 import { NetworkConfig, NetworkProviders } from "@colibri/core";
 import { StellarNetworkId } from "@moonlight/moonlight-sdk";
 import * as E from "@/config/error.ts";
-import { logAndThrow } from "@/utils/error/log-and-throw.ts";
 import { loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 
 export function selectNetwork(envNetwork: string): {
@@ -53,6 +52,6 @@ export function selectNetwork(envNetwork: string): {
       };
     }
     default:
-      logAndThrow(new E.INVALID_NETWORK());
+      throw new E.INVALID_NETWORK();
   }
 }

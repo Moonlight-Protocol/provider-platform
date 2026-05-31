@@ -1,8 +1,14 @@
 import { Router } from "@oak/oak";
-import authRouter from "@/http/v1/stellar/auth/routes.ts";
+import type { Logger } from "@/utils/logger/index.ts";
+import { buildAuthRouter } from "@/http/v1/stellar/auth/routes.ts";
 
-const stellarRouter = new Router();
-
-stellarRouter.use("/stellar", authRouter.routes(), authRouter.allowedMethods());
-
-export default stellarRouter;
+export function buildStellarRouter(deps: { log: Logger }): Router {
+  const stellarRouter = new Router();
+  const authRouter = buildAuthRouter(deps);
+  stellarRouter.use(
+    "/stellar",
+    authRouter.routes(),
+    authRouter.allowedMethods(),
+  );
+  return stellarRouter;
+}

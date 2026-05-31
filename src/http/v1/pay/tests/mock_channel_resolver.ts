@@ -9,7 +9,11 @@
 const stubChannelClient = {} as any;
 
 // deno-lint-ignore require-await -- mock satisfies resolveChannelContext async contract
-export async function resolveChannelContext(_channelContractId: string) {
+export async function resolveChannelContext(
+  _channelContractId: string,
+  _ppPublicKey?: string,
+  _deps?: unknown,
+) {
   return {
     signer: null,
     ppSecretKey: "",
@@ -19,7 +23,10 @@ export async function resolveChannelContext(_channelContractId: string) {
 }
 
 // deno-lint-ignore require-await -- mock satisfies resolveChannelClient async contract
-export async function resolveChannelClient(_channelContractId: string) {
+export async function resolveChannelClient(
+  _channelContractId: string,
+  _deps?: unknown,
+) {
   return {
     channelClient: stubChannelClient,
     channelAuthId: "",

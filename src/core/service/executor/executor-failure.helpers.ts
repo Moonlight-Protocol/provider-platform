@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import type { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
 import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
@@ -22,15 +22,21 @@ export function handleExecutionFailure(
   deps: {
     operationsBundleRepository: OperationsBundleRepository;
     maxRetryAttempts: number;
+    log: Logger;
   },
 ): Promise<ExecutionFailureResult[]> {
   return withSpan("Executor.handleExecutionFailure", async (span) => {
+    const log = deps.log.scope("handleExecutionFailure");
+    log.info("handleExecutionFailure");
+    log.debug("bundleIdCount", bundleIds.length);
+    log.debug("lastFailureReason", lastFailureReason);
+
     const errorMessage = error.message || "Unknown error";
     span.addEvent("handling_failure", {
       "error.message": errorMessage,
       "bundles.count": bundleIds.length,
     });
-    LOG.error("Execution failed", { error: errorMessage, bundleIds });
+    log.error(error, "execution failed");
 
     const bundlesToRetry: ExecutionFailureResult[] = [];
 
@@ -38,9 +44,8 @@ export function handleExecutionFailure(
       try {
         const bundle = await deps.operationsBundleRepository.findById(bundleId);
         if (!bundle) {
-          LOG.warn(
-            `Bundle ${bundleId} not found while handling execution failure`,
-          );
+          log.debug("bundleId", bundleId);
+          log.event("bundle not found while handling execution failure");
           continue;
         }
 
@@ -54,13 +59,9 @@ export function handleExecutionFailure(
             lastFailureReason,
             updatedAt: new Date(),
           });
-          LOG.warn(
-            "Bundle moved to dead-letter after max retry attempts reached",
-            {
-              bundleId,
-              retryCount: nextRetryCount,
-            },
-          );
+          log.debug("bundleId", bundleId);
+          log.debug("retryCount", nextRetryCount);
+          log.event("bundle moved to dead-letter after max retry attempts");
         } else {
           await deps.operationsBundleRepository.update(bundleId, {
             status: BundleStatus.PENDING,
@@ -74,9 +75,8 @@ export function handleExecutionFailure(
         }
       } catch (updateError) {
         span.addEvent("bundle_reset_failed", { "bundle.id": bundleId });
-        LOG.error(`Failed to update bundle ${bundleId} status`, {
-          error: updateError,
-        });
+        log.debug("bundleId", bundleId);
+        log.error(updateError, "failed to update bundle status");
       }
     }
 
@@ -91,7 +91,12 @@ export function handleExecutionFailure(
 export function buildRetryBundles(
   slot: { getBundles(): SlotBundle[] },
   metaList: ExecutionFailureResult[],
+  deps: { log: Logger },
 ): SlotBundle[] {
+  const log = deps.log.scope("buildRetryBundles");
+  log.info("buildRetryBundles");
+  log.debug("metaCount", metaList.length);
+
   const metaByBundleId = new Map(metaList.map((m) => [m.bundleId, m] as const));
 
   const eligible = slot.getBundles().filter((b) =>
@@ -105,5 +110,6 @@ export function buildRetryBundles(
     bundle.lastFailureReason = meta.lastFailureReason;
   }
 
+  log.debug("eligibleCount", eligible.length);
   return eligible;
 }

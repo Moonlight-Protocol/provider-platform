@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/escrow_summary_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { getEscrowSummaryHandler } from "@/http/v1/pay/escrow/summary.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handleGetEscrowSummary } from "@/http/v1/pay/escrow/summary.ts";
 import {
   createTestEscrow,
   ensureInitialized,
@@ -25,7 +26,7 @@ function createMockContext(
   params: { address?: string },
   session?: unknown,
 ): {
-  ctx: Parameters<typeof getEscrowSummaryHandler>[0];
+  ctx: Parameters<ReturnType<typeof handleGetEscrowSummary>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -89,7 +90,7 @@ Deno.test("escrow summary - returns correct count and total for held escrows", a
     { sub: receiverAddress },
   );
 
-  await getEscrowSummaryHandler(ctx);
+  await handleGetEscrowSummary({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -122,7 +123,7 @@ Deno.test("escrow summary - returns 0 for address with no escrows", async () => 
     { sub: addr },
   );
 
-  await getEscrowSummaryHandler(ctx);
+  await handleGetEscrowSummary({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -163,7 +164,7 @@ Deno.test("escrow summary - excludes claimed escrows from count", async () => {
     { sub: receiverAddress },
   );
 
-  await getEscrowSummaryHandler(ctx);
+  await handleGetEscrowSummary({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -187,7 +188,7 @@ Deno.test("escrow summary - missing address returns 400", async () => {
 
   const { ctx, getResponse } = createMockContext({});
 
-  await getEscrowSummaryHandler(ctx);
+  await handleGetEscrowSummary({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -227,7 +228,7 @@ Deno.test("escrow summary - undefined params returns 400", async () => {
   };
 
   // deno-lint-ignore no-explicit-any
-  await getEscrowSummaryHandler(ctx as any);
+  await handleGetEscrowSummary({ log: newNoop() })(ctx as any);
 
   assertEquals(responseStatus, 400);
   assertEquals(

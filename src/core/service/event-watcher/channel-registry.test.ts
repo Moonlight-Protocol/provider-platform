@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { newNoop } from "@/utils/logger/index.ts";
 import { ChannelRegistry } from "./channel-registry.ts";
 import type { ChannelAuthEvent } from "./event-watcher.types.ts";
 
@@ -15,7 +16,7 @@ function makeEvent(
 }
 
 Deno.test("ChannelRegistry - provider_added for configured channel → active", () => {
-  const registry = new ChannelRegistry([CONTRACT_A]);
+  const registry = new ChannelRegistry([CONTRACT_A], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
 
   const channel = registry.get(CONTRACT_A);
@@ -24,7 +25,7 @@ Deno.test("ChannelRegistry - provider_added for configured channel → active", 
 });
 
 Deno.test("ChannelRegistry - provider_added for unconfigured channel → pending", () => {
-  const registry = new ChannelRegistry([]);
+  const registry = new ChannelRegistry([], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
 
   const channel = registry.get(CONTRACT_A);
@@ -32,7 +33,7 @@ Deno.test("ChannelRegistry - provider_added for unconfigured channel → pending
 });
 
 Deno.test("ChannelRegistry - provider_removed → inactive", () => {
-  const registry = new ChannelRegistry([CONTRACT_A]);
+  const registry = new ChannelRegistry([CONTRACT_A], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
   registry.handleEvent(makeEvent("provider_removed", CONTRACT_A, 200));
 
@@ -42,7 +43,7 @@ Deno.test("ChannelRegistry - provider_removed → inactive", () => {
 });
 
 Deno.test("ChannelRegistry - provider_removed for unknown channel → inactive record", () => {
-  const registry = new ChannelRegistry([]);
+  const registry = new ChannelRegistry([], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_removed", CONTRACT_A, 200));
 
   const channel = registry.get(CONTRACT_A);
@@ -51,7 +52,7 @@ Deno.test("ChannelRegistry - provider_removed for unknown channel → inactive r
 });
 
 Deno.test("ChannelRegistry - getAll returns all channels", () => {
-  const registry = new ChannelRegistry([CONTRACT_A]);
+  const registry = new ChannelRegistry([CONTRACT_A], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
   registry.handleEvent(makeEvent("provider_added", CONTRACT_B, 101));
 
@@ -59,7 +60,7 @@ Deno.test("ChannelRegistry - getAll returns all channels", () => {
 });
 
 Deno.test("ChannelRegistry - getByState filters correctly", () => {
-  const registry = new ChannelRegistry([CONTRACT_A]);
+  const registry = new ChannelRegistry([CONTRACT_A], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
   registry.handleEvent(makeEvent("provider_added", CONTRACT_B, 101));
 
@@ -69,7 +70,7 @@ Deno.test("ChannelRegistry - getByState filters correctly", () => {
 });
 
 Deno.test("ChannelRegistry - activateChannel transitions pending → active", () => {
-  const registry = new ChannelRegistry([]);
+  const registry = new ChannelRegistry([], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
   assertEquals(registry.get(CONTRACT_A)?.state, "pending");
 
@@ -78,7 +79,7 @@ Deno.test("ChannelRegistry - activateChannel transitions pending → active", ()
 });
 
 Deno.test("ChannelRegistry - deactivateChannel transitions active → pending", () => {
-  const registry = new ChannelRegistry([CONTRACT_A]);
+  const registry = new ChannelRegistry([CONTRACT_A], { log: newNoop() });
   registry.handleEvent(makeEvent("provider_added", CONTRACT_A, 100));
   assertEquals(registry.get(CONTRACT_A)?.state, "active");
 
@@ -87,7 +88,7 @@ Deno.test("ChannelRegistry - deactivateChannel transitions active → pending", 
 });
 
 Deno.test("ChannelRegistry - contract_initialized does not create channel record", () => {
-  const registry = new ChannelRegistry([]);
+  const registry = new ChannelRegistry([], { log: newNoop() });
   registry.handleEvent(makeEvent("contract_initialized", CONTRACT_A, 50));
 
   assertEquals(registry.getAll().length, 0);

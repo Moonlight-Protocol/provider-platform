@@ -3,10 +3,9 @@ import { type Context, Status } from "@oak/oak";
 import { P_ListBundlesByUser } from "@/core/service/bundle/list-bundles.process.ts";
 import type { GetEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_GetEndpoint } from "@/http/pipelines/get-endpoint.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 
-// Reuse the bundle item schema from get.ts
 const bundleItemSchema = z.object({
   id: z.string(),
   status: z.string(),
@@ -35,33 +34,39 @@ export type BundleListProcessOutput = {
   bundles: z.infer<typeof bundleItemSchema>[];
 };
 
-const assembleResponse = (
-  input: BundleListProcessOutput,
-): GetEndpointOutput<typeof responseSchema> => {
-  const message = "Bundles successfully retrieved";
+export function handleListBundles(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<unknown> {
+  const log = deps.log.scope("listBundles");
 
-  LOG.info(message, { count: input.bundles.length });
+  const assembleResponse = (
+    input: BundleListProcessOutput,
+  ): GetEndpointOutput<typeof responseSchema> => {
+    log.debug("count", input.bundles.length);
+    log.event("bundles successfully retrieved");
 
-  return {
-    ctx: input.ctx,
-    status: Status.OK,
-    message,
-    data: {
-      bundles: input.bundles,
-    },
+    return {
+      ctx: input.ctx,
+      status: Status.OK,
+      message: "Bundles successfully retrieved",
+      data: {
+        bundles: input.bundles,
+      },
+    };
   };
-};
 
-export const listBundlesHandler = (ctx: Context) => {
-  const handler = PIPE_GetEndpoint({
-    name: "ListBundlesEndpointPipeline",
-    requestSchema,
-    responseSchema,
-    steps: [
-      P_ListBundlesByUser,
-      assembleResponse,
-    ],
-  });
+  return (ctx) => {
+    log.info("listBundles");
+    const handler = PIPE_GetEndpoint({
+      name: "ListBundlesEndpointPipeline",
+      requestSchema,
+      responseSchema,
+      steps: [
+        P_ListBundlesByUser(deps),
+        assembleResponse,
+      ],
+    }, deps);
 
-  return handler.run(ctx);
-};
+    return handler.run(ctx);
+  };
+}

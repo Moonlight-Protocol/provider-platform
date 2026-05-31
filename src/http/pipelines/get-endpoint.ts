@@ -1,5 +1,6 @@
 import { Pipeline, type PipelineStep, type PipelineSteps } from "@fifo/convee";
 import type { ZodSchema } from "zod";
+import type { Logger } from "@/utils/logger/index.ts";
 import { P_ParseRequestQuery } from "@/http/processes/parse-request-query.ts";
 import { P_SetSuccessResponse } from "@/http/processes/set-successful-response.ts";
 import { PLG_ProcessErrorResponse } from "@/http/plugins/process-error-response.ts";
@@ -25,17 +26,17 @@ export const PIPE_GetEndpoint = <
   name?: string;
   requestSchema: Req;
   responseSchema: Res;
-}) => {
+}, deps: { log: Logger }) => {
   const pipe = Pipeline.create(
     [
-      P_ParseRequestQuery(requestSchema),
+      P_ParseRequestQuery(requestSchema, deps),
       ...steps,
-      P_SetSuccessResponse(responseSchema),
+      P_SetSuccessResponse(responseSchema, deps),
     ],
     { name },
   );
 
-  pipe.addPlugin(PLG_ProcessErrorResponse(), name);
+  pipe.addPlugin(PLG_ProcessErrorResponse(deps), name);
 
   return pipe;
 };

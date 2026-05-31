@@ -9,7 +9,7 @@ import {
 } from "@/persistence/drizzle/entity/council-membership.entity.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 /**
  * Pull every active privacy-channel contract id out of a PP's memberships.
@@ -55,40 +55,46 @@ export class MetricsCollector {
   private ppRepo: PpRepository;
   private membershipRepo: CouncilMembershipRepository;
   private platformVersion: string;
+  private log: Logger;
 
-  constructor(platformVersion: string) {
+  constructor(platformVersion: string, deps: { log: Logger }) {
     this.metricRepo = new MempoolMetricRepository(drizzleClient);
     this.bundleRepo = new OperationsBundleRepository(drizzleClient);
     this.ppRepo = new PpRepository(drizzleClient);
     this.membershipRepo = new CouncilMembershipRepository(drizzleClient);
     this.platformVersion = platformVersion;
+    this.log = deps.log.scope("MetricsCollector");
   }
 
   start(): void {
-    if (this.intervalId !== null) return;
+    this.log.info("start");
+    if (this.intervalId !== null) {
+      this.log.event("already started, skipping");
+      return;
+    }
 
-    // Collect immediately on start, then every interval
     this.collect();
     this.intervalId = setInterval(
       () => this.collect(),
       COLLECTION_INTERVAL_MS,
     ) as unknown as number;
 
-    LOG.info("MetricsCollector started", {
-      intervalMs: COLLECTION_INTERVAL_MS,
-      platformVersion: this.platformVersion,
-    });
+    this.log.debug("intervalMs", COLLECTION_INTERVAL_MS);
+    this.log.debug("platformVersion", this.platformVersion);
+    this.log.event("MetricsCollector started");
   }
 
   stop(): void {
+    this.log.info("stop");
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      LOG.info("MetricsCollector stopped");
+      this.log.event("MetricsCollector stopped");
     }
   }
 
   private async collect(): Promise<void> {
+    this.log.info("collect");
     try {
       const mempool = getMempool();
       const windowStart = new Date(Date.now() - COLLECTION_INTERVAL_MS);
@@ -157,24 +163,19 @@ export class MetricsCollector {
         recorded++;
       }
 
-      LOG.debug("Per-PP metrics snapshot recorded", {
-        ppsRecorded: recorded,
-      });
+      this.log.debug("ppsRecorded", recorded);
 
       const retentionCutoff = new Date(
         Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000,
       );
       const deleted = await this.metricRepo.deleteOlderThan(retentionCutoff);
       if (deleted > 0) {
-        LOG.debug("Cleaned up old metrics", {
-          deleted,
-          retentionDays: RETENTION_DAYS,
-        });
+        this.log.debug("deleted", deleted);
+        this.log.debug("retentionDays", RETENTION_DAYS);
+        this.log.event("cleaned up old metrics");
       }
     } catch (error) {
-      LOG.error("MetricsCollector failed to collect", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.log.error(error, "MetricsCollector failed to collect");
     }
   }
 }

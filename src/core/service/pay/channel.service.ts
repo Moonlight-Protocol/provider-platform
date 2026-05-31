@@ -5,11 +5,11 @@
  * Reads contract IDs and network config from the existing env/config modules.
  */
 import { Buffer } from "buffer";
-import { LOG } from "@/config/logger.ts";
 import {
   ChannelReadMethods,
   type PrivacyChannel,
 } from "@moonlight/moonlight-sdk";
+import type { Logger } from "@/utils/logger/index.ts";
 
 /**
  * Queries on-chain UTXO balances for the given public keys.
@@ -20,10 +20,16 @@ import {
 export async function queryBalances(
   publicKeys: Uint8Array[],
   channelClient: PrivacyChannel,
+  deps: { log: Logger },
 ): Promise<bigint[]> {
+  const log = deps.log.scope("queryBalances");
+
   if (publicKeys.length === 0) {
     return [];
   }
+
+  log.debug("utxoCount", publicKeys.length);
+  log.event("querying on-chain UTXO balances");
 
   try {
     const result = await channelClient.read({
@@ -37,10 +43,7 @@ export async function queryBalances(
       BigInt(balance)
     );
   } catch (error) {
-    LOG.error("Failed to query UTXO balances", {
-      error: error instanceof Error ? error.message : String(error),
-      utxoCount: publicKeys.length,
-    });
+    log.error(error, "failed to query UTXO balances");
     throw error;
   }
 }

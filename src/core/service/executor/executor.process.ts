@@ -1,4 +1,4 @@
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
@@ -91,11 +91,13 @@ function submitTransactionToNetwork(
   expiration: number,
   channelContractId: string,
   ppPublicKey: string,
+  log: Logger,
 ): Promise<string> {
   return withSpan("Executor.submitTransactionToNetwork", async (span) => {
     const { signer, channelClient, txConfig } = await resolveChannelContext(
       channelContractId,
       ppPublicKey,
+      { log },
     );
     span.setAttribute("pp.publicKey", ppPublicKey);
 
@@ -147,7 +149,7 @@ function submitTransactionToNetwork(
       const errorMessage = error instanceof Error
         ? error.message
         : String(error);
-      LOG.error("Transaction submission failed", { error: errorMessage });
+      log.error(error, "transaction submission failed");
       span.addEvent("submission_failed", { "error.message": errorMessage });
       const baseError = error instanceof Error
         ? error
@@ -172,28 +174,20 @@ function submitTransactionToNetwork(
             "error.message": e instanceof Error ? e.message : String(e),
           });
         }
-        LOG.error("Network error details", {
-          code: networkCtx.code,
-          source: networkCtx.source,
-          txHash: networkCtx.txHash,
-          txSeqNum: networkCtx.txSeqNum,
-          errorResult: networkCtx.errorResult,
-          diagnosticEvents: networkCtx.diagnosticEvents,
-        });
+        log.error(error, "network error details");
+        log.debug("code", networkCtx.code);
+        log.debug("source", networkCtx.source);
       }
 
       const simError = error as SIM_ERRORS.SIMULATION_FAILED;
       if (simError?.meta?.data) {
         const simResponse = simError.meta.data.simulationResponse ??
           simError.meta.data;
-        LOG.error("Simulation details", {
-          simError: JSON.stringify(simResponse, null, 2),
-        });
+        log.error(error, "simulation details");
+        log.debug("simError", JSON.stringify(simResponse, null, 2));
 
         if (simError.meta.data.input?.transaction) {
-          LOG.error("Failed transaction XDR", {
-            xdr: simError.meta.data.input.transaction.toXDR(),
-          });
+          log.debug("xdr", simError.meta.data.input.transaction.toXDR());
         }
 
         const failedTxXdr = simError.meta.data.input?.transaction
@@ -221,10 +215,18 @@ function submitTransactionToNetwork(
 async function createTransactionRecord(
   txHash: string,
   bundleIds: string[],
+  deps: { log: Logger },
   accountId: string = "system",
 ): Promise<void> {
+  const log = deps.log.scope("createTransactionRecord");
+  log.info("createTransactionRecord");
+  log.debug("txHash", txHash);
+  log.debug("bundleCount", bundleIds.length);
+
+  log.event("fetching latest ledger");
   const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger();
 
+  log.event("inserting transaction row");
   await transactionRepository.create({
     id: txHash,
     status: TransactionStatus.UNVERIFIED,
@@ -238,7 +240,7 @@ async function createTransactionRecord(
     createdBy: accountId,
   });
 
-  // Link bundles to transaction
+  log.event("linking bundles to transaction");
   for (const bundleId of bundleIds) {
     await bundleTransactionRepository.create({
       transactionId: txHash,
@@ -258,10 +260,12 @@ function handleExecutionFailure(
   error: Error,
   bundleIds: string[],
   lastFailureReason: string,
+  log: Logger,
 ) {
   return _handleExecutionFailure(error, bundleIds, lastFailureReason, {
     operationsBundleRepository,
     maxRetryAttempts: EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS,
+    log,
   });
 }
 
@@ -272,18 +276,23 @@ export class Executor {
   private intervalId: number | null = null;
   private isRunning: boolean = false;
   private isProcessing: boolean = false;
+  private log: Logger;
+
+  constructor(deps: { log: Logger }) {
+    this.log = deps.log.scope("Executor");
+  }
 
   /**
    * Starts the executor loop
    */
   start(): void {
     if (this.isRunning) {
-      LOG.warn("Executor is already running");
+      this.log.event("Executor is already running");
       return;
     }
 
     this.isRunning = true;
-    LOG.info("Executor started", { intervalMs: EXECUTOR_CONFIG.INTERVAL_MS });
+    this.log.event("Executor started");
 
     // Execute immediately, then on interval
     this.executeNext();
@@ -306,7 +315,7 @@ export class Executor {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    LOG.info("Executor stopped");
+    this.log.event("Executor stopped");
   }
 
   /**
@@ -357,11 +366,12 @@ export class Executor {
         const channelCtx = await resolveChannelContext(
           channelContractId,
           ppPublicKey,
+          { log: this.log },
         );
 
         // Build transaction from slot using the resolved context
         const { txBuilder, bundleIds: buildBundleIds } =
-          await buildTransactionFromSlot(slot, channelCtx);
+          await buildTransactionFromSlot(slot, channelCtx, { log: this.log });
 
         // Use bundleIds from build result to ensure consistency
         bundleIds = buildBundleIds;
@@ -375,21 +385,19 @@ export class Executor {
           expiration,
           channelContractId,
           ppPublicKey,
+          this.log,
         );
 
-        LOG.info("Transaction submitted successfully", {
-          transactionHash,
-          bundleCount: bundleIds.length,
-          bundleIds,
-        });
+        this.log.debug("transactionHash", transactionHash);
+        this.log.debug("bundleCount", bundleIds.length);
+        this.log.event("transaction submitted successfully");
 
         // Create transaction record and link bundles
-        await createTransactionRecord(transactionHash, bundleIds);
-
-        LOG.info("Slot executed successfully", {
-          transactionHash,
-          bundleCount: bundleIds.length,
+        await createTransactionRecord(transactionHash, bundleIds, {
+          log: this.log,
         });
+
+        this.log.event("Slot executed successfully");
 
         await emitForBundles(bundleIds, (scope) => ({
           kind: "executor.transaction_submitted",
@@ -400,7 +408,7 @@ export class Executor {
             bundleIds,
             channelContractId,
           },
-        }));
+        }), { log: this.log });
       } catch (error) {
         const errorMessage = error instanceof Error
           ? error.message
@@ -446,10 +454,10 @@ export class Executor {
         const lastFailureReason = safeJsonStringify(lastFailureReasonPayload) ??
           truncate(errorMessage, 2000);
 
-        LOG.error("Slot execution failed", {
-          error: errorMessage,
-          bundleIds,
-        });
+        this.log.error(
+          new Error(String("Slot execution failed")),
+          "Slot execution failed",
+        );
 
         const failedChannelContractId = slot?.getBundles()[0]
           ?.channelContractId ?? null;
@@ -463,7 +471,7 @@ export class Executor {
               channelContractId: failedChannelContractId,
               reason: errorMessage,
             },
-          }));
+          }), { log: this.log });
         }
 
         // Handle failure: re-add bundles to mempool (only those still elegible) and update status
@@ -473,24 +481,26 @@ export class Executor {
             errorInstance,
             bundleIds,
             lastFailureReason,
+            this.log,
           );
 
           // Reuse the in-memory slot bundle objects, but update retryCount/lastFailureReason
           // based on the decision computed from the database.
-          const bundlesToRetry = buildRetryBundles(slot, bundlesToRetryMeta);
+          const bundlesToRetry = buildRetryBundles(slot, bundlesToRetryMeta, {
+            log: this.log,
+          });
 
           if (bundlesToRetry.length > 0) {
             await mempool.reAddBundles(bundlesToRetry);
-            LOG.info("Bundles re-added to mempool for retry", {
-              bundleIds: bundlesToRetry.map((b) => b.bundleId),
-            });
+            this.log.event("Bundles re-added to mempool for retry");
           }
         } else {
-          LOG.error("Execution error with no slot or bundles to re-add", {
-            error: errorMessage,
-            hasSlot: !!slot,
-            bundleCount: bundleIds.length,
-          });
+          this.log.error(
+            new Error(
+              String("Execution error with no slot or bundles to re-add"),
+            ),
+            "Execution error with no slot or bundles to re-add",
+          );
         }
       } finally {
         this.isProcessing = false;

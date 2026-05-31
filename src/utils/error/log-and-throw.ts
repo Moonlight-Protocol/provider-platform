@@ -1,6 +1,3 @@
-import { LOG } from "@/config/logger.ts";
-
-export function logAndThrow(error: Error): never {
-  LOG.error(error.message, { error });
-  throw error;
-}
+// Helper retired in the logging convention migration. Throw directly at call
+// sites — the catch in the calling handler/factory logs the error via
+// log.error(err, msg).

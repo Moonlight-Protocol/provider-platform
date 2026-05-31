@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/self_send_test.ts
  */
 import { assertEquals, assertExists } from "@std/assert";
-import { postSelfSendHandler } from "@/http/v1/pay/self/send.ts";
+import { handlePostSelfSend } from "@/http/v1/pay/self/send.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 import {
   createTestKyc,
   ensureInitialized,
@@ -29,7 +30,7 @@ function createMockContext(
   body: unknown,
   session: unknown,
 ): {
-  ctx: Parameters<typeof postSelfSendHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostSelfSend>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -91,7 +92,7 @@ Deno.test("self send - successful send to verified address creates SEND transact
     selfCustodialSession(senderAddress),
   );
 
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -129,7 +130,7 @@ Deno.test("self send - send to unverified address creates escrow", async () => {
     selfCustodialSession(senderAddress),
   );
 
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -165,7 +166,7 @@ Deno.test("self send - invalid amount 'abc' returns 400", async () => {
     { to: testAddress(), amount: "abc" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -176,7 +177,7 @@ Deno.test("self send - invalid amount '-1' returns 400", async () => {
     { to: testAddress(), amount: "-1" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -187,7 +188,7 @@ Deno.test("self send - invalid amount '1.5' returns 400", async () => {
     { to: testAddress(), amount: "1.5" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -202,7 +203,7 @@ Deno.test("self send - invalid to address returns 400", async () => {
     { to: "not-an-address", amount: "5000000" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,
@@ -221,7 +222,7 @@ Deno.test("self send - missing 'to' field returns 400", async () => {
     { amount: "5000000" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,
@@ -236,7 +237,7 @@ Deno.test("self send - missing 'amount' field returns 400", async () => {
     { to: testAddress() },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,
@@ -255,7 +256,7 @@ Deno.test("self send - zero amount returns 400", async () => {
     { to: testAddress(), amount: "0" },
     selfCustodialSession(testAddress()),
   );
-  await postSelfSendHandler(ctx);
+  await handlePostSelfSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,

@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_account_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { getCustodialAccountHandler } from "@/http/v1/pay/custodial/account.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handleGetCustodialAccount } from "@/http/v1/pay/custodial/account.ts";
 import {
   createTestAccount,
   ensureInitialized,
@@ -22,7 +23,7 @@ type MockResponse = { status: number; body: unknown };
 function createMockContext(
   session: unknown,
 ): {
-  ctx: Parameters<typeof getCustodialAccountHandler>[0];
+  ctx: Parameters<ReturnType<typeof handleGetCustodialAccount>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -79,7 +80,7 @@ Deno.test("custodial account - returns account info for valid session", async ()
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await getCustodialAccountHandler(ctx);
+  await handleGetCustodialAccount({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -114,7 +115,7 @@ Deno.test("custodial account - returns 404 for non-existent account", async () =
   const fakeId = crypto.randomUUID();
   const { ctx, getResponse } = createMockContext(custodialSession(fakeId));
 
-  await getCustodialAccountHandler(ctx);
+  await handleGetCustodialAccount({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 404);
@@ -133,7 +134,7 @@ Deno.test("custodial account - returns zero balance as '0'", async () => {
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await getCustodialAccountHandler(ctx);
+  await handleGetCustodialAccount({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -149,7 +150,7 @@ Deno.test("custodial account - returns large balance as string", async () => {
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await getCustodialAccountHandler(ctx);
+  await handleGetCustodialAccount({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -172,7 +173,7 @@ Deno.test("custodial account - suspended account returns status 'suspended'", as
 
   const { ctx, getResponse } = createMockContext(custodialSession(account.id));
 
-  await getCustodialAccountHandler(ctx);
+  await handleGetCustodialAccount({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);

@@ -14,9 +14,7 @@ if (!SERVICE_AUTH_SECRET) {
       "SERVICE_AUTH_SECRET must be set in production. A random secret would invalidate all JWTs on restart.",
     );
   }
-  console.warn(
-    "WARNING: SERVICE_AUTH_SECRET is not set. Generating a random secret. This is NOT recommended for production environments.",
-  );
+  // Dev mode: random secret generated below. main.ts surfaces the notice.
 }
 
 export const authSecret = SERVICE_AUTH_SECRET || generateSecret();

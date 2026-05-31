@@ -8,7 +8,7 @@ import {
   type NewAccount,
   type NewEntity,
 } from "@/persistence/drizzle/entity/index.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 const entityRepo = new EntityRepository(drizzleClient);
 const accountRepo = new AccountRepository(drizzleClient);
@@ -26,90 +26,93 @@ const bodySchema = z.object({
  * data. Auto-accept: the entity is created (or its existing record promoted)
  * to APPROVED, and a USER-type account is created for the pubkey if one
  * doesn't exist yet.
- *
- * Returns 409 if an account already exists for that pubkey and its entity
- * is already APPROVED — idempotent-but-not-silent.
  */
-export const postEntityHandler = async (ctx: Context) => {
-  try {
-    const raw = await ctx.request.body.json();
-    const parsed = bodySchema.safeParse(raw);
-    if (!parsed.success) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = {
-        message: "Invalid body",
-        issues: parsed.error.issues,
-      };
-      return;
-    }
-    const { pubkey, name, jurisdictions } = parsed.data;
+export function handlePostEntity(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<void> {
+  const log = deps.log.scope("postEntity");
 
-    const existingAccount = await accountRepo.findById(pubkey);
-
-    if (existingAccount) {
-      const existingEntity = await entityRepo.findById(
-        existingAccount.entityId,
-      );
-      if (existingEntity?.status === EntityStatus.APPROVED) {
-        ctx.response.status = Status.Conflict;
+  return async (ctx) => {
+    log.info("postEntity");
+    try {
+      const raw = await ctx.request.body.json();
+      const parsed = bodySchema.safeParse(raw);
+      if (!parsed.success) {
+        ctx.response.status = Status.BadRequest;
         ctx.response.body = {
-          message: "Entity already approved for this pubkey",
-          data: { pubkey, entityId: existingEntity.id },
+          message: "Invalid body",
+          issues: parsed.error.issues,
         };
         return;
       }
-      const updated = await entityRepo.update(existingAccount.entityId, {
+      const { pubkey, name, jurisdictions } = parsed.data;
+      log.debug("pubkey", pubkey);
+      log.debug("name", name);
+
+      log.event("checking for existing account");
+      const existingAccount = await accountRepo.findById(pubkey);
+
+      if (existingAccount) {
+        const existingEntity = await entityRepo.findById(
+          existingAccount.entityId,
+        );
+        if (existingEntity?.status === EntityStatus.APPROVED) {
+          log.event("entity already approved for pubkey");
+          ctx.response.status = Status.Conflict;
+          ctx.response.body = {
+            message: "Entity already approved for this pubkey",
+            data: { pubkey, entityId: existingEntity.id },
+          };
+          return;
+        }
+        log.event("promoting existing entity to APPROVED");
+        const updated = await entityRepo.update(existingAccount.entityId, {
+          name,
+          jurisdictions,
+          status: EntityStatus.APPROVED,
+        });
+        log.debug("entityId", updated?.id ?? existingAccount.entityId);
+        ctx.response.status = Status.OK;
+        ctx.response.body = {
+          message: "Entity updated",
+          data: {
+            pubkey,
+            entityId: updated?.id ?? existingAccount.entityId,
+            status: EntityStatus.APPROVED,
+          },
+        };
+        return;
+      }
+
+      log.event("creating new entity + account");
+      const newEntity = await entityRepo.create({
+        id: crypto.randomUUID(),
+        status: EntityStatus.APPROVED,
         name,
         jurisdictions,
-        status: EntityStatus.APPROVED,
-      });
-      LOG.info("Entity promoted to APPROVED", {
-        pubkey,
-        entityId: updated?.id ?? existingAccount.entityId,
-      });
-      ctx.response.status = Status.OK;
+      } as NewEntity);
+
+      await accountRepo.create({
+        id: pubkey,
+        type: "USER",
+        entityId: newEntity.id,
+      } as NewAccount);
+
+      log.debug("entityId", newEntity.id);
+      log.event("entity registered and approved");
+      ctx.response.status = Status.Created;
       ctx.response.body = {
-        message: "Entity updated",
+        message: "Entity created",
         data: {
           pubkey,
-          entityId: updated?.id ?? existingAccount.entityId,
+          entityId: newEntity.id,
           status: EntityStatus.APPROVED,
         },
       };
-      return;
+    } catch (error) {
+      log.error(error, "failed to create/update entity");
+      ctx.response.status = Status.InternalServerError;
+      ctx.response.body = { message: "Failed to create/update entity" };
     }
-
-    const newEntity = await entityRepo.create({
-      id: crypto.randomUUID(),
-      status: EntityStatus.APPROVED,
-      name,
-      jurisdictions,
-    } as NewEntity);
-
-    await accountRepo.create({
-      id: pubkey,
-      type: "USER",
-      entityId: newEntity.id,
-    } as NewAccount);
-
-    LOG.info("Entity registered and approved", {
-      pubkey,
-      entityId: newEntity.id,
-    });
-    ctx.response.status = Status.Created;
-    ctx.response.body = {
-      message: "Entity created",
-      data: {
-        pubkey,
-        entityId: newEntity.id,
-        status: EntityStatus.APPROVED,
-      },
-    };
-  } catch (error) {
-    LOG.error("Failed to create/update entity", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    ctx.response.status = Status.InternalServerError;
-    ctx.response.body = { message: "Failed to create/update entity" };
-  }
-};
+  };
+}

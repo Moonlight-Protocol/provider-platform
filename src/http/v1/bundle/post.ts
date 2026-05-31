@@ -3,7 +3,7 @@ import { type Context, Status } from "@oak/oak";
 import { P_AddOperationsBundle } from "@/core/service/bundle/add-bundle.process.ts";
 import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 import { BUNDLE_MAX_OPERATIONS } from "@/config/env.ts";
 import { bundleRequestSchema } from "@/http/v1/bundle/bundle.schemas.ts";
 
@@ -19,34 +19,40 @@ type BundleProcessOutput = {
   operationsBundleId: string;
 };
 
-const assembleResponse = (
-  input: BundleProcessOutput,
-): PostEndpointOutput<typeof responseSchema> => {
-  const message = "Bundle received and queued for processing";
+export function handlePostBundle(
+  deps: { log: Logger },
+): (ctx: Context) => Promise<unknown> {
+  const log = deps.log.scope("postBundle");
 
-  LOG.info(message, { bundleId: input.operationsBundleId });
+  const assembleResponse = (
+    input: BundleProcessOutput,
+  ): PostEndpointOutput<typeof responseSchema> => {
+    log.debug("bundleId", input.operationsBundleId);
+    log.event("bundle received and queued for processing");
 
-  return {
-    ctx: input.ctx,
-    status: Status.OK,
-    message,
-    data: {
-      operationsBundleId: input.operationsBundleId,
-      status: "PENDING",
-    },
+    return {
+      ctx: input.ctx,
+      status: Status.OK,
+      message: "Bundle received and queued for processing",
+      data: {
+        operationsBundleId: input.operationsBundleId,
+        status: "PENDING",
+      },
+    };
   };
-};
 
-export const postBundleHandler = (ctx: Context) => {
-  const handler = PIPE_PostEndpoint({
-    name: "PostBundleEndpointPipeline",
-    requestSchema: requestSchema,
-    responseSchema: responseSchema,
-    steps: [
-      P_AddOperationsBundle,
-      assembleResponse,
-    ],
-  });
+  return (ctx) => {
+    log.info("postBundle");
+    const handler = PIPE_PostEndpoint({
+      name: "PostBundleEndpointPipeline",
+      requestSchema: requestSchema,
+      responseSchema: responseSchema,
+      steps: [
+        P_AddOperationsBundle(deps),
+        assembleResponse,
+      ],
+    }, deps);
 
-  return handler.run(ctx);
-};
+    return handler.run(ctx);
+  };
+}

@@ -1,17 +1,23 @@
 import { SESSION_TTL } from "@/config/env.ts";
 import { memDb } from "@/persistence/kv/config.ts";
 import type { Session } from "@/models/auth/session/session.model.ts";
-import { LOG } from "@/config/logger.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
-class InMemorySessionManager {
+export class InMemorySessionManager {
+  private log: Logger;
+
+  constructor(deps: { log: Logger }) {
+    this.log = deps.log.scope("InMemorySessionManager");
+  }
+
   public async addSession(
     txHash: string,
     clientAccount: string,
     requestId: string,
     expiresAt: Date,
   ): Promise<void> {
-    LOG.debug(`Adding session to store: ${txHash}`);
-    LOG.debug(`Entries: ${await memDb.countAll()}`);
+    this.log.info("addSession");
+    this.log.debug("txHash", txHash);
 
     const cr = await memDb.sessions.add({
       txHash,
@@ -22,44 +28,79 @@ class InMemorySessionManager {
     });
 
     if (cr.ok) {
-      LOG.info("session", { txHash }, "added to store");
-      LOG.debug("Entries:", await memDb.countAll());
+      this.log.event("session added to store");
     }
   }
 
   public async getSession(txHash: string): Promise<Session | undefined> {
+    this.log.info("getSession");
+    this.log.debug("txHash", txHash);
+
+    this.log.event("looking up session by txHash");
     const session = await memDb.sessions.findByPrimaryIndex("txHash", txHash);
     if (session && Date.now() < session.value.expiresAt.getTime()) {
+      this.log.event("session found and valid");
       return session.value;
     }
+    this.log.event("session missing or expired, deleting");
     await memDb.sessions.delete(txHash);
     return undefined;
   }
 
   public async updateSession(session: Session): Promise<void> {
+    this.log.info("updateSession");
+    this.log.debug("txHash", session.txHash);
+
     if (!(await this.getSession(session.txHash))) {
-      throw new Error(`Session with id ${session.txHash} not found or expired`);
+      const err = new Error(
+        `Session with id ${session.txHash} not found or expired`,
+      );
+      this.log.error(err, "cannot update missing session");
+      throw err;
     }
 
+    this.log.event("persisting session update");
     await memDb.sessions.update(session.txHash, session);
   }
 
   public async cleanupExpired(): Promise<void> {
     const now = Date.now();
 
-    LOG.debug(`Cleaning expired sessions`);
-    LOG.debug("Entries B4:", await memDb.countAll());
+    this.log.info("cleanupExpired");
 
-    const cursor = await memDb.sessions.deleteMany({
+    await memDb.sessions.deleteMany({
       filter: (doc) => doc.value.expiresAt.getTime() < now,
     });
 
-    LOG.debug("Cursor", cursor);
-    LOG.debug("Entries AFTER:", await memDb.countAll());
+    this.log.event("expired sessions cleaned");
   }
 }
 
-export const sessionManager = new InMemorySessionManager();
+let _sessionManager: InMemorySessionManager | null = null;
+let _cleanupInterval: number | null = null;
 
-// Schedule cleanup every session TTL period
-setInterval(() => sessionManager.cleanupExpired(), SESSION_TTL * 1000);
+/**
+ * Lazy singleton accessor. The first caller wires up the logger and starts
+ * the cleanup interval; subsequent callers get the same instance.
+ */
+export function getSessionManager(
+  deps: { log: Logger },
+): InMemorySessionManager {
+  if (!_sessionManager) {
+    _sessionManager = new InMemorySessionManager(deps);
+    _cleanupInterval = setInterval(
+      () => _sessionManager!.cleanupExpired(),
+      SESSION_TTL * 1000,
+    ) as unknown as number;
+  }
+  return _sessionManager;
+}
+
+/** Test helper / shutdown — clear the singleton and stop the cleanup interval. */
+export function _resetSessionManagerForTests(): void {
+  if (_cleanupInterval !== null) {
+    clearInterval(_cleanupInterval);
+    _cleanupInterval = null;
+  }
+  _sessionManager = null;
+}

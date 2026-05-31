@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/kyc_get_test.ts
  */
 import { assertEquals } from "@std/assert";
-import { getKycHandler } from "@/http/v1/pay/kyc/get.ts";
+import { newNoop } from "@/utils/logger/index.ts";
+import { handleGetKyc } from "@/http/v1/pay/kyc/get.ts";
 import {
   createTestKyc,
   ensureInitialized,
@@ -25,7 +26,7 @@ function createMockContext(
   params: { address?: string },
   session?: unknown,
 ): {
-  ctx: Parameters<typeof getKycHandler>[0];
+  ctx: Parameters<ReturnType<typeof handleGetKyc>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -73,7 +74,7 @@ Deno.test("kyc get - returns VERIFIED status for verified address", async () => 
 
   const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
-  await getKycHandler(ctx);
+  await handleGetKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -102,7 +103,7 @@ Deno.test("kyc get - returns PENDING status for pending address", async () => {
 
   const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
-  await getKycHandler(ctx);
+  await handleGetKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -124,7 +125,7 @@ Deno.test("kyc get - returns NONE for address with no KYC record", async () => {
   const address = testAddress();
   const { ctx, getResponse } = createMockContext({ address }, { sub: address });
 
-  await getKycHandler(ctx);
+  await handleGetKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -145,7 +146,7 @@ Deno.test("kyc get - missing address returns 400", async () => {
 
   const { ctx, getResponse } = createMockContext({});
 
-  await getKycHandler(ctx);
+  await handleGetKyc({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 400);
@@ -185,7 +186,7 @@ Deno.test("kyc get - undefined params returns 400", async () => {
   };
 
   // deno-lint-ignore no-explicit-any
-  await getKycHandler(ctx as any);
+  await handleGetKyc({ log: newNoop() })(ctx as any);
 
   assertEquals(responseStatus, 400);
   assertEquals(

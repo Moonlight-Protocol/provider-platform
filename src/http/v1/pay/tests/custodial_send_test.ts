@@ -5,7 +5,8 @@
  * Run with: deno test --allow-all --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/custodial_send_test.ts
  */
 import { assertEquals, assertExists } from "@std/assert";
-import { postCustodialSendHandler } from "@/http/v1/pay/custodial/send.ts";
+import { handlePostCustodialSend } from "@/http/v1/pay/custodial/send.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 import {
   createTestAccount,
   createTestKyc,
@@ -31,7 +32,7 @@ function createMockContext(
   body: unknown,
   session: unknown,
 ): {
-  ctx: Parameters<typeof postCustodialSendHandler>[0];
+  ctx: Parameters<ReturnType<typeof handlePostCustodialSend>>[0];
   getResponse: () => MockResponse;
 } {
   let responseStatus = 200;
@@ -104,7 +105,7 @@ Deno.test("custodial send - successful send debits balance and creates SEND tran
     custodialSession(account.id),
   );
 
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(
@@ -141,7 +142,7 @@ Deno.test("custodial send - send to unverified address creates escrow", async ()
     custodialSession(account.id),
   );
 
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   const res = getResponse();
 
   assertEquals(res.status, 200);
@@ -173,7 +174,7 @@ Deno.test("custodial send - insufficient balance returns 400", async () => {
     custodialSession(account.id),
   );
 
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
 
   assertEquals(getResponse().status, 400);
   assertEquals(
@@ -200,7 +201,7 @@ Deno.test("custodial send - suspended account returns 403", async () => {
     custodialSession(account.id),
   );
 
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
 
   assertEquals(getResponse().status, 403);
   assertEquals(
@@ -223,7 +224,7 @@ Deno.test("custodial send - non-custodial JWT type returns 403", async () => {
     sep10Session(account.id),
   );
 
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
 
   assertEquals(getResponse().status, 403);
   assertEquals(
@@ -250,7 +251,7 @@ Deno.test("custodial send - concurrent sends don't double-spend", async () => {
         { to: receiverAddress, amount: "10000000" },
         custodialSession(account.id),
       );
-      await postCustodialSendHandler(ctx);
+      await handlePostCustodialSend({ log: newNoop() })(ctx);
       return getResponse();
     })(),
     (async () => {
@@ -258,7 +259,7 @@ Deno.test("custodial send - concurrent sends don't double-spend", async () => {
         { to: receiverAddress, amount: "10000000" },
         custodialSession(account.id),
       );
-      await postCustodialSendHandler(ctx);
+      await handlePostCustodialSend({ log: newNoop() })(ctx);
       return getResponse();
     })(),
   ]);
@@ -310,7 +311,7 @@ Deno.test("custodial send - invalid amount 'abc' returns 400", async () => {
     to: testAddress(),
     amount: "abc",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -322,7 +323,7 @@ Deno.test("custodial send - invalid amount '-1' returns 400", async () => {
     to: testAddress(),
     amount: "-1",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -334,7 +335,7 @@ Deno.test("custodial send - invalid amount '1.5' returns 400", async () => {
     to: testAddress(),
     amount: "1.5",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -346,7 +347,7 @@ Deno.test("custodial send - invalid amount '' returns 400", async () => {
     to: testAddress(),
     amount: "",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -362,7 +363,7 @@ Deno.test("custodial send - invalid to address returns 400", async () => {
     to: "not-an-address",
     amount: "5000000",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,
@@ -382,7 +383,7 @@ Deno.test("custodial send - missing 'to' field returns 400", async () => {
     { amount: "5000000" },
     custodialSession(account.id),
   );
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -394,7 +395,7 @@ Deno.test("custodial send - missing 'amount' field returns 400", async () => {
     { to: testAddress() },
     custodialSession(account.id),
   );
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
 });
 
@@ -410,7 +411,7 @@ Deno.test("custodial send - zero amount returns 400", async () => {
     to: testAddress(),
     amount: "0",
   }, custodialSession(account.id));
-  await postCustodialSendHandler(ctx);
+  await handlePostCustodialSend({ log: newNoop() })(ctx);
   assertEquals(getResponse().status, 400);
   assertEquals(
     (getResponse().body as { message: string }).message,
