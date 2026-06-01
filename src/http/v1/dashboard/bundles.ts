@@ -6,14 +6,14 @@ import {
 } from "@moonlight/moonlight-sdk";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
 import { entity } from "@/persistence/drizzle/entity/entity.entity.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
 const bundleRepo = new OperationsBundleRepository(drizzleClient);
-const ppRepo = new PpRepository(drizzleClient);
+
 const LIST_DEFAULT_LIMIT = 25;
 const LIST_MAX_LIMIT = 200;
 const LIST_WINDOW_MS = 6 * 60 * 60 * 1000;
@@ -83,9 +83,11 @@ function classify(op: ParsedOp): OpView {
 }
 
 /**
- * GET /dashboard/bundles/:id
+ * GET /api/v1/providers/:ppPublicKey/bundles/:id
  *
- * Returns one bundle with its decoded operations.
+ * Returns one bundle with its decoded operations. The bundle MUST belong to
+ * this PP; otherwise 404 (this closes the cross-PP leak that the unscoped
+ * /dashboard/bundles/:id endpoint had).
  */
 export function handleGetBundleDetail(
   deps: { log: Logger },
@@ -102,10 +104,11 @@ export function handleGetBundleDetail(
         ctx.response.body = { message: "Bundle id is required" };
         return;
       }
+      const pp = ctx.state.pp as PaymentProvider;
       log.debug("bundleId", bundleId);
       log.event("loading bundle");
       const bundle = await bundleRepo.findById(bundleId);
-      if (!bundle) {
+      if (!bundle || bundle.ppPublicKey !== pp.publicKey) {
         ctx.response.status = Status.NotFound;
         ctx.response.body = { message: "Bundle not found" };
         return;
@@ -165,9 +168,16 @@ export function handleGetBundleDetail(
 }
 
 /**
- * GET /dashboard/bundles?ppPublicKey=...&limit=N
+ * GET /api/v1/providers/:ppPublicKey/bundles?limit=N
  *
- * Returns most-recent bundles (by updatedAt desc) for the requested PP.
+ * Provider-scoped recent-bundles list — returns every bundle submitted to
+ * this PP in the last 6 hours regardless of submitter, joined to the
+ * submitter entity for entityName + jurisdictions display. Operator JWT +
+ * ownership check (the providers router applies requirePpOwnership before
+ * this handler runs).
+ *
+ * Contrast with /providers/:ppPublicKey/entity/bundles which is the calling
+ * entity's view of THEIR bundles to this PP, gated by an end-user JWT.
  */
 export function handleListRecentBundles(
   deps: { log: Logger },
@@ -177,27 +187,7 @@ export function handleListRecentBundles(
   return async (ctx) => {
     log.info("listRecentBundles");
     try {
-      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-      if (!ppPublicKey) {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = {
-          message: "ppPublicKey query parameter is required",
-        };
-        return;
-      }
-      log.debug("ppPublicKey", ppPublicKey);
-
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      log.event("verifying PP ownership");
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
+      const pp = ctx.state.pp as PaymentProvider;
 
       const limitParam = ctx.request.url.searchParams.get("limit");
       const limit = limitParam
@@ -225,7 +215,7 @@ export function handleListRecentBundles(
           and(
             isNull(operationsBundle.deletedAt),
             gte(operationsBundle.updatedAt, windowStart),
-            eq(operationsBundle.ppPublicKey, ppPublicKey),
+            eq(operationsBundle.ppPublicKey, pp.publicKey),
           ),
         )
         .orderBy(desc(operationsBundle.updatedAt))

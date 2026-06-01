@@ -1,16 +1,12 @@
 import { type Context, Status } from "@oak/oak";
 import { NETWORK_CONFIG } from "@/config/env.ts";
-import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
-const ppRepo = new PpRepository(drizzleClient);
-
 /**
- * GET /dashboard/treasury?ppPublicKey=G...
+ * GET /api/v1/providers/:ppPublicKey/treasury
  *
- * Returns the treasury (PP account) balance and info.
- * Each PP's public key is its on-chain account address.
+ * Returns the treasury (PP account) balance and info on Stellar.
  */
 export function handleGetTreasury(
   deps: { log: Logger },
@@ -19,26 +15,7 @@ export function handleGetTreasury(
 
   return async (ctx) => {
     log.info("getTreasury");
-    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-    if (!ppPublicKey) {
-      ctx.response.status = Status.BadRequest;
-      ctx.response.body = {
-        message: "ppPublicKey query parameter is required",
-      };
-      return;
-    }
-
-    // Verify PP ownership
-    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const pp = await ppRepo.findByPublicKeyAndOwner(
-      ppPublicKey,
-      ownerPublicKey,
-    );
-    if (!pp) {
-      ctx.response.status = Status.NotFound;
-      ctx.response.body = { message: "Provider not found" };
-      return;
-    }
+    const pp = ctx.state.pp as PaymentProvider;
 
     const horizonUrl = NETWORK_CONFIG.horizonUrl;
     if (!horizonUrl) {
@@ -48,7 +25,7 @@ export function handleGetTreasury(
     }
 
     try {
-      const response = await fetch(`${horizonUrl}/accounts/${ppPublicKey}`);
+      const response = await fetch(`${horizonUrl}/accounts/${pp.publicKey}`);
 
       if (!response.ok) {
         throw new Error(`Horizon returned ${response.status}`);
@@ -60,7 +37,7 @@ export function handleGetTreasury(
       ctx.response.body = {
         message: "Treasury info retrieved",
         data: {
-          address: ppPublicKey,
+          address: pp.publicKey,
           sequence: accountData.sequence,
           balances: accountData.balances,
           lastModifiedLedger: accountData.last_modified_ledger,

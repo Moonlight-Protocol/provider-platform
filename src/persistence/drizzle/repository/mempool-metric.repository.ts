@@ -52,7 +52,8 @@ export class MempoolMetricRepository {
   }
 
   /**
-   * Returns aggregated averages since a given time.
+   * Returns aggregated averages since a given time, across all PPs. Used by
+   * platform-wide views; per-PP dashboards should call getAveragesSinceForPp.
    */
   async getAveragesSince(since: Date): Promise<{
     avgQueueDepth: number;
@@ -71,6 +72,44 @@ export class MempoolMetricRepository {
       })
       .from(mempoolMetric)
       .where(gte(mempoolMetric.recordedAt, since));
+
+    return {
+      avgQueueDepth: Number(result?.avgQueueDepth ?? 0),
+      avgSlotCount: Number(result?.avgSlotCount ?? 0),
+      avgProcessingMs: Number(result?.avgProcessingMs ?? 0),
+      avgThroughputPerMin: Number(result?.avgThroughputPerMin ?? 0),
+      sampleCount: result?.sampleCount ?? 0,
+    };
+  }
+
+  /**
+   * Returns aggregated averages since a given time, scoped to a single PP.
+   */
+  async getAveragesSinceForPp(
+    ppPublicKey: string,
+    since: Date,
+  ): Promise<{
+    avgQueueDepth: number;
+    avgSlotCount: number;
+    avgProcessingMs: number;
+    avgThroughputPerMin: number;
+    sampleCount: number;
+  }> {
+    const [result] = await this.db
+      .select({
+        avgQueueDepth: avg(mempoolMetric.queueDepth),
+        avgSlotCount: avg(mempoolMetric.slotCount),
+        avgProcessingMs: avg(mempoolMetric.avgProcessingMs),
+        avgThroughputPerMin: avg(mempoolMetric.throughputPerMin),
+        sampleCount: count(),
+      })
+      .from(mempoolMetric)
+      .where(
+        and(
+          eq(mempoolMetric.ppPublicKey, ppPublicKey),
+          gte(mempoolMetric.recordedAt, since),
+        ),
+      );
 
     return {
       avgQueueDepth: Number(result?.avgQueueDepth ?? 0),

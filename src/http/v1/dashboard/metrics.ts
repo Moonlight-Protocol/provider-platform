@@ -1,22 +1,21 @@
 import type { Context } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
+import type { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
 const DEFAULT_RANGE_MIN = 60; // 1h at 60s snapshots
 const MAX_RANGE_MIN = 10_080; // matches MetricsCollector retention (7 days)
 
 let metricRepo = new MempoolMetricRepository(drizzleClient);
-let ppRepo = new PpRepository(drizzleClient);
 
 /** Test-only seam to inject repos backed by the PGlite test DB. */
 export function setMetricsRepoForTests(
   metric: MempoolMetricRepository,
-  pp: PpRepository,
+  _pp: PpRepository,
 ): void {
   metricRepo = metric;
-  ppRepo = pp;
 }
 
 function parseRangeMin(raw: string | null): number | null {
@@ -35,17 +34,7 @@ export function handleGetMetrics(
 
   return async (ctx) => {
     log.info("getMetrics");
-    const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-    const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-    log.debug("ppPublicKey", ppPublicKey);
-
-    if (!ppPublicKey) {
-      ctx.response.status = 400;
-      ctx.response.body = {
-        error: "Missing required query param: ppPublicKey",
-      };
-      return;
-    }
+    const pp = ctx.state.pp as PaymentProvider;
 
     const rangeMin = parseRangeMin(
       ctx.request.url.searchParams.get("rangeMin"),
@@ -59,21 +48,10 @@ export function handleGetMetrics(
       return;
     }
 
-    log.event("verifying PP ownership");
-    const pp = await ppRepo.findByPublicKeyAndOwner(
-      ppPublicKey,
-      ownerPublicKey,
-    );
-    if (!pp) {
-      ctx.response.status = 403;
-      ctx.response.body = { error: "PP not owned by authenticated operator" };
-      return;
-    }
-
     const since = new Date(Date.now() - rangeMin * 60_000);
     log.event("fetching metric snapshots");
     const rows = await metricRepo.findRecentForPp(
-      ppPublicKey,
+      pp.publicKey,
       since,
       rangeMin,
     );
@@ -82,7 +60,7 @@ export function handleGetMetrics(
     ctx.response.status = 200;
     ctx.response.body = {
       data: {
-        ppPublicKey,
+        ppPublicKey: pp.publicKey,
         rangeMin,
         since: since.toISOString(),
         snapshots: rows.map((row) => ({

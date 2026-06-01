@@ -1,19 +1,17 @@
 import { type Context, Status } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { UtxoRepository } from "@/persistence/drizzle/repository/utxo.repository.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
-const ppRepo = new PpRepository(drizzleClient);
 const utxoRepo = new UtxoRepository(drizzleClient);
 
 /**
- * GET /dashboard/utxos?ppPublicKey=G...&channelContractId=C...
+ * GET /api/v1/providers/:ppPublicKey/utxos?channelContractId=C...
  *
  * Returns the currently-unspent UTXOs the provider has created in the given
- * privacy channel — i.e. outputs the provider's previous bundles minted that
- * have not yet been spent or withdrawn. The dashboard surfaces them as the
- * "ready to be withdrawn" pool.
+ * privacy channel. PP comes from URL; channel still uses a query parameter
+ * because it varies independently of the PP context.
  */
 export function handleGetUtxos(
   deps: { log: Logger },
@@ -23,34 +21,16 @@ export function handleGetUtxos(
   return async (ctx) => {
     log.info("getUtxos");
     try {
-      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+      const _pp = ctx.state.pp as PaymentProvider;
       const channelContractId = ctx.request.url.searchParams.get(
         "channelContractId",
       );
 
-      if (!ppPublicKey) {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = {
-          message: "ppPublicKey query parameter is required",
-        };
-        return;
-      }
       if (!channelContractId) {
         ctx.response.status = Status.BadRequest;
         ctx.response.body = {
           message: "channelContractId query parameter is required",
         };
-        return;
-      }
-
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
         return;
       }
 

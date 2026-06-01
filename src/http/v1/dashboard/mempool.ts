@@ -10,15 +10,17 @@ import {
   MEMPOOL_TTL_CHECK_INTERVAL_MS,
   MEMPOOL_VERIFIER_INTERVAL_MS,
 } from "@/config/env.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
 const metricRepo = new MempoolMetricRepository(drizzleClient);
 
 /**
- * GET /dashboard/mempool
+ * GET /api/v1/providers/:ppPublicKey/mempool
  *
- * Returns live mempool state, historical averages, and configuration.
- * Averages are computed from the last hour of metric snapshots.
+ * Returns live mempool state (platform-wide; the mempool is a single in-process
+ * queue shared by all PPs on this instance) plus historical averages from the
+ * last hour FILTERED to this PP's recorded snapshots.
  */
 export function handleGetMempool(
   deps: { log: Logger },
@@ -27,14 +29,18 @@ export function handleGetMempool(
 
   return async (ctx) => {
     log.info("getMempool");
+    const pp = ctx.state.pp as PaymentProvider;
 
     log.event("reading live mempool stats");
     const mempool = getMempool();
     const stats = mempool.getStats();
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    log.event("fetching historical averages");
-    const averages = await metricRepo.getAveragesSince(oneHourAgo);
+    log.event("fetching per-PP historical averages");
+    const averages = await metricRepo.getAveragesSinceForPp(
+      pp.publicKey,
+      oneHourAgo,
+    );
     log.debug("sampleCount", averages.sampleCount);
 
     ctx.response.status = Status.OK;

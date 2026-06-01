@@ -1,13 +1,12 @@
 import "../../ensure_test_env.ts";
 import { Application, Router } from "@oak/oak";
 import { assert, assertEquals } from "@std/assert";
+import { newNoop } from "@/utils/logger/index.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
-import {
-  EVENTS_WS_SUBPROTOCOL,
-  eventsWsHandler,
-} from "@/http/v1/events/ws-handler.ts";
-import { emitForChannel } from "@/core/service/events/emit-helpers.ts";
+import { EVENTS_WS_SUBPROTOCOL } from "@/http/v1/events/ws-handler.ts";
+import { getEventBus } from "@/core/service/events/event-bus.ts";
 import type { ProviderEvent } from "@/core/service/events/event.types.ts";
+import { buildProvidersRouter } from "@/http/v1/providers/routes.ts";
 import {
   councilMembership,
   CouncilMembershipStatus,
@@ -26,10 +25,15 @@ const CHANNEL_AUTH_ID = "CCHANNEL000000000000000000000000000000000000000000000";
 
 function createTestApp(): Application {
   const app = new Application();
-  const router = new Router();
-  router.get("/api/v1/events/ws", eventsWsHandler);
-  app.use(router.routes());
-  app.use(router.allowedMethods());
+  const apiRouter = new Router();
+  const providersRouter = buildProvidersRouter({ log: newNoop() });
+  apiRouter.use(
+    "/api/v1",
+    providersRouter.routes(),
+    providersRouter.allowedMethods(),
+  );
+  app.use(apiRouter.routes());
+  app.use(apiRouter.allowedMethods());
   return app;
 }
 
@@ -81,15 +85,15 @@ async function mintJwt(ownerPublicKey: string): Promise<string> {
   return await generateJwt(ownerPublicKey, "test-challenge-hash");
 }
 
-function openWs(
-  port: number,
-  jwt: string,
-  ppPublicKey: string,
-): WebSocket {
+function wsUrl(port: number, ppPublicKey: string): string {
+  return `ws://127.0.0.1:${port}/api/v1/providers/${
+    encodeURIComponent(ppPublicKey)
+  }/events/ws`;
+}
+
+function openWs(port: number, jwt: string, ppPublicKey: string): WebSocket {
   return new WebSocket(
-    `ws://127.0.0.1:${port}/api/v1/events/ws?pp=${
-      encodeURIComponent(ppPublicKey)
-    }`,
+    wsUrl(port, ppPublicKey),
     [EVENTS_WS_SUBPROTOCOL, `bearer.${jwt}`],
   );
 }
@@ -169,17 +173,20 @@ Deno.test({
       const messagePromise = waitForMessage(socket, 1_000);
 
       const t0 = performance.now();
-      await emitForChannel(CHANNEL_AUTH_ID, (scope) => ({
+      // Emit directly to the event bus. scope-resolver isn't exercised here —
+      // the WS plumbing is. (Cross-PP filtering is covered by a unit test on
+      // scope-resolver.ts.)
+      getEventBus({ log: newNoop() }).emit({
         kind: "mempool.bundle_added",
         ts: Date.now(),
-        scope,
+        scope: { ppPublicKey: PP_PUBLIC_KEY, ppLabel: PP_LABEL },
         payload: {
           bundleId: "test-bundle-1",
           weight: 5,
           channelContractId: CHANNEL_AUTH_ID,
           newSlot: true,
         },
-      }));
+      });
 
       const raw = await messagePromise;
       const elapsed = performance.now() - t0;
@@ -216,9 +223,7 @@ Deno.test({
     const { port, controller, serverPromise } = await startServer();
     try {
       const res = await fetch(
-        `http://127.0.0.1:${port}/api/v1/events/ws?pp=${
-          encodeURIComponent(PP_PUBLIC_KEY)
-        }`,
+        wsUrl(port, PP_PUBLIC_KEY).replace("ws://", "http://"),
         {
           headers: {
             "Upgrade": "websocket",
@@ -249,9 +254,7 @@ Deno.test({
     const jwt = await mintJwt(OTHER_OWNER_PUBLIC_KEY);
     try {
       const res = await fetch(
-        `http://127.0.0.1:${port}/api/v1/events/ws?pp=${
-          encodeURIComponent(PP_PUBLIC_KEY)
-        }`,
+        wsUrl(port, PP_PUBLIC_KEY).replace("ws://", "http://"),
         {
           headers: {
             "Upgrade": "websocket",
@@ -269,4 +272,24 @@ Deno.test({
       await serverPromise.catch(() => {});
     }
   },
+});
+
+Deno.test("legacy /events/ws returns 410 Gone", async () => {
+  const { buildEventsRouter } = await import("@/http/v1/events/routes.ts");
+  const app = new Application();
+  const apiRouter = new Router();
+  const eventsRouter = buildEventsRouter({ log: newNoop() });
+  apiRouter.use(
+    "/api/v1",
+    eventsRouter.routes(),
+    eventsRouter.allowedMethods(),
+  );
+  app.use(apiRouter.routes());
+  app.use(apiRouter.allowedMethods());
+
+  const res = await app.handle(
+    new Request("http://localhost/api/v1/events/ws", { method: "GET" }),
+  );
+  if (!res) throw new Error("No response");
+  assertEquals(res.status, 410);
 });

@@ -44,6 +44,8 @@ async function verifyJwtToken(token: string): Promise<JwtPayload | null> {
   }
 }
 
+type RouteParams = { ppPublicKey?: string };
+
 export function handleEventsWs(
   deps: { log: Logger },
 ): (ctx: Context) => Promise<void> {
@@ -74,10 +76,13 @@ export function handleEventsWs(
       return;
     }
 
-    const ppPublicKey = ctx.request.url.searchParams.get("pp");
+    const params = (ctx as unknown as { params?: RouteParams }).params;
+    const ppPublicKey = params?.ppPublicKey;
     if (!ppPublicKey) {
       ctx.response.status = 400;
-      ctx.response.body = { error: "Missing ?pp=<ppPublicKey> query param" };
+      ctx.response.body = {
+        error: "Missing :ppPublicKey URL path param",
+      };
       return;
     }
 

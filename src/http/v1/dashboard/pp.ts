@@ -188,7 +188,10 @@ export function handleListPps(
 }
 
 /**
- * DELETE /dashboard/pp/delete
+ * DELETE /api/v1/providers/:ppPublicKey
+ *
+ * The middleware has already verified ownership; ctx.state.pp is the PP to
+ * delete.
  */
 export function handleDeletePp(
   deps: { log: Logger },
@@ -198,42 +201,21 @@ export function handleDeletePp(
   return async (ctx) => {
     log.info("deletePp");
     try {
-      const body = await ctx.request.body.json();
-      const { publicKey } = body;
+      const pp = ctx.state.pp as {
+        id: string;
+        publicKey: string;
+      };
 
-      if (!publicKey || typeof publicKey !== "string") {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = { message: "publicKey is required" };
-        return;
-      }
+      removeProviderAddress(pp.publicKey);
 
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-
-      const pp = await ppRepo.findByPublicKey(publicKey);
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
-
-      if (pp.ownerPublicKey !== ownerPublicKey) {
-        ctx.response.status = Status.Forbidden;
-        ctx.response.body = {
-          message: "This provider belongs to another user",
-        };
-        return;
-      }
-
-      removeProviderAddress(publicKey);
-
-      const memberships = await membershipRepo.listAllForPp(publicKey);
+      const memberships = await membershipRepo.listAllForPp(pp.publicKey);
       for (const m of memberships) {
         await membershipRepo.delete(m.id);
       }
 
       await ppRepo.hardDelete(pp.id);
 
-      log.debug("publicKey", publicKey);
+      log.debug("publicKey", pp.publicKey);
       log.event("PP deleted");
 
       ctx.response.status = Status.OK;

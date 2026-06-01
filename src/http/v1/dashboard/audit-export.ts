@@ -1,10 +1,12 @@
 import { type Context, Status } from "@oak/oak";
+import { and, between, eq, gte, isNull, lte } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { OperationsBundleRepository } from "@/persistence/drizzle/repository/index.ts";
-import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import {
+  BundleStatus,
+  operationsBundle,
+} from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
-
-const bundleRepo = new OperationsBundleRepository(drizzleClient);
 
 function csvEscape(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n")) {
@@ -14,10 +16,9 @@ function csvEscape(val: string): string {
 }
 
 /**
- * GET /dashboard/audit-export?status=COMPLETED&from=2026-01-01&to=2026-03-16
+ * GET /api/v1/providers/:ppPublicKey/audit-export?status=COMPLETED&from=2026-01-01&to=2026-03-16
  *
- * Returns bundle data as CSV for compliance reporting.
- * Date filtering is done in SQL, not in-memory.
+ * Returns bundle data as CSV for compliance reporting, scoped to this PP.
  */
 export function handleGetAuditExport(
   deps: { log: Logger },
@@ -26,6 +27,7 @@ export function handleGetAuditExport(
 
   return async (ctx) => {
     log.info("getAuditExport");
+    const pp = ctx.state.pp as PaymentProvider;
     const params = ctx.request.url.searchParams;
     const statusParam = params.get("status") || "COMPLETED";
 
@@ -54,11 +56,31 @@ export function handleGetAuditExport(
     }
 
     try {
-      const bundles = await bundleRepo.findByStatusAndDateRange(
-        status,
-        from,
-        to,
-      );
+      const dateClauses = [];
+      if (from && to) {
+        dateClauses.push(between(operationsBundle.createdAt, from, to));
+      } else if (from) {
+        dateClauses.push(gte(operationsBundle.createdAt, from));
+      } else if (to) {
+        dateClauses.push(lte(operationsBundle.createdAt, to));
+      }
+      const bundles = await drizzleClient
+        .select({
+          id: operationsBundle.id,
+          status: operationsBundle.status,
+          fee: operationsBundle.fee,
+          createdAt: operationsBundle.createdAt,
+          updatedAt: operationsBundle.updatedAt,
+        })
+        .from(operationsBundle)
+        .where(
+          and(
+            eq(operationsBundle.ppPublicKey, pp.publicKey),
+            eq(operationsBundle.status, status),
+            isNull(operationsBundle.deletedAt),
+            ...dateClauses,
+          ),
+        );
 
       const headers = ["id", "status", "fee", "createdAt", "updatedAt"];
       const rows = bundles.map((b) =>

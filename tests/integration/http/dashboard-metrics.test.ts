@@ -1,11 +1,13 @@
 import "../../ensure_test_env.ts";
 import { Application, Router } from "@oak/oak";
 import { assertEquals } from "@std/assert";
-import { jwtMiddleware } from "@/http/middleware/auth/index.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 import {
-  getMetricsHandler,
+  handleGetMetrics,
   setMetricsRepoForTests,
 } from "@/http/v1/dashboard/metrics.ts";
+import { setPpRepoForOwnershipTests } from "@/http/middleware/require-pp-ownership.ts";
+import { buildProvidersRouter } from "@/http/v1/providers/routes.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
 import { MempoolMetricRepository } from "@/persistence/drizzle/repository/mempool-metric.repository.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
@@ -22,16 +24,30 @@ const PP_PUBLIC_KEY =
 const OTHER_PP_PUBLIC_KEY =
   "GPP2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
-const METRICS_PATH = "http://localhost/api/v1/dashboard/metrics";
+function buildMetricsUrl(ppPublicKey: string, rangeMin?: number): string {
+  const base = `http://localhost/api/v1/providers/${ppPublicKey}/metrics`;
+  if (rangeMin === undefined) return base;
+  return `${base}?rangeMin=${rangeMin}`;
+}
 
 function createTestApp(): Application {
+  const log = newNoop();
   const app = new Application();
-  const router = new Router();
-  router.get("/api/v1/dashboard/metrics", jwtMiddleware, getMetricsHandler);
-  app.use(router.routes());
-  app.use(router.allowedMethods());
+  const apiRouter = new Router();
+  const providersRouter = buildProvidersRouter({ log });
+  apiRouter.use(
+    "/api/v1",
+    providersRouter.routes(),
+    providersRouter.allowedMethods(),
+  );
+  app.use(apiRouter.routes());
+  app.use(apiRouter.allowedMethods());
   return app;
 }
+
+// Keep the unused-symbol references alive so the symbols stay covered by the
+// import (handler is wired via the router; we don't call it directly).
+void handleGetMetrics;
 
 async function seedDb(): Promise<void> {
   const db = getTestDb();
@@ -111,6 +127,7 @@ async function setup() {
     new MempoolMetricRepository(db),
     new PpRepository(db),
   );
+  setPpRepoForOwnershipTests(new PpRepository(db));
   return createTestApp();
 }
 
@@ -123,37 +140,20 @@ Deno.test({
   sanitizeOps: false,
 });
 
-Deno.test("returns 400 when ppPublicKey is missing", async () => {
-  const app = await setup();
-  const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(app, METRICS_PATH, jwt);
-  assertEquals(res.status, 400);
-  const body = await res.json();
-  assertEquals(body.error, "Missing required query param: ppPublicKey");
-});
-
 Deno.test("returns 400 when rangeMin is non-positive", async () => {
   const app = await setup();
   const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}&rangeMin=-1`,
-    jwt,
-  );
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY, -1), jwt);
   assertEquals(res.status, 400);
   const body = await res.json();
   assertEquals(body.error, "rangeMin must be a positive integer");
 });
 
-Deno.test("returns 403 when authenticated operator does not own the requested PP", async () => {
+Deno.test("returns 404 when authenticated operator does not own the requested PP", async () => {
   const app = await setup();
   const jwt = await generateJwt(OTHER_OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}`,
-    jwt,
-  );
-  assertEquals(res.status, 403);
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY), jwt);
+  assertEquals(res.status, 404);
 });
 
 Deno.test("returns recent snapshots scoped to the requested PP", async () => {
@@ -170,11 +170,7 @@ Deno.test("returns recent snapshots scoped to the requested PP", async () => {
   await seedSnapshot(null, new Date(now - 30_000), { queueDepth: 888 });
 
   const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}&rangeMin=60`,
-    jwt,
-  );
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY, 60), jwt);
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.data.ppPublicKey, PP_PUBLIC_KEY);
@@ -200,11 +196,7 @@ Deno.test("excludes snapshots outside the rangeMin window", async () => {
   );
 
   const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}&rangeMin=2`,
-    jwt,
-  );
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY, 2), jwt);
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.data.snapshots.length, 1);
@@ -220,11 +212,7 @@ Deno.test("snapshot payload exposes bundlesFailed for the error-rate counter", a
   });
 
   const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}&rangeMin=60`,
-    jwt,
-  );
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY, 60), jwt);
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.data.snapshots.length, 1);
@@ -235,11 +223,7 @@ Deno.test("snapshot payload exposes bundlesFailed for the error-rate counter", a
 Deno.test("defaults rangeMin to 60 when omitted", async () => {
   const app = await setup();
   const jwt = await generateJwt(OWNER_PUBLIC_KEY, "test-challenge");
-  const res = await request(
-    app,
-    `${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}`,
-    jwt,
-  );
+  const res = await request(app, buildMetricsUrl(PP_PUBLIC_KEY), jwt);
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.data.rangeMin, 60);
@@ -248,10 +232,33 @@ Deno.test("defaults rangeMin to 60 when omitted", async () => {
 Deno.test("returns 401 when JWT is missing", async () => {
   const app = await setup();
   const response = await app.handle(
-    new Request(`${METRICS_PATH}?ppPublicKey=${PP_PUBLIC_KEY}`, {
-      method: "GET",
-    }),
+    new Request(buildMetricsUrl(PP_PUBLIC_KEY), { method: "GET" }),
   );
   if (!response) throw new Error("No response from Oak app");
   assertEquals(response.status, 401);
+});
+
+Deno.test("legacy /dashboard/metrics returns 410 Gone", async () => {
+  // Wired in the dashboard router; we just confirm the path-shape contract.
+  // Full coverage of the dashboard 410-stub surface lives in dashboard-routes
+  // — this assertion is here to flag any accidental re-enable.
+  const { buildDashboardRouter } = await import(
+    "@/http/v1/dashboard/routes.ts"
+  );
+  const app = new Application();
+  const apiRouter = new Router();
+  const dashboardRouter = buildDashboardRouter({ log: newNoop() });
+  apiRouter.use(
+    "/api/v1",
+    dashboardRouter.routes(),
+    dashboardRouter.allowedMethods(),
+  );
+  app.use(apiRouter.routes());
+  app.use(apiRouter.allowedMethods());
+
+  const res = await app.handle(
+    new Request("http://localhost/api/v1/dashboard/metrics", { method: "GET" }),
+  );
+  if (!res) throw new Error("No response");
+  assertEquals(res.status, 410);
 });
