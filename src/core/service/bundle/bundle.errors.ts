@@ -30,12 +30,12 @@ export class PP_PUBLIC_KEY_REQUIRED
       code: BUNDLE_ERROR_CODES.PP_PUBLIC_KEY_REQUIRED,
       message: "PP public key is required",
       details:
-        "Bundle submission requires the route /providers/:ppPublicKey/bundles. No default PP exists.",
+        "Bundle submission requires the route /providers/:ppPublicKey/entity/bundles. No default PP exists.",
       api: {
         status: 400,
         message: "PP public key is required",
         details:
-          "Submit the bundle to /api/v1/providers/<ppPublicKey>/bundles. The PP must be specified explicitly.",
+          "Submit the bundle to /api/v1/providers/<ppPublicKey>/entity/bundles. The PP must be specified explicitly.",
       },
       meta: {},
     });

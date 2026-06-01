@@ -2,7 +2,6 @@ import { type Context, Status } from "@oak/oak";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { CouncilMembershipRepository } from "@/persistence/drizzle/repository/council-membership.repository.ts";
 import { CouncilMembershipStatus } from "@/persistence/drizzle/entity/council-membership.entity.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import {
   addCouncilWatcher,
   addProviderAddress,
@@ -52,8 +51,6 @@ function isInternalUrl(url: URL): boolean {
 }
 
 const membershipRepo = new CouncilMembershipRepository(drizzleClient);
-const ppRepo = new PpRepository(drizzleClient);
-
 /**
  * POST /dashboard/council/discover
  * Fetches council info from the council-platform's public API.
@@ -188,7 +185,10 @@ export function handleDiscoverCouncil(
 }
 
 /**
- * POST /dashboard/council/join
+ * POST /api/v1/providers/:ppPublicKey/council/join
+ *
+ * Submits a signed join envelope to a council on behalf of this PP. The PP
+ * comes from the URL; the body carries only the council target + envelope.
  */
 export function handleJoinCouncil(
   deps: { log: Logger },
@@ -198,13 +198,14 @@ export function handleJoinCouncil(
   return async (ctx) => {
     log.info("joinCouncil");
     try {
+      const pp = ctx.state.pp as { publicKey: string };
+      const ppPublicKey = pp.publicKey;
       const body = await ctx.request.body.json();
       const {
         councilUrl,
         councilId: bodyCouncilId,
         councilName,
         councilPublicKey,
-        ppPublicKey,
       } = body;
 
       const envelopeJurisdictions = (body.signedEnvelope as
@@ -218,12 +219,6 @@ export function handleJoinCouncil(
       if (!councilUrl || typeof councilUrl !== "string") {
         ctx.response.status = Status.BadRequest;
         ctx.response.body = { message: "councilUrl is required" };
-        return;
-      }
-
-      if (!ppPublicKey || typeof ppPublicKey !== "string") {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = { message: "ppPublicKey is required" };
         return;
       }
 
@@ -247,20 +242,6 @@ export function handleJoinCouncil(
       } catch {
         ctx.response.status = Status.BadRequest;
         ctx.response.body = { message: "councilUrl must be a valid URL" };
-        return;
-      }
-
-      // Verify PP is registered and owned by this user
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = {
-          message: "PP not registered. Register it first.",
-        };
         return;
       }
 
@@ -401,7 +382,7 @@ export function handleJoinCouncil(
 }
 
 /**
- * GET /dashboard/council/membership
+ * GET /api/v1/providers/:ppPublicKey/council/membership
  */
 export function handleGetMembership(
   deps: { log: Logger },
@@ -411,27 +392,8 @@ export function handleGetMembership(
   return async (ctx) => {
     log.info("getMembership");
     try {
-      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-
-      if (!ppPublicKey) {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = {
-          message: "ppPublicKey query parameter is required",
-        };
-        return;
-      }
-
-      // Verify PP ownership
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
+      const pp = ctx.state.pp as { publicKey: string };
+      const ppPublicKey = pp.publicKey;
 
       const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
 
@@ -477,7 +439,10 @@ export function handleGetMembership(
 }
 
 /**
- * POST /dashboard/council/membership
+ * POST /api/v1/providers/:ppPublicKey/council/membership
+ *
+ * Sync this PP's current council membership against the remote council. The
+ * caller passes no body — the PP is taken from the URL.
  */
 export function handleSyncMembership(
   deps: { log: Logger },
@@ -487,26 +452,8 @@ export function handleSyncMembership(
   return async (ctx) => {
     log.info("syncMembership");
     try {
-      const body = await ctx.request.body.json();
-      const { ppPublicKey } = body;
-
-      if (!ppPublicKey || typeof ppPublicKey !== "string") {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = { message: "ppPublicKey is required" };
-        return;
-      }
-
-      // Verify PP ownership
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
+      const pp = ctx.state.pp as { publicKey: string };
+      const ppPublicKey = pp.publicKey;
 
       const membership = await membershipRepo.getCurrentForPp(ppPublicKey);
       if (!membership) {

@@ -2,7 +2,6 @@ import { type Context, Status } from "@oak/oak";
 import { and, between, desc, eq, isNull } from "drizzle-orm";
 import { MoonlightOperation } from "@moonlight/moonlight-sdk";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
 import { TransactionRepository } from "@/persistence/drizzle/repository/transaction.repository.ts";
 import { BundleTransactionRepository } from "@/persistence/drizzle/repository/bundle-transaction.repository.ts";
 import { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
@@ -10,9 +9,9 @@ import { UtxoRepository } from "@/persistence/drizzle/repository/utxo.repository
 import { transaction } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { operationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { bundleTransaction } from "@/persistence/drizzle/entity/bundle-transaction.entity.ts";
+import type { PaymentProvider } from "@/persistence/drizzle/entity/pp.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
-const ppRepo = new PpRepository(drizzleClient);
 const txRepo = new TransactionRepository();
 const bundleTxRepo = new BundleTransactionRepository();
 const bundleRepo = new OperationsBundleRepository(drizzleClient);
@@ -57,7 +56,11 @@ function parseBundleOps(operationsMLXDR: string[], log: Logger): ParsedOps {
   return { deposits, withdraws, spendCount, createCount };
 }
 
-async function buildTxDetail(txId: string, log: Logger) {
+async function buildTxDetail(
+  txId: string,
+  ppPublicKey: string,
+  log: Logger,
+) {
   log.info("buildTxDetail");
   log.debug("txId", txId);
   log.event("loading transaction");
@@ -70,6 +73,7 @@ async function buildTxDetail(txId: string, log: Logger) {
   const bundles = [];
   let earliestBundleCreatedAt: Date | null = null;
   let channelContractId: string | null = null;
+  let matchesPp = false;
   const aggregatedDeposits: Array<
     { depositorAddress: string; amount: string }
   > = [];
@@ -80,6 +84,7 @@ async function buildTxDetail(txId: string, log: Logger) {
   for (const link of bundleLinks) {
     const bundle = await bundleRepo.findById(link.bundleId);
     if (!bundle) continue;
+    if (bundle.ppPublicKey === ppPublicKey) matchesPp = true;
     if (!channelContractId && bundle.channelContractId) {
       channelContractId = bundle.channelContractId;
     }
@@ -100,6 +105,10 @@ async function buildTxDetail(txId: string, log: Logger) {
       createCount: ops.createCount,
     });
   }
+
+  // Reject if no constituent bundle is owned by this PP — this prevents
+  // leaking transaction detail across PPs that happen to share a tx id.
+  if (!matchesPp) return null;
 
   const utxos = [];
   for (const link of bundleLinks) {
@@ -135,17 +144,18 @@ async function buildTxDetail(txId: string, log: Logger) {
   };
 }
 
-async function findTxIdsInRange(
+async function findTxIdsInRangeForPp(
+  ppPublicKey: string,
   channelContractId: string,
   from: Date,
   to: Date,
   limit: number,
   log: Logger,
 ): Promise<string[]> {
-  log.info("findTxIdsInRange");
+  log.info("findTxIdsInRangeForPp");
   log.debug("channelContractId", channelContractId);
   log.debug("limit", limit);
-  log.event("querying transactions by channel + time range");
+  log.event("querying transactions by PP + channel + time range");
   const rows = await drizzleClient
     .selectDistinct({ id: transaction.id, createdAt: transaction.createdAt })
     .from(transaction)
@@ -159,6 +169,7 @@ async function findTxIdsInRange(
     )
     .where(
       and(
+        eq(operationsBundle.ppPublicKey, ppPublicKey),
         eq(operationsBundle.channelContractId, channelContractId),
         between(transaction.createdAt, from, to),
         isNull(transaction.deletedAt),
@@ -169,7 +180,7 @@ async function findTxIdsInRange(
   return rows.map((r) => r.id);
 }
 
-type RouteParams = { id?: string };
+type RouteParams = { id?: string; ppPublicKey?: string };
 
 export function handleListDashboardTransactions(
   deps: { log: Logger },
@@ -179,17 +190,17 @@ export function handleListDashboardTransactions(
   return async (ctx) => {
     log.info("listDashboardTransactions");
     try {
-      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
+      const pp = ctx.state.pp as PaymentProvider;
       const channelContractId = ctx.request.url.searchParams.get(
         "channelContractId",
       );
       const fromIso = ctx.request.url.searchParams.get("fromIso");
       const toIso = ctx.request.url.searchParams.get("toIso");
 
-      if (!ppPublicKey || !channelContractId || !fromIso || !toIso) {
+      if (!channelContractId || !fromIso || !toIso) {
         ctx.response.status = Status.BadRequest;
         ctx.response.body = {
-          message: "ppPublicKey, channelContractId, fromIso, toIso required",
+          message: "channelContractId, fromIso, toIso are required",
         };
         return;
       }
@@ -202,18 +213,8 @@ export function handleListDashboardTransactions(
         return;
       }
 
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
-
-      const txIds = await findTxIdsInRange(
+      const txIds = await findTxIdsInRangeForPp(
+        pp.publicKey,
         channelContractId,
         from,
         to,
@@ -223,7 +224,7 @@ export function handleListDashboardTransactions(
 
       const items = [];
       for (const txId of txIds) {
-        const detail = await buildTxDetail(txId, log);
+        const detail = await buildTxDetail(txId, pp.publicKey, log);
         if (detail) items.push(detail);
       }
 
@@ -257,27 +258,9 @@ export function handleGetTransactionDetail(
         return;
       }
 
-      const ppPublicKey = ctx.request.url.searchParams.get("ppPublicKey");
-      if (!ppPublicKey) {
-        ctx.response.status = Status.BadRequest;
-        ctx.response.body = {
-          message: "ppPublicKey query parameter is required",
-        };
-        return;
-      }
+      const pp = ctx.state.pp as PaymentProvider;
 
-      const ownerPublicKey = (ctx.state.session as { sub: string }).sub;
-      const pp = await ppRepo.findByPublicKeyAndOwner(
-        ppPublicKey,
-        ownerPublicKey,
-      );
-      if (!pp) {
-        ctx.response.status = Status.NotFound;
-        ctx.response.body = { message: "Provider not found" };
-        return;
-      }
-
-      const detail = await buildTxDetail(txId, log);
+      const detail = await buildTxDetail(txId, pp.publicKey, log);
       if (!detail) {
         ctx.response.status = Status.NotFound;
         ctx.response.body = { message: "Transaction not found" };

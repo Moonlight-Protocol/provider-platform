@@ -9,6 +9,7 @@ import { buildWaitlistRouter } from "@/http/v1/waitlist/routes.ts";
 import { buildCouncilRouter } from "@/http/v1/council/routes.ts";
 import { buildEventsRouter } from "@/http/v1/events/routes.ts";
 import { buildEntitiesRouter } from "@/http/v1/entities/routes.ts";
+import { buildProvidersRouter } from "@/http/v1/providers/routes.ts";
 
 export function buildApiRouter(deps: { log: Logger }): Router {
   const apiRouter = new Router();
@@ -21,6 +22,7 @@ export function buildApiRouter(deps: { log: Logger }): Router {
   const councilRouter = buildCouncilRouter(deps);
   const eventsRouter = buildEventsRouter(deps);
   const entitiesRouter = buildEntitiesRouter(deps);
+  const providersRouter = buildProvidersRouter(deps);
 
   apiRouter.use(
     "/api/v1",
@@ -62,6 +64,11 @@ export function buildApiRouter(deps: { log: Logger }): Router {
     "/api/v1",
     entitiesRouter.routes(),
     entitiesRouter.allowedMethods(),
+  );
+  apiRouter.use(
+    "/api/v1",
+    providersRouter.routes(),
+    providersRouter.allowedMethods(),
   );
 
   return apiRouter;

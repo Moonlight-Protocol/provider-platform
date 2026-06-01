@@ -1,7 +1,7 @@
 /**
  * Resolves the PP signer and channel client for a (channel, PP) pair.
  *
- * Bundles are submitted to /providers/:ppPublicKey/bundles, so the PP is
+ * Bundles are submitted to /providers/:ppPublicKey/entity/bundles, so the PP is
  * always explicit. The resolver loads exactly that PP, verifies it is an
  * active member of the requested channel, and returns its signer. There is
  * no default / first-match across the fleet.
