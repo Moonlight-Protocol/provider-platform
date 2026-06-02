@@ -5,13 +5,20 @@ import type {
 } from "@/http/pipelines/types.ts";
 import type { requestSchema as postRequestSchema } from "@/http/v1/stellar/auth/post.ts";
 import type { requestSchema as getRequestSchema } from "@/http/v1/stellar/auth/get.ts";
+import type { EntityStatus } from "@/persistence/drizzle/entity/entity.entity.ts";
 
 export type PostChallengeInput = PostEndpointInput<typeof postRequestSchema>;
 
 export type PostChallengeWithJWT = PostChallengeInput & { jwt: string };
+export type PostChallengeWithEntityStatus = PostChallengeWithJWT & {
+  entityStatus: EntityStatus;
+};
 export type ContextWithJWT = {
   ctx: Context;
   jwt: string;
+};
+export type ContextWithJWTAndStatus = ContextWithJWT & {
+  entityStatus: EntityStatus;
 };
 
 export type ChallengeData = {

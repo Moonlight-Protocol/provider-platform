@@ -73,10 +73,15 @@ export const P_UpdateChallengeSession = (deps: { log: Logger }) =>
           "client.account": txClientAccount,
         });
         const account = await accountRepository.findById(txClientAccount);
-        assertOrThrow(
-          isDefined(account),
-          new E.USER_NOT_FOUND_IN_DATABASE(txClientAccount),
-        );
+        if (!account) {
+          // SEP-10 verify is intentionally accountless-friendly so unverified
+          // users can complete the handshake and surface the KYC step in the
+          // wallet. Skip the session row; the bundle gate (BND_011) keeps
+          // them from submitting anything until they KYC.
+          log.event("no account yet — skipping session create");
+          span.addEvent("no_account_skipping_session");
+          return input;
+        }
 
         span.addEvent("persisting_session");
         await sessionRepository.create({

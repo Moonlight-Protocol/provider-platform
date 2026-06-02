@@ -4,10 +4,12 @@ import { P_VerifyChallenge } from "@/core/service/auth/challenge/verify/verify-c
 import { P_UpdateChallengeSession } from "@/core/service/auth/challenge/store/update-challenge-session.ts";
 import { P_UpdateChallengeDB } from "@/core/service/auth/challenge/store/update-challenge-db.ts";
 import { P_GenerateChallengeJWT } from "@/core/service/auth/challenge/create/generate-challenge-jwt.ts";
+import { P_AttachEntityStatus } from "@/core/service/auth/challenge/store/attach-entity-status.ts";
 import type { PostEndpointOutput } from "@/http/pipelines/types.ts";
 import { PIPE_PostEndpoint } from "@/http/pipelines/post-endpoint.ts";
 import { P_CompareChallenge } from "@/core/service/auth/challenge/verify/compare-challenge.ts";
-import type { ContextWithJWT } from "@/core/service/auth/challenge/types.ts";
+import type { ContextWithJWTAndStatus } from "@/core/service/auth/challenge/types.ts";
+import { EntityStatus } from "@/persistence/drizzle/entity/entity.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
 export const requestSchema = z.object({
@@ -16,6 +18,7 @@ export const requestSchema = z.object({
 
 export const responseSchema = z.object({
   jwt: z.string(),
+  entityStatus: z.nativeEnum(EntityStatus),
 });
 
 export function handlePostAuth(
@@ -24,7 +27,7 @@ export function handlePostAuth(
   const log = deps.log.scope("postAuth");
 
   const assembleResponse = (
-    input: ContextWithJWT,
+    input: ContextWithJWTAndStatus,
   ): PostEndpointOutput<typeof responseSchema> => {
     log.event("auth challenge verified successfully");
 
@@ -34,6 +37,7 @@ export function handlePostAuth(
       message: "Auth challenge verified successfully",
       data: {
         jwt: input.jwt,
+        entityStatus: input.entityStatus,
       },
     };
   };
@@ -50,8 +54,9 @@ export function handlePostAuth(
         P_GenerateChallengeJWT(deps),
         P_UpdateChallengeSession(deps),
         P_UpdateChallengeDB(deps),
+        P_AttachEntityStatus(deps),
         assembleResponse,
-      ],
+      ] as const,
     }, deps);
 
     return handler.run(ctx);
