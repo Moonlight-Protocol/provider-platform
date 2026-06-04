@@ -15,6 +15,7 @@ import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { eq } from "drizzle-orm";
 import { transaction } from "@/persistence/drizzle/entity/index.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 
 const MAX_RETRY = 3;
 
@@ -121,6 +122,7 @@ Deno.test(
           reAddedBundles.push(...bundles);
         },
         maxRetryAttempts: MAX_RETRY,
+        log: newNoop(),
       },
     );
 
@@ -163,6 +165,7 @@ Deno.test(
         reAddedBundles.push(...bundles);
       },
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     // Transaction marked FAILED
@@ -213,6 +216,7 @@ Deno.test(
           reAddedBundles.push(...bundles);
         },
         maxRetryAttempts: MAX_RETRY,
+        log: newNoop(),
       },
     );
 
@@ -248,6 +252,7 @@ Deno.test(
       createSlotBundleFn: mockCreateSlotBundle,
       reAddBundlesFn: async () => {},
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     const found = await repo.findById(bundleId);
@@ -293,6 +298,7 @@ Deno.test(
         reAddCalled = true;
       },
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     assertEquals(reAddCalled, false);

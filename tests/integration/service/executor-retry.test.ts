@@ -8,6 +8,7 @@ import {
 } from "../../test_helpers.ts";
 import { handleExecutionFailure } from "@/core/service/executor/executor-failure.helpers.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 
 const MAX_RETRY = 3;
 
@@ -54,6 +55,7 @@ Deno.test(
     const retryMeta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     // The bundle should be returned for retry
@@ -83,6 +85,7 @@ Deno.test(
     const retryMeta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     // Should NOT be returned for retry
@@ -128,7 +131,11 @@ Deno.test(
       error,
       [eligibleId, deadLetterId],
       reason,
-      { operationsBundleRepository: repo, maxRetryAttempts: MAX_RETRY },
+      {
+        operationsBundleRepository: repo,
+        maxRetryAttempts: MAX_RETRY,
+        log: newNoop(),
+      },
     );
 
     assertEquals(retryMeta.length, 1);
@@ -162,6 +169,7 @@ Deno.test(
     await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     const found = await repo.findById(id);
@@ -191,6 +199,7 @@ Deno.test(
     const meta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     assertEquals(meta.length, 1);
@@ -215,6 +224,7 @@ Deno.test(
     const meta = await handleExecutionFailure(error, [missingId], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      log: newNoop(),
     });
 
     assertEquals(meta.length, 0);

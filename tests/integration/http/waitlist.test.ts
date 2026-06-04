@@ -5,18 +5,20 @@ import { assertEquals } from "@std/assert";
 import { ensureInitialized, getTestDb, resetDb } from "../../test_helpers.ts";
 import { waitlistRequest } from "@/persistence/drizzle/entity/index.ts";
 import { WaitlistRequestRepository } from "@/persistence/drizzle/repository/waitlist-request.repository.ts";
+import { newNoop } from "@/utils/logger/index.ts";
 
 const WAITLIST_PATH = "http://localhost/api/v1/waitlist";
 
 // We import the route module *after* PGlite is wired up (tests/deno.json
 // remaps @/persistence/drizzle/config.ts to our pglite_db.ts).
-const { default: waitlistRouter, setWaitlistRepoForTests } = await import(
+const { buildWaitlistRouter, setWaitlistRepoForTests } = await import(
   "@/http/v1/waitlist/routes.ts"
 );
 
 function createTestApp(): Application {
   const app = new Application();
   const router = new Router();
+  const waitlistRouter = buildWaitlistRouter({ log: newNoop() });
   router.use(
     "/api/v1",
     waitlistRouter.routes(),
