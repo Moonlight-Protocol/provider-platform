@@ -21,6 +21,23 @@ export const SESSION_TTL = Number(requireEnv("SESSION_TTL"));
 export const { NETWORK_CONFIG, NETWORK } = selectNetwork(requireEnv("NETWORK"));
 export const NETWORK_FEE = requireBaseFee("NETWORK_FEE");
 
+// Stellar account minimum reserve unit, in stroops. The on-chain minimum
+// balance for an account is `(2 + numSubEntries) * BASE_RESERVE_STROOPS`.
+// Soroban RPC does not expose base_reserve (it is a stellar-core protocol
+// constant, not a ConfigSettingEntry), so we read it from env. Override per
+// network if a protocol upgrade changes it.
+const _rawBaseReserve = loadOptionalEnv("BASE_RESERVE_STROOPS") ?? "5000000";
+const _parsedBaseReserve = Number(_rawBaseReserve);
+if (
+  !Number.isFinite(_parsedBaseReserve) ||
+  !Number.isInteger(_parsedBaseReserve) || _parsedBaseReserve < 0
+) {
+  throw new Error(
+    `BASE_RESERVE_STROOPS must be a non-negative integer, got: "${_rawBaseReserve}"`,
+  );
+}
+export const BASE_RESERVE_STROOPS = BigInt(_parsedBaseReserve);
+
 export const NETWORK_RPC_SERVER = new Server(
   NETWORK_CONFIG.rpcUrl as string,
   { allowHttp: NETWORK_CONFIG.allowHttp },
