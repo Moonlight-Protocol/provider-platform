@@ -4,6 +4,9 @@ import { createBaseColumns } from "@/persistence/drizzle/entity/base.entity.ts";
 import { account } from "@/persistence/drizzle/entity/account.entity.ts";
 import { challenge } from "@/persistence/drizzle/entity/challenge.entity.ts";
 
+// Identity-level status enum reused by `pp_entity_approvals.status` to gate
+// bundle submission per PP. The global `entities` table owns identity
+// (name, jurisdictions) only — there is no global status column anymore.
 export enum EntityStatus {
   UNVERIFIED = "UNVERIFIED",
   APPROVED = "APPROVED",
@@ -20,7 +23,6 @@ export const entityStatusEnum = pgEnum("entity_status", [
 
 export const entity = pgTable("entities", {
   id: text("id").primaryKey(),
-  status: entityStatusEnum("status").notNull(),
   name: text("name"),
   jurisdictions: text("jurisdictions").array(),
   ...createBaseColumns(),

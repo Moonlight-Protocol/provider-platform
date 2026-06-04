@@ -5,7 +5,6 @@ import { EntityRepository } from "@/persistence/drizzle/repository/entity.reposi
 import { AccountRepository } from "@/persistence/drizzle/repository/account.repository.ts";
 import {
   ChallengeStatus,
-  EntityStatus,
   type NewAccount,
   type NewChallenge,
   type NewEntity,
@@ -44,7 +43,6 @@ export const P_CreateChallengeDB = (deps: { log: Logger }) =>
             log.event("creating new entity and account");
             entity = await entityRepository.create({
               id: crypto.randomUUID(),
-              status: EntityStatus.UNVERIFIED,
             } as NewEntity);
 
             account = await accountRepository.create({

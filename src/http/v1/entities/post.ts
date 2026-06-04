@@ -3,6 +3,7 @@ import { z } from "zod";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { AccountRepository } from "@/persistence/drizzle/repository/account.repository.ts";
 import { EntityRepository } from "@/persistence/drizzle/repository/entity.repository.ts";
+import { PpEntityApprovalRepository } from "@/persistence/drizzle/repository/pp-entity-approval.repository.ts";
 import {
   EntityStatus,
   type NewAccount,
@@ -13,6 +14,7 @@ import type { Logger } from "@/utils/logger/index.ts";
 
 const entityRepo = new EntityRepository(drizzleClient);
 const accountRepo = new AccountRepository(drizzleClient);
+const ppApprovalRepo = new PpEntityApprovalRepository(drizzleClient);
 
 const NAME_MAX_LEN = 250;
 
@@ -52,12 +54,9 @@ function sanitiseName(raw: string): string {
  *
  * Public KYC/KYB-style submission. Caller proves wallet ownership by signing
  * a previously-issued nonce (see POST /entities/challenge). On success the
- * entity is created or its existing record promoted to APPROVED, and a
- * USER-type account is created for the pubkey if one doesn't exist yet.
- *
- * The :ppPublicKey URL param is intentionally not loaded here — the PP exists
- * (the route mount verified that). What matters is the submitter's wallet
- * proof and the sanitised name/jurisdictions.
+ * entity is created/updated AND a per-PP approval row is upserted to APPROVED
+ * for the pair (ppPublicKey, pubkey). Identity (name, jurisdictions) stays on
+ * the global entity record; the per-PP gate lives on `pp_entity_approvals`.
  */
 export function handlePostEntity(
   deps: { log: Logger },
@@ -67,6 +66,14 @@ export function handlePostEntity(
   return async (ctx) => {
     log.info("postEntity");
     try {
+      const params =
+        (ctx as unknown as { params?: { ppPublicKey?: string } }).params;
+      const ppPublicKey = params?.ppPublicKey;
+      if (!ppPublicKey || typeof ppPublicKey !== "string") {
+        ctx.response.status = Status.BadRequest;
+        ctx.response.body = { message: "ppPublicKey path param is required" };
+        return;
+      }
       const raw = await ctx.request.body.json();
       const parsed = bodySchema.safeParse(raw);
       if (!parsed.success) {
@@ -105,65 +112,79 @@ export function handlePostEntity(
       }
 
       log.debug("pubkey", pubkey);
+      log.debug("ppPublicKey", ppPublicKey);
       log.debug("nameLength", name.length);
 
-      log.event("checking for existing account");
+      // Identity record (global): create-or-update the entity + account.
+      let entityId: string;
       const existingAccount = await accountRepo.findById(pubkey);
-
       if (existingAccount) {
-        const existingEntity = await entityRepo.findById(
-          existingAccount.entityId,
-        );
-        if (existingEntity?.status === EntityStatus.APPROVED) {
-          log.event("entity already approved for pubkey");
-          ctx.response.status = Status.Conflict;
-          ctx.response.body = {
-            message: "Entity already approved for this pubkey",
-            data: { pubkey, entityId: existingEntity.id },
-          };
-          return;
-        }
-        log.event("promoting existing entity to APPROVED");
+        log.event("updating existing entity identity");
         const updated = await entityRepo.update(existingAccount.entityId, {
           name,
           jurisdictions,
-          status: EntityStatus.APPROVED,
         });
-        log.debug("entityId", updated?.id ?? existingAccount.entityId);
-        ctx.response.status = Status.OK;
-        ctx.response.body = {
-          message: "Entity updated",
-          data: {
-            pubkey,
-            entityId: updated?.id ?? existingAccount.entityId,
-            status: EntityStatus.APPROVED,
-          },
-        };
-        return;
+        entityId = updated?.id ?? existingAccount.entityId;
+      } else {
+        log.event("creating new entity + account");
+        const newEntity = await entityRepo.create({
+          id: crypto.randomUUID(),
+          status: EntityStatus.UNVERIFIED,
+          name,
+          jurisdictions,
+        } as NewEntity);
+        await accountRepo.create({
+          id: pubkey,
+          type: "USER",
+          entityId: newEntity.id,
+        } as NewAccount);
+        entityId = newEntity.id;
       }
 
-      log.event("creating new entity + account");
-      const newEntity = await entityRepo.create({
-        id: crypto.randomUUID(),
-        status: EntityStatus.APPROVED,
-        name,
-        jurisdictions,
-      } as NewEntity);
+      // Per-PP approval: upsert this (pp, account) pair to APPROVED.
+      const existingApproval = await ppApprovalRepo.findByPpAndAccount(
+        ppPublicKey,
+        pubkey,
+      );
+      if (existingApproval) {
+        if (existingApproval.status === EntityStatus.APPROVED) {
+          log.event("pp approval already approved for pubkey");
+          ctx.response.status = Status.Conflict;
+          ctx.response.body = {
+            message: "Entity already approved for this provider",
+            data: {
+              pubkey,
+              ppPublicKey,
+              entityId,
+              status: EntityStatus.APPROVED,
+            },
+          };
+          return;
+        }
+        log.event("promoting existing pp approval to APPROVED");
+        await ppApprovalRepo.update(existingApproval.id, {
+          status: EntityStatus.APPROVED,
+        });
+      } else {
+        log.event("creating new pp approval (APPROVED)");
+        await ppApprovalRepo.create({
+          id: crypto.randomUUID(),
+          ppPublicKey,
+          accountPubkey: pubkey,
+          status: EntityStatus.APPROVED,
+        });
+      }
 
-      await accountRepo.create({
-        id: pubkey,
-        type: "USER",
-        entityId: newEntity.id,
-      } as NewAccount);
-
-      log.debug("entityId", newEntity.id);
-      log.event("entity registered and approved");
-      ctx.response.status = Status.Created;
+      log.event("entity approved for pp");
+      ctx.response.status = existingApproval ? Status.OK : Status.Created;
       ctx.response.body = {
-        message: "Entity created",
+        message: existingApproval
+          ? "Entity approval updated"
+          : "Entity approved",
         data: {
           pubkey,
-          entityId: newEntity.id,
+          ppPublicKey,
+          entityId,
           status: EntityStatus.APPROVED,
         },
       };

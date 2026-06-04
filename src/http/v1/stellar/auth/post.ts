@@ -12,13 +12,19 @@ import type { ContextWithJWTAndStatus } from "@/core/service/auth/challenge/type
 import { EntityStatus } from "@/persistence/drizzle/entity/entity.entity.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
+// SEP-10 verify is now PP-aware: the wallet posts `ppPublicKey` alongside
+// the signed challenge so the response can carry per-PP `entityStatus` and
+// per-PP `kycSubmissionUrl`. A wallet APPROVED on PP-A must not appear
+// APPROVED on PP-B.
 export const requestSchema = z.object({
   signedChallenge: z.string(),
+  ppPublicKey: z.string().min(1),
 });
 
 export const responseSchema = z.object({
   jwt: z.string(),
   entityStatus: z.nativeEnum(EntityStatus),
+  kycSubmissionUrl: z.string().nullable(),
 });
 
 export function handlePostAuth(
@@ -38,6 +44,7 @@ export function handlePostAuth(
       data: {
         jwt: input.jwt,
         entityStatus: input.entityStatus,
+        kycSubmissionUrl: input.kycSubmissionUrl,
       },
     };
   };

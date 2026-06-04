@@ -5,7 +5,7 @@ import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { ChallengeRepository } from "@/persistence/drizzle/repository/challenge.repository.ts";
 import { ChallengeStatus } from "@/persistence/drizzle/entity/challenge.entity.ts";
 import type {
-  ContextWithJWT,
+  ContextWithJWTAndPpPublicKey,
   PostChallengeWithJWT,
 } from "@/core/service/auth/challenge/types.ts";
 import * as E from "@/core/service/auth/challenge/store/error.ts";
@@ -18,12 +18,12 @@ const challengeRepository = new ChallengeRepository(drizzleClient);
 
 export const P_UpdateChallengeDB = (deps: { log: Logger }) =>
   ProcessEngine.create(
-    (input: PostChallengeWithJWT): Promise<ContextWithJWT> => {
+    (input: PostChallengeWithJWT): Promise<ContextWithJWTAndPpPublicKey> => {
       return withSpan("P_UpdateChallengeDB", async (span) => {
         const log = deps.log.scope("P_UpdateChallengeDB");
         log.info("P_UpdateChallengeDB");
 
-        const { signedChallenge } = input.body;
+        const { signedChallenge, ppPublicKey } = input.body;
         const tx = new Transaction(
           signedChallenge,
           NETWORK_CONFIG.networkPassphrase,
@@ -51,7 +51,8 @@ export const P_UpdateChallengeDB = (deps: { log: Logger }) =>
 
         return {
           ctx: input.ctx,
-          jwt: input.jwt!,
+          jwt: input.jwt,
+          ppPublicKey,
         };
       });
     },

@@ -9,6 +9,11 @@ export const paymentProvider = pgTable("payment_providers", {
   ownerPublicKey: text("owner_public_key"),
   isActive: boolean("is_active").notNull().default(false),
   label: text("label"),
+  // Optional. When set, the wallet renders a "Submit KYC" link pointing at
+  // this URL whenever the submitter's per-PP entity status is not APPROVED.
+  // Operator-owned (different PP operators may use different schemes), so
+  // the wallet uses the stored string verbatim.
+  kycSubmissionUrl: text("kyc_submission_url"),
   ...createBaseColumns(),
 });
 
