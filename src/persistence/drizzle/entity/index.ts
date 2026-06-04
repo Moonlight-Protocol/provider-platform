@@ -17,3 +17,4 @@ export * from "@/persistence/drizzle/entity/council-membership.entity.ts";
 export * from "@/persistence/drizzle/entity/pp.entity.ts";
 export * from "@/persistence/drizzle/entity/wallet-user.entity.ts";
 export * from "@/persistence/drizzle/entity/waitlist-request.entity.ts";
+export * from "@/persistence/drizzle/entity/pp-entity-approval.entity.ts";

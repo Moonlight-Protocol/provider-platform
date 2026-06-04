@@ -38,6 +38,7 @@ import {
   SessionRepository,
   UtxoRepository,
 } from "@/persistence/drizzle/repository/index.ts";
+import { PpEntityApprovalRepository } from "@/persistence/drizzle/repository/pp-entity-approval.repository.ts";
 import { EntityStatus } from "@/persistence/drizzle/entity/index.ts";
 import { withSpan } from "@/core/tracing.ts";
 import type { Logger } from "@/utils/logger/index.ts";
@@ -45,6 +46,7 @@ import type { Logger } from "@/utils/logger/index.ts";
 const sessionRepository = new SessionRepository(drizzleClient);
 const accountRepository = new AccountRepository(drizzleClient);
 const entityRepository = new EntityRepository(drizzleClient);
+const ppApprovalRepository = new PpEntityApprovalRepository(drizzleClient);
 const utxoRepository = new UtxoRepository(drizzleClient);
 const operationsBundleRepository = new OperationsBundleRepository(
   drizzleClient,
@@ -342,21 +344,30 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
 
         span.addEvent("validating_entity_approval", {
           "account.id": userSession.accountId,
+          "pp.public_key": ppPublicKey,
         });
-        log.event("validating entity approval");
+        log.event("validating per-PP entity approval");
         const submitterAccount = await accountRepository.findById(
           userSession.accountId,
         );
-        const submitterEntity = submitterAccount
-          ? await entityRepository.findById(submitterAccount.entityId)
-          : null;
-        if (
-          !submitterEntity ||
-          submitterEntity.status !== EntityStatus.APPROVED
-        ) {
-          log.event("submitter entity not approved");
+        if (!submitterAccount) {
+          log.event("submitter has no account; reject");
           throw new E.SUBMITTER_NOT_APPROVED(userSession.accountId);
         }
+        const approval = await ppApprovalRepository.findByPpAndAccount(
+          ppPublicKey,
+          submitterAccount.id,
+        );
+        if (!approval || approval.status !== EntityStatus.APPROVED) {
+          log.event("submitter entity not approved for this PP");
+          throw new E.SUBMITTER_NOT_APPROVED(userSession.accountId);
+        }
+        // Identity (name / jurisdictions) still lives on the global entity
+        // record; the per-PP approval above is the gate, but the bundle entry
+        // wants the submitter's identity for downstream audit/labels.
+        const submitterEntity = await entityRepository.findById(
+          submitterAccount.entityId,
+        );
 
         span.addEvent("generating_bundle_id");
         log.event("generating bundle ID");

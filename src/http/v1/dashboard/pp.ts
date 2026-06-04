@@ -26,7 +26,7 @@ export function handleRegisterPp(
     log.info("registerPp");
     try {
       const body = await ctx.request.body.json();
-      const { secretKey, derivationIndex, label } = body;
+      const { secretKey, derivationIndex, label, kycSubmissionUrl } = body;
 
       if (!secretKey || typeof secretKey !== "string") {
         ctx.response.status = Status.BadRequest;
@@ -78,6 +78,10 @@ export function handleRegisterPp(
         ownerPublicKey,
         isActive: true,
         label: label?.trim() ?? null,
+        kycSubmissionUrl: typeof kycSubmissionUrl === "string" &&
+            kycSubmissionUrl.trim().length > 0
+          ? kycSubmissionUrl.trim()
+          : null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
