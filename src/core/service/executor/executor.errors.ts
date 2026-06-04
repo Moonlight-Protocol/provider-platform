@@ -5,7 +5,19 @@ export enum EXECUTOR_ERROR_CODES {
   TRANSACTION_SUBMIT_FAILED = "EXC_002",
   INSUFFICIENT_UTXOS = "EXC_003",
   SLOT_EMPTY = "EXC_004",
+  INSUFFICIENT_FEES = "EXC_005",
 }
+
+/**
+ * Structured detail attached to InsufficientFees and persisted on the bundle
+ * record as `failure_detail`. All XLM amounts are stroop strings (int64).
+ */
+export type InsufficientFeesDetail = {
+  feePayerPubkey: string;
+  availableXlm: string;
+  requiredXlm: string;
+  shortfallXlm: string;
+};
 
 const source = "@service/executor";
 
@@ -55,6 +67,29 @@ export class INSUFFICIENT_UTXOS
         `Not enough free UTXOs available. Required: ${required}, Available: ${available}`,
       meta: { required, available },
     });
+  }
+}
+
+/**
+ * Pre-flight terminal failure: the fee-paying account cannot cover the
+ * simulated tx fee after subtracting Stellar minimum reserves. Thrown by the
+ * pre-flight check before any signing or submission attempt. The submit
+ * orchestration catches this specifically and moves the bundle straight to
+ * BundleStatus.FAILED (no retry counter, no mempool retention).
+ */
+export class InsufficientFees extends PlatformError<InsufficientFeesDetail> {
+  readonly detail: InsufficientFeesDetail;
+
+  constructor(detail: InsufficientFeesDetail) {
+    super({
+      source,
+      code: EXECUTOR_ERROR_CODES.INSUFFICIENT_FEES,
+      message: "Insufficient fees on fee-payer account",
+      details:
+        `Fee payer ${detail.feePayerPubkey} has ${detail.availableXlm} stroops available after reserves; required ${detail.requiredXlm} (shortfall ${detail.shortfallXlm}).`,
+      meta: detail,
+    });
+    this.detail = detail;
   }
 }
 

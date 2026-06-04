@@ -218,6 +218,7 @@ export type BundleDTO = {
   fee: string;
   createdAt: string;
   updatedAt: string | null;
+  failureDetail: Record<string, unknown> | null;
 };
 
 /**
@@ -235,6 +236,7 @@ export function toBundleDTO(bundle: OperationsBundle): BundleDTO {
     fee: bundle.fee.toString(),
     createdAt: bundle.createdAt.toISOString(),
     updatedAt: bundle.updatedAt ? bundle.updatedAt.toISOString() : null,
+    failureDetail: bundle.failureDetail ?? null,
   };
 }
 

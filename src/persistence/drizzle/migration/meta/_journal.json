@@ -127,6 +127,13 @@
       "when": 1780300000000,
       "tag": "0017_pp_aware_entity_status_and_kyc_url",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780531200000,
+      "tag": "0018_add_failure_detail_to_bundles",
+      "breakpoints": true
     }
   ]
 }

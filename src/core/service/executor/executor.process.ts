@@ -1,13 +1,21 @@
 import type { Logger } from "@/utils/logger/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
+import {
+  BundleStatus,
+} from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { TransactionStatus } from "@/persistence/drizzle/entity/transaction.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import {
+  BASE_RESERVE_STROOPS,
   MEMPOOL_EXECUTOR_INTERVAL_MS,
   MEMPOOL_MAX_RETRY_ATTEMPTS,
+  NETWORK_CONFIG,
+  NETWORK_FEE,
   NETWORK_RPC_SERVER,
   TRANSACTION_EXPIRATION_OFFSET,
 } from "@/config/env.ts";
+import { InsufficientFees } from "@/core/service/executor/executor.errors.ts";
+import { runPreflightOpexFeeCheck } from "@/core/service/executor/preflight-opex-balance.ts";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
 import { ChannelInvokeMethods } from "@moonlight/moonlight-sdk";
 import type { SIM_ERRORS } from "@colibri/core";
@@ -379,6 +387,22 @@ export class Executor {
         // Get transaction expiration
         const expiration = await getTransactionExpiration();
 
+        // Pre-flight OpEx fee check. Throws InsufficientFees if the PP root
+        // account cannot cover (inclusion + Soroban resource fee) after
+        // subtracting Stellar minimum reserves. The submit-orchestration
+        // catch block routes InsufficientFees to a terminal-FAILED bypass
+        // (no retry counter, no mempool retention).
+        await runPreflightOpexFeeCheck(
+          { txBuilder, feePayerPubkey: ppPublicKey },
+          {
+            rpcServer: NETWORK_RPC_SERVER,
+            networkPassphrase: NETWORK_CONFIG.networkPassphrase as string,
+            baseInclusionFeeStroops: BigInt(NETWORK_FEE),
+            baseReserveStroops: BASE_RESERVE_STROOPS,
+            log: this.log,
+          },
+        );
+
         // Submit transaction to network
         const transactionHash = await submitTransactionToNetwork(
           txBuilder,
@@ -410,6 +434,49 @@ export class Executor {
           },
         }), { log: this.log });
       } catch (error) {
+        // Typed-error fast-path: pre-flight detected an under-funded fee
+        // payer. Terminal-fail every bundle in the slot with the structured
+        // detail; DO NOT increment retry counters; DO NOT re-enqueue.
+        if (error instanceof InsufficientFees) {
+          span.addEvent("preflight_insufficient_fees_terminal", {
+            bundleIds,
+          });
+          this.log.error(error, "pre-flight InsufficientFees — terminal-fail");
+          for (const bundleId of bundleIds) {
+            try {
+              await operationsBundleRepository.update(bundleId, {
+                status: BundleStatus.FAILED,
+                lastFailureReason: error.message,
+                failureDetail: { ...error.detail },
+                updatedAt: new Date(),
+              });
+            } catch (updateError) {
+              span.addEvent("insufficient_fees_persist_failed", {
+                "bundle.id": bundleId,
+              });
+              this.log.error(
+                updateError,
+                "failed to mark bundle FAILED on InsufficientFees",
+              );
+            }
+          }
+          const failedChannelContractId = slot?.getBundles()[0]
+            ?.channelContractId ?? null;
+          if (failedChannelContractId) {
+            await emitForBundles(bundleIds, (scope) => ({
+              kind: "executor.execution_failed",
+              ts: Date.now(),
+              scope,
+              payload: {
+                bundleIds,
+                channelContractId: failedChannelContractId,
+                reason: error.message,
+              },
+            }), { log: this.log });
+          }
+          return;
+        }
+
         const errorMessage = error instanceof Error
           ? error.message
           : String(error);

@@ -37,6 +37,7 @@ export const operationsBundle = pgTable("operations_bundles", {
   fee: bigint("fee", { mode: "bigint" }).notNull(),
   retryCount: integer("retry_count").notNull().default(0),
   lastFailureReason: text("last_failure_reason"),
+  failureDetail: jsonb("failure_detail").$type<Record<string, unknown>>(),
   ppPublicKey: text("pp_public_key"),
   ...createBaseColumns(),
 }, (table) => [

@@ -17,6 +17,10 @@ export const responseSchema = z.object({
   fee: z.string(),
   createdAt: z.string(),
   updatedAt: z.string().nullable(),
+  // Structured-reason payload for terminal failures (e.g. InsufficientFees
+  // carries { feePayerPubkey, availableXlm, requiredXlm, shortfallXlm }).
+  // null on success states and for legacy free-form failures.
+  failureDetail: z.record(z.string(), z.unknown()).nullable(),
 });
 
 export type BundleGetProcessOutput = {
