@@ -12,7 +12,30 @@ export const EVENTS_WS_SUBPROTOCOL = "moonlight.events.v1";
 
 const BEARER_PROTO_PREFIX = "bearer.";
 
-const IDLE_TIMEOUT_SECONDS = 30;
+/**
+ * `idleTimeout` is the no-pong-received deadline for the underlying Deno
+ * WebSocket upgrade. Deno's `upgradeWebSocket` sends WS protocol-level
+ * `ping` frames automatically every `idleTimeout / 2` seconds and closes
+ * the connection if the client doesn't reply with a `pong` within the
+ * full `idleTimeout` window. Pings + pongs are protocol-level — browsers
+ * and the standard WebSocket client respond transparently with no
+ * application-layer message required.
+ *
+ * Previously 30 s. That was tight enough that the per-PP harness against
+ * deployed testnet was losing frames on every inter-bundle pause: Stellar
+ * ledger close + Verifier polling exceeds 30 s between `bundle.X_completed`
+ * and the next cycle's `mempool.bundle_added`. The WS dropped, the
+ * subscriber reconnected (no replay), the events that arrived in the
+ * disconnect window were lost.
+ *
+ * 60 s gives Deno's auto-ping a 30 s tick, covers Stellar testnet's
+ * worst-case inter-bundle latency, and stays at parity with industry
+ * baselines: nginx default proxy_read_timeout 60 s, Fly proxy default
+ * idle 60 s. We don't need to exceed the upstream proxy ceiling — the
+ * proxy is reading the WS data frames + ping frames as activity, so the
+ * connection stays alive on its side too.
+ */
+const IDLE_TIMEOUT_SECONDS = 60;
 
 let ppRepository = new PpRepository(drizzleClient);
 
