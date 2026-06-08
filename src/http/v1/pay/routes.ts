@@ -9,14 +9,11 @@ import { handleGetCustodialAccount } from "@/http/v1/pay/custodial/account.ts";
 import { handlePostCustodialSend } from "@/http/v1/pay/custodial/send.ts";
 import { handlePostCustodialLogin } from "@/http/v1/pay/custodial/login.ts";
 import { handlePostCustodialRegister } from "@/http/v1/pay/custodial/register.ts";
-import { handlePostSimulateKyc } from "@/http/v1/pay/demo/simulate-kyc.ts";
 import { handleGetEscrowSummary } from "@/http/v1/pay/escrow/summary.ts";
 import { handlePostReport } from "@/http/v1/pay/report/post.ts";
 import type { Logger } from "@/utils/logger/index.ts";
-import { loadOptionalEnv } from "@/utils/env/loadEnv.ts";
 
 export function buildPayRouter(deps: { log: Logger }): Router {
-  const log = deps.log.scope("pay.routes");
   const payRouter = new Router();
 
   // --- Public auth endpoints (no JWT) ---
@@ -57,23 +54,6 @@ export function buildPayRouter(deps: { log: Logger }): Router {
     handleGetEscrowSummary(deps),
   );
   payRouter.post("/pay/report", jwtMiddleware(deps), handlePostReport(deps));
-
-  // --- Demo endpoints (local/standalone only) ---
-  const networkEnv = loadOptionalEnv("NETWORK") ?? "";
-  const demoEnabled = loadOptionalEnv("PAY_DEMO_ENABLED") === "true";
-  if (networkEnv === "local" || networkEnv === "standalone" || demoEnabled) {
-    log.debug("network", networkEnv);
-    log.debug("demoEnabled", demoEnabled);
-    log.event("pay demo routes enabled");
-    payRouter.post(
-      "/pay/demo/simulate-kyc",
-      jwtMiddleware(deps),
-      handlePostSimulateKyc(deps),
-    );
-  } else {
-    log.debug("network", networkEnv);
-    log.event("pay demo routes disabled (non-local network)");
-  }
 
   return payRouter;
 }
