@@ -193,12 +193,6 @@ for these in the app code. Enable by setting `OTEL_DENO=true`.
 | --------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `DISCORD_WEBHOOK_URL` | no       | unset   | Discord webhook fired (best-effort, non-blocking) when a wallet posts to `POST /api/v1/waitlist`. Unset = no notification. |
 
-### Internal (do not set as a self-hoster)
-
-`PAY_DEMO_ENABLED` opens `POST /api/v1/pay/demo/simulate-kyc` on non-local
-`NETWORK`s. Self-hosters should leave it unset; it exists only for internal
-testnet/dev environments.
-
 ## Initial setup
 
 This walks the platform through "fresh deploy" to "operator can submit bundles
@@ -393,11 +387,6 @@ OTEL OTLP exporter is opt-in via `OTEL_DENO=true`. Point
   submission (and promotes pending → approved if the wallet's account already
   exists). There is no operator approval step. Operators uncomfortable with this
   should not run this platform.
-
-- **`/api/v1/pay/demo/*` is internal.** The demo simulate-KYC endpoint is
-  registered only when `NETWORK=local` or `NETWORK=standalone`. Self-hosters
-  should not set `PAY_DEMO_ENABLED=true`; the variable exists for our
-  testnet/dev environments and is not a supported operator surface.
 
 - **Legacy `/api/v1/dashboard/...` per-PP paths return 410 Gone** with the new
   URL-scoped equivalent in the body. They are a temporary migration aid and will
