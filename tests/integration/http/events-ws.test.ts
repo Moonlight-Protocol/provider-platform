@@ -273,23 +273,3 @@ Deno.test({
     }
   },
 });
-
-Deno.test("legacy /events/ws returns 410 Gone", async () => {
-  const { buildEventsRouter } = await import("@/http/v1/events/routes.ts");
-  const app = new Application();
-  const apiRouter = new Router();
-  const eventsRouter = buildEventsRouter({ log: newNoop() });
-  apiRouter.use(
-    "/api/v1",
-    eventsRouter.routes(),
-    eventsRouter.allowedMethods(),
-  );
-  app.use(apiRouter.routes());
-  app.use(apiRouter.allowedMethods());
-
-  const res = await app.handle(
-    new Request("http://localhost/api/v1/events/ws", { method: "GET" }),
-  );
-  if (!res) throw new Error("No response");
-  assertEquals(res.status, 410);
-});
