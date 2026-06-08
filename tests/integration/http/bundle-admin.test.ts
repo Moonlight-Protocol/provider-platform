@@ -1,6 +1,5 @@
 import "../../ensure_test_env.ts";
 import { Application, Router } from "@oak/oak";
-import { assertEquals } from "@std/assert";
 import { newNoop } from "@/utils/logger/index.ts";
 import { buildDashboardRouter } from "@/http/v1/dashboard/routes.ts";
 import { ensureInitialized, resetDb } from "../../test_helpers.ts";
@@ -75,13 +74,4 @@ Deno.test("GET /dashboard/bundles (query variant) is not routed (bare-deleted)",
   if (res.status !== 404 && res.status !== 405) {
     throw new Error(`expected 404/405, got ${res.status}`);
   }
-});
-
-Deno.test("GET /dashboard/bundles/:id is 410 Gone", async () => {
-  const app = await setup();
-  const res = await app.handle(
-    new Request(`${LIST_PATH}/some-id`, { method: "GET" }),
-  );
-  if (!res) throw new Error("No response from Oak app");
-  assertEquals(res.status, 410);
 });

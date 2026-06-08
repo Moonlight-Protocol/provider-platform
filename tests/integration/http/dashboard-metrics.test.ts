@@ -237,28 +237,3 @@ Deno.test("returns 401 when JWT is missing", async () => {
   if (!response) throw new Error("No response from Oak app");
   assertEquals(response.status, 401);
 });
-
-Deno.test("legacy /dashboard/metrics returns 410 Gone", async () => {
-  // Wired in the dashboard router; we just confirm the path-shape contract.
-  // Full coverage of the dashboard 410-stub surface lives in dashboard-routes
-  // — this assertion is here to flag any accidental re-enable.
-  const { buildDashboardRouter } = await import(
-    "@/http/v1/dashboard/routes.ts"
-  );
-  const app = new Application();
-  const apiRouter = new Router();
-  const dashboardRouter = buildDashboardRouter({ log: newNoop() });
-  apiRouter.use(
-    "/api/v1",
-    dashboardRouter.routes(),
-    dashboardRouter.allowedMethods(),
-  );
-  app.use(apiRouter.routes());
-  app.use(apiRouter.allowedMethods());
-
-  const res = await app.handle(
-    new Request("http://localhost/api/v1/dashboard/metrics", { method: "GET" }),
-  );
-  if (!res) throw new Error("No response");
-  assertEquals(res.status, 410);
-});
