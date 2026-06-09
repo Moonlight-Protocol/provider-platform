@@ -139,9 +139,16 @@ export function handleEventsWs(
 
     const listener = (event: ProviderEvent) => {
       if (event.scope.ppPublicKey !== boundPpPublicKey) return;
-      if (socket.readyState !== WebSocket.OPEN) return;
+      if (socket.readyState !== WebSocket.OPEN) {
+        log.debug("kind", event.kind);
+        log.debug("readyState", socket.readyState);
+        log.event("event dropped: WS not OPEN");
+        return;
+      }
       try {
         socket.send(JSON.stringify(event));
+        log.debug("kind", event.kind);
+        log.event("event sent to WS");
       } catch (error) {
         log.debug("kind", event.kind);
         log.error(error, "failed to send event over WS");
