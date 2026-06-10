@@ -4,7 +4,7 @@ import { assert, assertEquals } from "@std/assert";
 import { newNoop } from "@/utils/logger/index.ts";
 import generateJwt from "@/core/service/auth/generate-jwt.ts";
 import { EVENTS_WS_SUBPROTOCOL } from "@/http/v1/events/ws-handler.ts";
-import { getEventBus } from "@/core/service/events/event-bus.ts";
+import { getEventBus } from "@/core/service/events/pg-notify-event-bus.ts";
 import type { ProviderEvent } from "@/core/service/events/event.types.ts";
 import { buildProvidersRouter } from "@/http/v1/providers/routes.ts";
 import {

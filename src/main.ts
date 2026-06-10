@@ -7,8 +7,13 @@ import { traceContextMiddleware } from "@/http/middleware/trace-context.ts";
 import { corsMiddleware } from "@/http/middleware/cors.ts";
 import { PORT } from "@/config/env.ts";
 import { createLogger } from "@/config/logger.ts";
-import { getEventBus } from "@/core/service/events/event-bus.ts";
+import {
+  getEventBus,
+  PROVIDER_EVENTS_CHANNEL,
+} from "@/core/service/events/pg-notify-event-bus.ts";
+import { startPgListener } from "@/core/service/events/pg-listener.ts";
 import { getSessionManager } from "@/core/service/auth/sessions/in-memory-session-manager.ts";
+import { pgClient } from "@/persistence/drizzle/config.ts";
 import {
   initializeMempoolSystem,
   shutdownMempoolSystem,
@@ -26,10 +31,21 @@ async function bootstrap() {
   const deps = { log: rootLog };
 
   // Initialize lazy singletons that depend on the root logger.
-  getEventBus(deps);
+  const eventBus = getEventBus(deps);
   getSessionManager(deps);
 
+  let stopPgListener: (() => Promise<void>) | null = null;
+
   try {
+    // Wire the cross-machine event transport BEFORE anything emits. Order
+    // matters: pgListener must be subscribed first so the very first emit
+    // round-trips successfully, then setSql flips the bus from loopback to
+    // NOTIFY mode.
+    stopPgListener = await startPgListener({ log: rootLog, bus: eventBus });
+    eventBus.setNotifier((payload) =>
+      pgClient.notify(PROVIDER_EVENTS_CHANNEL, payload)
+    );
+
     await initializeMempoolSystem(deps);
     await startEventWatcher(deps);
 
@@ -50,6 +66,7 @@ async function bootstrap() {
       Promise.all([
         stopEventWatcher(),
         shutdownMempoolSystem(deps),
+        stopPgListener ? stopPgListener() : Promise.resolve(),
       ]).finally(() => Deno.exit(0));
     };
 
@@ -62,6 +79,7 @@ async function bootstrap() {
     Promise.all([
       stopEventWatcher(),
       shutdownMempoolSystem(deps),
+      stopPgListener ? stopPgListener() : Promise.resolve(),
     ]).finally(() => Deno.exit(1));
   }
 }

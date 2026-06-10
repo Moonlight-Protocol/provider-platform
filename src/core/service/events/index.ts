@@ -1,4 +1,12 @@
-export { EventBus, type EventListener, getEventBus } from "./event-bus.ts";
+export {
+  type EventListener,
+  getEventBus,
+  MAX_NOTIFY_PAYLOAD_BYTES,
+  PgNotifyEventBus,
+  PROVIDER_EVENTS_CHANNEL,
+  resetEventBusForTests,
+} from "./pg-notify-event-bus.ts";
+export { startPgListener } from "./pg-listener.ts";
 export {
   emitForAllPps,
   emitForBundles,
