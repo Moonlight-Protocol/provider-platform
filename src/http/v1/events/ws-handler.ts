@@ -5,7 +5,7 @@ import { SERVICE_AUTH_SECRET_AS_CRYPTO_KEY } from "@/core/service/auth/service/s
 import type { JwtPayload } from "@/core/service/auth/generate-jwt.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
-import { getEventBus } from "@/core/service/events/event-bus.ts";
+import { getEventBus } from "@/core/service/events/pg-notify-event-bus.ts";
 import type { ProviderEvent } from "@/core/service/events/event.types.ts";
 
 export const EVENTS_WS_SUBPROTOCOL = "moonlight.events.v1";

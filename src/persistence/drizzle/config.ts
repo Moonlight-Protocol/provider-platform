@@ -12,5 +12,6 @@ const drizzleClient = drizzle({
 });
 
 export type DrizzleClient = typeof drizzleClient;
+export type PgClient = typeof client;
 
-export { drizzleClient };
+export { client as pgClient, drizzleClient };

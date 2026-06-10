@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import type { Logger } from "@/utils/logger/index.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
-import { getEventBus } from "@/core/service/events/event-bus.ts";
+import { getEventBus } from "@/core/service/events/pg-notify-event-bus.ts";
 import {
   resolveAllPpScopes,
   resolveScopeForPp,
