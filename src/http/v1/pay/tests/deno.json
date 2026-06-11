@@ -9,6 +9,7 @@
     "@/persistence/drizzle/config.ts": "./pglite_db.ts",
     "@/config/logger.ts": "./mock_logger.ts",
     "@/core/service/auth/generate-jwt.ts": "./mock_jwt.ts",
+    "@/core/service/auth/service/service-auth-secret.ts": "./mock_service_auth_secret.ts",
     "@/core/service/pay/channel.service.ts": "./mock_channel_service.ts",
     "@/core/service/executor/channel-resolver.ts": "./mock_channel_resolver.ts",
 
