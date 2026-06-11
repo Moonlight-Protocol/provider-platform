@@ -61,6 +61,23 @@ export const P_AttachEntityStatus = (deps: { log: Logger }) =>
           accountPubkey,
         );
         const entityStatus = approval?.status ?? EntityStatus.UNVERIFIED;
+
+        // Record the interaction so unauthorized pubkeys (no row, or an
+        // existing UNVERIFIED row) become visible to the operator. Skip the
+        // write for APPROVED/PENDING/BLOCKED entities re-connecting — the
+        // upsert would no-op anyway, but there is no reason to touch their row.
+        // Best-effort: a write failure must never break the auth response.
+        if (!approval || approval.status === EntityStatus.UNVERIFIED) {
+          try {
+            await ppEntityApprovalRepository.recordInteraction(
+              ppPublicKey,
+              accountPubkey,
+            );
+          } catch (err) {
+            log.error(err, "failed to record entity interaction (connect)");
+          }
+        }
+
         span.addEvent("entity_status_attached", {
           "entity.status": entityStatus,
           "pp.has_kyc_url": String(kycSubmissionUrl !== null),

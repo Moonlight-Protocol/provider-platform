@@ -29,6 +29,7 @@ import {
 import { handleEventsWs } from "@/http/v1/events/ws-handler.ts";
 import { handlePostEntity } from "@/http/v1/entities/post.ts";
 import { handlePostEntityChallenge } from "@/http/v1/entities/challenge.ts";
+import { handleGetEntities } from "@/http/v1/entities/get.ts";
 
 /**
  * /api/v1/providers/:ppPublicKey/...
@@ -124,6 +125,13 @@ export function buildProvidersRouter(deps: { log: Logger }): Router {
     "/providers/:ppPublicKey/metrics",
     ...op(),
     handleGetMetrics(deps),
+  );
+
+  // --- Entities that have interacted with this PP (operator view) ---
+  router.get(
+    "/providers/:ppPublicKey/entities",
+    ...op(),
+    handleGetEntities(deps),
   );
 
   // --- Council membership lifecycle ---

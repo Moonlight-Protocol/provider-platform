@@ -299,6 +299,23 @@ function createSlotBundle(
   };
 }
 
+/**
+ * Best-effort record that a known pubkey hit the bundle-submit 403 gate, so the
+ * unauthorized submitter becomes visible to the operator. Never throws — the
+ * 403 rejection must still fire regardless of whether this write succeeds.
+ */
+async function recordRejectedSubmitter(
+  ppPublicKey: string,
+  accountPubkey: string,
+  log: Logger,
+): Promise<void> {
+  try {
+    await ppApprovalRepository.recordInteraction(ppPublicKey, accountPubkey);
+  } catch (err) {
+    log.error(err, "failed to record rejected submitter interaction");
+  }
+}
+
 // ========== MAIN PROCESS ==========
 
 export const P_AddOperationsBundle = (deps: { log: Logger }) =>
@@ -352,6 +369,11 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
         );
         if (!submitterAccount) {
           log.event("submitter has no account; reject");
+          await recordRejectedSubmitter(
+            ppPublicKey,
+            userSession.accountId,
+            log,
+          );
           throw new E.SUBMITTER_NOT_APPROVED(userSession.accountId);
         }
         const approval = await ppApprovalRepository.findByPpAndAccount(
@@ -360,6 +382,11 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
         );
         if (!approval || approval.status !== EntityStatus.APPROVED) {
           log.event("submitter entity not approved for this PP");
+          await recordRejectedSubmitter(
+            ppPublicKey,
+            userSession.accountId,
+            log,
+          );
           throw new E.SUBMITTER_NOT_APPROVED(userSession.accountId);
         }
         // Identity (name / jurisdictions) still lives on the global entity

@@ -5,10 +5,11 @@
   "exports": "./src/main.ts",
   "tasks": {
     "serve": "deno run --allow-all --unstable-kv src/main.ts",
-    "test": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/ && deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
+    "test": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests,src/http/v1/entities/tests src/ && deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/ && deno test --allow-all --no-check --config src/http/v1/entities/tests/deno.json src/http/v1/entities/tests/",
     "test:integration": "deno test --allow-all --no-check --config tests/deno.json tests/",
-    "test:unit": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests src/",
+    "test:unit": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests,src/http/v1/entities/tests src/",
     "test:pay": "deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/",
+    "test:entities": "deno test --allow-all --no-check --config src/http/v1/entities/tests/deno.json src/http/v1/entities/tests/",
     "db:generate": "deno run --env -A --node-modules-dir npm:drizzle-kit generate",
     "db:migrate": "deno run --env -A --node-modules-dir npm:drizzle-kit migrate",
     "db:push": "deno run --env -A --node-modules-dir npm:drizzle-kit push",
@@ -47,7 +48,8 @@
   },
   "test": {
     "exclude": [
-      "src/http/v1/pay/tests/"
+      "src/http/v1/pay/tests/",
+      "src/http/v1/entities/tests/"
     ]
   },
   "deploy": {
