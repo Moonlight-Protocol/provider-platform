@@ -1001,7 +1001,7 @@
     "dependencies": [
       "jsr:@colibri/core@~0.20.2",
       "jsr:@fifo/convee@0.10",
-      "jsr:@moonlight/moonlight-sdk@0.8",
+      "jsr:@moonlight/moonlight-sdk@~0.9.1",
       "jsr:@noble/curves@^1.8.0",
       "jsr:@noble/hashes@^1.6.1",
       "jsr:@oak/oak@^17.1.4",

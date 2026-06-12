@@ -36,7 +36,7 @@
     "postgres": "npm:postgres@^3.4.7",
     "@noble/curves": "jsr:@noble/curves@^1.8.0",
     "@noble/hashes": "jsr:@noble/hashes@^1.6.1",
-    "stellar-sdk": "npm:@stellar/stellar-sdk@^15.0.1",
+    "stellar-sdk": "npm:@stellar/stellar-sdk@^15.1.0",
     "buffer": "npm:buffer@^6.0.3",
     "asn1js": "npm:asn1js@3.0.5",
     "@oak/oak": "jsr:@oak/oak@^17.1.4",
