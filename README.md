@@ -33,7 +33,7 @@ erDiagram
 - **Deno 2.7.9** runtime (pinned in `Dockerfile`; CI uses `v2.x`).
 - **PostgreSQL 18** (image `postgres:18` in `docker-compose.yml`).
 - **Stellar SDK** `@stellar/stellar-sdk@^15.0.1` and
-  `@moonlight/moonlight-sdk@^0.8.0` for Soroban contract calls and bundle
+  `@moonlight/moonlight-sdk@^0.9.1` for Soroban contract calls and bundle
   construction.
 - **Oak** for HTTP, **Drizzle** for ORM/migrations, **Zod** for body validation.
 - **OpenTelemetry** OTLP (optional, opt-in via `OTEL_DENO=true`).
