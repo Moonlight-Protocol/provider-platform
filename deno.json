@@ -24,7 +24,7 @@
   "nodeModulesDir": "auto",
   "imports": {
     "@/": "./src/",
-    "@colibri/core": "jsr:@colibri/core@^0.20.2",
+    "@colibri/core": "jsr:@colibri/core@^0.22.0",
     "@drizzle-team/brocli": "npm:@drizzle-team/brocli@^0.11.0",
     "@fifo/convee": "jsr:@fifo/convee@^0.10.0",
     "@moonlight/moonlight-sdk": "jsr:@moonlight/moonlight-sdk@^0.9.1",
