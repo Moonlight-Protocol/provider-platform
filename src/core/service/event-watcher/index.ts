@@ -1,6 +1,10 @@
 import { CHALLENGE_TTL, EVENT_WATCHER_INTERVAL_MS } from "@/config/env.ts";
 import { EventWatcher } from "./event-watcher.process.ts";
 import { ChannelRegistry } from "./channel-registry.ts";
+import {
+  fetchCouncilConfig,
+  reconcileChannelStatuses,
+} from "./channel-convergence.ts";
 import { setChallengeTtlMs } from "@/core/service/auth/dashboard-auth.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
@@ -130,50 +134,6 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
   log.event("started event watcher for council");
 }
 
-interface CouncilConfigData {
-  council?: { name?: string; channelAuthId?: string };
-  channels?: Array<{ channelContractId?: string; status?: string }>;
-}
-
-/**
- * Fetch a council's current public state. Best-effort: returns null on any
- * network/parse error so callers degrade gracefully.
- */
-async function fetchCouncilConfig(
-  councilUrl: string,
-  channelAuthId: string,
-): Promise<CouncilConfigData | null> {
-  try {
-    const res = await fetch(
-      `${councilUrl}/api/v1/public/council?councilId=${
-        encodeURIComponent(channelAuthId)
-      }`,
-    );
-    if (!res.ok) return null;
-    const { data } = await res.json();
-    return data as CouncilConfigData;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Reconcile the registry's asset-channel statuses from a council config. A
- * channel with status "disabled" becomes withdraw-only; anything else (or a
- * missing status, for backward compatibility) is full service.
- */
-async function applyChannelStatusesFromConfig(
-  data: CouncilConfigData,
-): Promise<void> {
-  for (const ch of data.channels ?? []) {
-    if (!ch?.channelContractId) continue;
-    await channelRegistry.applyChannelState(
-      ch.channelContractId,
-      ch.status !== "disabled",
-    );
-  }
-}
-
 /**
  * Boot convergence: query every active membership's council once and reconcile
  * asset-channel statuses. Events are the live delta; this query is the
@@ -194,7 +154,7 @@ async function convergeChannelStatusesOnBoot(): Promise<void> {
         membership.councilUrl,
         membership.channelAuthId,
       );
-      if (data) await applyChannelStatusesFromConfig(data);
+      if (data) await reconcileChannelStatuses(channelRegistry, data);
     }
     log.debug("councils", seen.size);
     log.event("asset-channel statuses converged from council queries");
@@ -221,7 +181,7 @@ async function convergeChannelStatusesForCouncil(
         channelAuthId,
       );
       if (data) {
-        await applyChannelStatusesFromConfig(data);
+        await reconcileChannelStatuses(channelRegistry, data);
         log.debug("channelAuthId", channelAuthId);
         log.event("asset-channel statuses re-queried after out-of-retention");
       }
@@ -255,7 +215,7 @@ async function activateMembership(
       councilName = data.council?.name ?? councilName;
       // Seed asset-channel statuses so the withdraw-only gate is correct from
       // the moment membership activates (convergence-by-query).
-      await applyChannelStatusesFromConfig(data);
+      await reconcileChannelStatuses(channelRegistry, data);
     }
 
     await membershipRepo.update(membership.id, {
