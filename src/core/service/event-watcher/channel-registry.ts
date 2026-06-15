@@ -7,8 +7,11 @@ import type { ChannelAuthEvent } from "./event-watcher.types.ts";
  * - `active`: registered on-chain AND configured in this instance
  * - `pending`: registered on-chain but NOT yet configured
  * - `inactive`: was configured but no longer registered on-chain
+ * - `disabled`: the council disabled this asset channel on-chain. Distinct from
+ *   pending/inactive: the PP IS a member and serves it, but in withdraw-only
+ *   mode (new deposits/sends rejected). Re-enable returns it to `active`.
  */
-export type ChannelState = "active" | "pending" | "inactive";
+export type ChannelState = "active" | "pending" | "inactive" | "disabled";
 
 export interface ChannelRecord {
   /** Channel Auth contract ID */
@@ -109,12 +112,64 @@ export class ChannelRegistry {
       case "provider_removed":
         await this.onProviderRemoved(event);
         break;
+      case "channel_state_changed":
+        await this.applyChannelState(
+          event.channel ?? event.address,
+          event.enabled ?? true,
+          event.ledger,
+        );
+        break;
       case "contract_initialized":
         this.log.debug("contractId", event.contractId);
         this.log.debug("admin", event.address);
         this.log.event("Channel Auth contract initialized");
         break;
     }
+  }
+
+  /**
+   * Apply the council's confirmed asset-channel lifecycle decision. Keyed by the
+   * PRIVACY-CHANNEL contract id (the asset channel), distinct from the
+   * channel-auth membership records. Driven by `channel_state_changed` events
+   * (live deltas) and by convergence-from-query on boot / out-of-retention.
+   *
+   * `enabled=false` → `disabled` (withdraw-only, enforced at bundle accept).
+   * `enabled=true` → `active` (full service resumes). Idempotent: re-applying
+   * the same state is a no-op.
+   */
+  async applyChannelState(
+    channelContractId: string,
+    enabled: boolean,
+    ledger = 0,
+  ): Promise<void> {
+    this.log.info("applyChannelState");
+    this.log.debug("channelContractId", channelContractId);
+    this.log.debug("enabled", enabled);
+    const nextState: ChannelState = enabled ? "active" : "disabled";
+
+    const existing = this.channels.get(channelContractId);
+    if (existing && existing.state === nextState) return;
+
+    this.channels.set(channelContractId, {
+      contractId: channelContractId,
+      state: nextState,
+      registeredAtLedger: existing?.registeredAtLedger ?? ledger,
+      removedAtLedger: existing?.removedAtLedger,
+    });
+    this.log.debug("state", nextState);
+    this.log.event(
+      enabled ? "asset channel enabled" : "asset channel disabled",
+    );
+    await this.persist();
+  }
+
+  /**
+   * Whether an asset channel is currently disabled (withdraw-only). Unknown
+   * channels are treated as NOT disabled — the gate fails open to full service,
+   * so only an explicit on-chain disable restricts a channel.
+   */
+  isDisabled(channelContractId: string): boolean {
+    return this.channels.get(channelContractId)?.state === "disabled";
   }
 
   private async onProviderAdded(event: ChannelAuthEvent): Promise<void> {

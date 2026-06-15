@@ -12,6 +12,26 @@ function cursorKvKey(contractId: string): Deno.KvKey {
 }
 
 export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
+export type ResyncHandler = () => void | Promise<void>;
+
+/**
+ * Detect the Stellar RPC "startLedger out of retention" condition. When the
+ * persisted cursor predates the RPC's retention window, getEvents fails and we
+ * must reset the cursor and reconcile state via a council query instead.
+ */
+function isOutOfRetentionError(error: unknown): boolean {
+  const msg = (error instanceof Error ? error.message : String(error))
+    .toLowerCase();
+  return (
+    msg.includes("startledger") ||
+    (msg.includes("ledger") &&
+      (msg.includes("retention") ||
+        msg.includes("oldest") ||
+        msg.includes("before") ||
+        msg.includes("out of range") ||
+        msg.includes("not within")))
+  );
+}
 
 /**
  * EventWatcher polls Stellar RPC for Channel Auth contract events
@@ -32,6 +52,7 @@ export class EventWatcher {
   private lastLedger: number | null = null;
   private config: EventWatcherConfig;
   private handlers: EventHandler[] = [];
+  private resyncHandlers: ResyncHandler[] = [];
   private kv: Deno.Kv | null = null;
   private log: Logger;
 
@@ -51,6 +72,14 @@ export class EventWatcher {
    */
   onEvent(handler: EventHandler): void {
     this.handlers.push(handler);
+  }
+
+  /**
+   * Register a handler invoked when the watcher recovers from an out-of-retention
+   * cursor — the cue to reconcile state via a council query.
+   */
+  onResync(handler: ResyncHandler): void {
+    this.resyncHandlers.push(handler);
   }
 
   /**
@@ -174,9 +203,48 @@ export class EventWatcher {
             ? error.message
             : String(error),
         });
+
+        if (isOutOfRetentionError(error)) {
+          // Cursor predates RPC retention: events between the cursor and the
+          // current ledger are unrecoverable from RPC. Jump the cursor to the
+          // latest ledger and reconcile missed state via a council query.
+          span.addEvent("out_of_retention_recovery");
+          this.log.event("EventWatcher cursor out of retention; recovering");
+          try {
+            const latest = await NETWORK_RPC_SERVER.getLatestLedger();
+            this.lastLedger = latest.sequence + 1;
+            if (this.kv) {
+              await this.kv.set(
+                cursorKvKey(this.config.contractId),
+                this.lastLedger,
+              );
+            }
+            await this.fireResync();
+          } catch (recoveryError) {
+            this.log.error(
+              recoveryError,
+              "EventWatcher out-of-retention recovery failed",
+            );
+          }
+          return;
+        }
+
         this.log.error(error, "EventWatcher poll error");
       }
     });
+  }
+
+  /**
+   * Invoke all registered resync handlers (best-effort, isolated failures).
+   */
+  private async fireResync(): Promise<void> {
+    for (const handler of this.resyncHandlers) {
+      try {
+        await handler();
+      } catch (error) {
+        this.log.error(error, "EventWatcher resync handler error");
+      }
+    }
   }
 
   /**

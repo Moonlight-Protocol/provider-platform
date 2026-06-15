@@ -61,7 +61,22 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
     intervalMs: EVENT_WATCHER_INTERVAL_MS,
   }, { log: watcherLog! });
 
+  // Re-query the council and reconcile asset-channel statuses when the event
+  // cursor falls out of Stellar RPC retention (events may have been missed; the
+  // query can't be). This is the can't-miss convergence path.
+  watcher.onResync(async () => {
+    await convergeChannelStatusesForCouncil(channelAuthId);
+  });
+
   watcher.onEvent(async (event) => {
+    // Asset-channel lifecycle events are council-scoped, not provider-scoped —
+    // handle them regardless of which provider address appears, so a disable
+    // immediately drives the withdraw-only gate.
+    if (event.type === "channel_state_changed") {
+      await channelRegistry.handleEvent(event);
+      return;
+    }
+
     if (
       registeredProviders.has(event.address) ||
       event.type === "contract_initialized"
@@ -115,6 +130,108 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
   log.event("started event watcher for council");
 }
 
+interface CouncilConfigData {
+  council?: { name?: string; channelAuthId?: string };
+  channels?: Array<{ channelContractId?: string; status?: string }>;
+}
+
+/**
+ * Fetch a council's current public state. Best-effort: returns null on any
+ * network/parse error so callers degrade gracefully.
+ */
+async function fetchCouncilConfig(
+  councilUrl: string,
+  channelAuthId: string,
+): Promise<CouncilConfigData | null> {
+  try {
+    const res = await fetch(
+      `${councilUrl}/api/v1/public/council?councilId=${
+        encodeURIComponent(channelAuthId)
+      }`,
+    );
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    return data as CouncilConfigData;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reconcile the registry's asset-channel statuses from a council config. A
+ * channel with status "disabled" becomes withdraw-only; anything else (or a
+ * missing status, for backward compatibility) is full service.
+ */
+async function applyChannelStatusesFromConfig(
+  data: CouncilConfigData,
+): Promise<void> {
+  for (const ch of data.channels ?? []) {
+    if (!ch?.channelContractId) continue;
+    await channelRegistry.applyChannelState(
+      ch.channelContractId,
+      ch.status !== "disabled",
+    );
+  }
+}
+
+/**
+ * Boot convergence: query every active membership's council once and reconcile
+ * asset-channel statuses. Events are the live delta; this query is the
+ * can't-miss baseline so a disable that happened while we were down is applied.
+ */
+async function convergeChannelStatusesOnBoot(): Promise<void> {
+  const log = watcherLog!.scope("convergeChannelStatuses");
+  const seen = new Set<string>();
+  try {
+    const pps = await ppRepo.listAll();
+    for (const pp of pps) {
+      const membership = await membershipRepo.getActiveForPp(pp.publicKey);
+      if (!membership?.channelAuthId) continue;
+      const key = `${membership.councilUrl}|${membership.channelAuthId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const data = await fetchCouncilConfig(
+        membership.councilUrl,
+        membership.channelAuthId,
+      );
+      if (data) await applyChannelStatusesFromConfig(data);
+    }
+    log.debug("councils", seen.size);
+    log.event("asset-channel statuses converged from council queries");
+  } catch (err) {
+    log.error(err, "failed to converge channel statuses on boot");
+  }
+}
+
+/**
+ * Re-query a single council and reconcile its asset-channel statuses. Used on
+ * out-of-retention recovery for that council's watcher.
+ */
+async function convergeChannelStatusesForCouncil(
+  channelAuthId: string,
+): Promise<void> {
+  const log = watcherLog!.scope("convergeChannelStatuses");
+  try {
+    const pps = await ppRepo.listAll();
+    for (const pp of pps) {
+      const membership = await membershipRepo.getActiveForPp(pp.publicKey);
+      if (membership?.channelAuthId !== channelAuthId) continue;
+      const data = await fetchCouncilConfig(
+        membership.councilUrl,
+        channelAuthId,
+      );
+      if (data) {
+        await applyChannelStatusesFromConfig(data);
+        log.debug("channelAuthId", channelAuthId);
+        log.event("asset-channel statuses re-queried after out-of-retention");
+      }
+      return;
+    }
+  } catch (err) {
+    log.error(err, "failed to converge channel statuses for council");
+  }
+}
+
 async function activateMembership(
   ppPublicKey: string,
   channelAuthId: string,
@@ -132,18 +249,14 @@ async function activateMembership(
 
     let configJson: string | null = null;
     let councilName = membership.councilName;
-    try {
-      const res = await fetch(
-        `${membership.councilUrl}/api/v1/public/council?councilId=${
-          encodeURIComponent(channelAuthId)
-        }`,
-      );
-      if (res.ok) {
-        const { data } = await res.json();
-        configJson = JSON.stringify(data);
-        councilName = data.council?.name ?? councilName;
-      }
-    } catch { /* best effort */ }
+    const data = await fetchCouncilConfig(membership.councilUrl, channelAuthId);
+    if (data) {
+      configJson = JSON.stringify(data);
+      councilName = data.council?.name ?? councilName;
+      // Seed asset-channel statuses so the withdraw-only gate is correct from
+      // the moment membership activates (convergence-by-query).
+      await applyChannelStatusesFromConfig(data);
+    }
 
     await membershipRepo.update(membership.id, {
       status: CouncilMembershipStatus.ACTIVE,
@@ -230,6 +343,9 @@ export async function startEventWatcher(deps: { log: Logger }): Promise<void> {
   const log = watcherLog.scope("startEventWatcher");
   log.info("startEventWatcher");
   await initFromDb();
+  // Converge asset-channel statuses by querying the council(s) — applies any
+  // disable/enable that happened while this provider was down.
+  await convergeChannelStatusesOnBoot();
   if (activeWatchers.size === 0) {
     log.event("no active council memberships — no event watchers started");
   }

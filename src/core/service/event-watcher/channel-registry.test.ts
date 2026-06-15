@@ -93,3 +93,72 @@ Deno.test("ChannelRegistry - contract_initialized does not create channel record
 
   assertEquals(registry.getAll().length, 0);
 });
+
+// --- Asset-channel lifecycle (channel_state_changed) ---
+
+const PRIVACY_CHANNEL =
+  "CCHANNELAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4";
+const ASSET = "CASSETAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M";
+
+function makeStateEvent(
+  channel: string,
+  asset: string,
+  enabled: boolean,
+  ledger: number,
+): ChannelAuthEvent {
+  return {
+    type: "channel_state_changed",
+    address: channel,
+    channel,
+    asset,
+    enabled,
+    contractId: CONTRACT_A,
+    ledger,
+  };
+}
+
+Deno.test("ChannelRegistry - channel_state_changed disabled → disabled state", async () => {
+  const registry = new ChannelRegistry([], { log: newNoop() });
+  await registry.handleEvent(
+    makeStateEvent(PRIVACY_CHANNEL, ASSET, false, 300),
+  );
+
+  assertEquals(registry.get(PRIVACY_CHANNEL)?.state, "disabled");
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), true);
+});
+
+Deno.test("ChannelRegistry - re-enable returns channel to active", async () => {
+  const registry = new ChannelRegistry([], { log: newNoop() });
+  await registry.handleEvent(
+    makeStateEvent(PRIVACY_CHANNEL, ASSET, false, 300),
+  );
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), true);
+
+  await registry.handleEvent(makeStateEvent(PRIVACY_CHANNEL, ASSET, true, 310));
+  assertEquals(registry.get(PRIVACY_CHANNEL)?.state, "active");
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), false);
+});
+
+Deno.test("ChannelRegistry - isDisabled is false for unknown channel (fail open)", () => {
+  const registry = new ChannelRegistry([], { log: newNoop() });
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), false);
+});
+
+Deno.test("ChannelRegistry - applyChannelState converges from query", async () => {
+  const registry = new ChannelRegistry([], { log: newNoop() });
+  // Simulates boot/out-of-retention convergence from the council query.
+  await registry.applyChannelState(PRIVACY_CHANNEL, false);
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), true);
+
+  await registry.applyChannelState(PRIVACY_CHANNEL, true);
+  assertEquals(registry.isDisabled(PRIVACY_CHANNEL), false);
+});
+
+Deno.test("ChannelRegistry - getByState includes disabled", async () => {
+  const registry = new ChannelRegistry([], { log: newNoop() });
+  await registry.handleEvent(
+    makeStateEvent(PRIVACY_CHANNEL, ASSET, false, 300),
+  );
+
+  assertEquals(registry.getByState("disabled").length, 1);
+});

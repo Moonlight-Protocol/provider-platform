@@ -55,6 +55,7 @@ export function handleGetChannels(
           active: channels.filter((c) => c.state === "active").length,
           pending: channels.filter((c) => c.state === "pending").length,
           inactive: channels.filter((c) => c.state === "inactive").length,
+          disabled: channels.filter((c) => c.state === "disabled").length,
         },
       },
     };

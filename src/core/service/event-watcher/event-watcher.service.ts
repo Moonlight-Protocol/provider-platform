@@ -1,5 +1,5 @@
 import type { Server } from "stellar-sdk/rpc";
-import { Address, type xdr } from "stellar-sdk";
+import { Address, scValToNative, type xdr } from "stellar-sdk";
 import { withSpan } from "@/core/tracing.ts";
 import type {
   ChannelAuthEvent,
@@ -11,6 +11,7 @@ const KNOWN_TOPICS: Record<string, ChannelAuthEventType> = {
   contract_initialized: "contract_initialized",
   provider_added: "provider_added",
   provider_removed: "provider_removed",
+  channel_state_changed: "channel_state_changed",
 };
 
 /**
@@ -81,6 +82,27 @@ export function fetchChannelAuthEvents(
         if (!topicSymbol || !(topicSymbol in KNOWN_TOPICS)) continue;
 
         const eventType = KNOWN_TOPICS[topicSymbol];
+
+        // ChannelStateChanged carries two address topics (channel, asset) and a
+        // boolean data value (enabled). `address` mirrors the channel so the
+        // shared {type, address, ledger} handler shape still applies.
+        if (eventType === "channel_state_changed") {
+          if (topics.length < 3) continue;
+          const channel = decodeAddress(topics[1]);
+          const asset = decodeAddress(topics[2]);
+          const enabled = Boolean(scValToNative(rawEvent.value));
+          parsed.push({
+            type: eventType,
+            address: channel,
+            channel,
+            asset,
+            enabled,
+            ledger: rawEvent.ledger,
+            contractId,
+          });
+          continue;
+        }
+
         const address = decodeAddress(topics[1]);
 
         parsed.push({
