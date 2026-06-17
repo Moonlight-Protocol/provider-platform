@@ -6,12 +6,14 @@ import type {
   EventWatcherConfig,
 } from "./event-watcher.types.ts";
 import { withSpan } from "@/core/tracing.ts";
+import { recoverFromOutOfRetention } from "./retention.ts";
 
 function cursorKvKey(contractId: string): Deno.KvKey {
   return ["event-watcher", contractId, "lastLedger"];
 }
 
 export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
+export type ResyncHandler = () => void | Promise<void>;
 
 /**
  * EventWatcher polls Stellar RPC for Channel Auth contract events
@@ -32,6 +34,7 @@ export class EventWatcher {
   private lastLedger: number | null = null;
   private config: EventWatcherConfig;
   private handlers: EventHandler[] = [];
+  private resyncHandlers: ResyncHandler[] = [];
   private kv: Deno.Kv | null = null;
   private log: Logger;
 
@@ -51,6 +54,14 @@ export class EventWatcher {
    */
   onEvent(handler: EventHandler): void {
     this.handlers.push(handler);
+  }
+
+  /**
+   * Register a handler invoked when the watcher recovers from an out-of-retention
+   * cursor — the cue to reconcile state via a council query.
+   */
+  onResync(handler: ResyncHandler): void {
+    this.resyncHandlers.push(handler);
   }
 
   /**
@@ -174,9 +185,49 @@ export class EventWatcher {
             ? error.message
             : String(error),
         });
+
+        try {
+          const recoveredCursor = await recoverFromOutOfRetention(
+            error,
+            () => NETWORK_RPC_SERVER.getLatestLedger(),
+            () => this.fireResync(),
+            this.log,
+          );
+          if (recoveredCursor !== null) {
+            span.addEvent("out_of_retention_recovery");
+            this.lastLedger = recoveredCursor;
+            if (this.kv) {
+              await this.kv.set(
+                cursorKvKey(this.config.contractId),
+                this.lastLedger,
+              );
+            }
+            return;
+          }
+        } catch (recoveryError) {
+          this.log.error(
+            recoveryError,
+            "EventWatcher out-of-retention recovery failed",
+          );
+          return;
+        }
+
         this.log.error(error, "EventWatcher poll error");
       }
     });
+  }
+
+  /**
+   * Invoke all registered resync handlers (best-effort, isolated failures).
+   */
+  private async fireResync(): Promise<void> {
+    for (const handler of this.resyncHandlers) {
+      try {
+        await handler();
+      } catch (error) {
+        this.log.error(error, "EventWatcher resync handler error");
+      }
+    }
   }
 
   /**

@@ -17,7 +17,9 @@ import {
   classifyOperations,
   fetchUtxoBalances,
   generateBundleId,
+  isWithdrawOnlyBundle,
 } from "@/core/service/bundle/bundle.service.ts";
+import { channelRegistry } from "@/core/service/event-watcher/index.ts";
 import {
   BUNDLE_MAX_OPERATIONS,
   MEMPOOL_CHEAP_OP_WEIGHT,
@@ -408,6 +410,18 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
         const operations = await parseOperations(operationsMLXDR, deps);
         const classified = classifyOperations(operations);
         validateSpendOperations(classified.spend);
+
+        // Withdraw-only gate: a channel the council has disabled accepts only
+        // withdrawals. New deposits and sends are rejected until re-enabled. The
+        // registry's disabled state is driven by on-chain channel_state_changed
+        // events and converged from the council query on boot/out-of-retention.
+        if (
+          channelRegistry?.isDisabled(channelContractId) &&
+          !isWithdrawOnlyBundle(classified)
+        ) {
+          log.event("rejecting non-withdraw bundle on disabled channel");
+          throw new E.CHANNEL_DISABLED(channelContractId);
+        }
 
         span.addEvent("operations_classified", {
           "operations.create": classified.create.length,

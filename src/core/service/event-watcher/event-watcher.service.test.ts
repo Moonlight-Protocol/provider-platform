@@ -151,6 +151,64 @@ Deno.test("fetchChannelAuthEvents - parses multiple events in order", async () =
   assertEquals(events[2].address, TEST_ADDR_1);
 });
 
+function buildChannelStateEvent(
+  channel: string,
+  asset: string,
+  enabled: boolean,
+  ledger: number,
+) {
+  return {
+    type: "contract" as const,
+    ledger,
+    topic: [
+      xdr.ScVal.scvSymbol("channel_state_changed"),
+      new Address(channel).toScVal(),
+      new Address(asset).toScVal(),
+    ],
+    value: xdr.ScVal.scvBool(enabled),
+    id: `${ledger}-0`,
+    pagingToken: `${ledger}-0`,
+    inSuccessfulContractCall: true,
+    contractId: TEST_CONTRACT,
+  };
+}
+
+Deno.test("fetchChannelAuthEvents - parses channel_state_changed (disabled)", async () => {
+  const mockServer = createMockServer([
+    buildChannelStateEvent(TEST_ADDR_1, TEST_ADDR_2, false, 3000),
+  ]);
+
+  const { events } = await fetchChannelAuthEvents(
+    mockServer,
+    TEST_CONTRACT,
+    2900,
+    { log: newNoop() },
+  );
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].type, "channel_state_changed");
+  assertEquals(events[0].channel, TEST_ADDR_1);
+  assertEquals(events[0].asset, TEST_ADDR_2);
+  assertEquals(events[0].enabled, false);
+});
+
+Deno.test("fetchChannelAuthEvents - parses channel_state_changed (enabled)", async () => {
+  const mockServer = createMockServer([
+    buildChannelStateEvent(TEST_ADDR_1, TEST_ADDR_2, true, 3100),
+  ]);
+
+  const { events } = await fetchChannelAuthEvents(
+    mockServer,
+    TEST_CONTRACT,
+    3000,
+    { log: newNoop() },
+  );
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].type, "channel_state_changed");
+  assertEquals(events[0].enabled, true);
+});
+
 Deno.test("fetchChannelAuthEvents - skips events with insufficient topics", async () => {
   const mockServer = {
     // deno-lint-ignore require-await -- mock satisfies getEvents async contract

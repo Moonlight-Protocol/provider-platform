@@ -48,6 +48,19 @@ export function classifyOperations(
 }
 
 /**
+ * Whether a classified bundle is "withdraw-only" — the only kind a council can
+ * accept on a DISABLED channel. A withdraw-only bundle contains at least one
+ * withdraw and zero deposits (its spends/creates are the withdraw's inputs and
+ * change). Anything that adds value (deposit) or merely moves it between parties
+ * without exiting (a send/transfer: creates/spends but no withdraw) is rejected.
+ */
+export function isWithdrawOnlyBundle(
+  classified: ClassifiedOperations,
+): boolean {
+  return classified.deposit.length === 0 && classified.withdraw.length > 0;
+}
+
+/**
  * Fetches the balance of one or more UTXOs directly from the network
  *
  * @param utxoPublicKeys - Array of UTXO public keys

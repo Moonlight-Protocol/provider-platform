@@ -15,6 +15,7 @@ export enum BUNDLE_ERROR_CODES {
   PP_PUBLIC_KEY_REQUIRED = "BND_012",
   PP_NOT_FOUND = "BND_013",
   PP_NOT_MEMBER_OF_CHANNEL = "BND_014",
+  CHANNEL_DISABLED = "BND_015",
 }
 
 const source = "@service/bundle";
@@ -85,6 +86,32 @@ export class PP_NOT_MEMBER_OF_CHANNEL extends PlatformError<{
           "The addressed Privacy Provider is not authorized to process bundles for this channel.",
       },
       meta: { ppPublicKey, channelContractId },
+    });
+  }
+}
+
+/**
+ * Error thrown when a bundle targets a channel the council has disabled. A
+ * disabled channel is withdraw-only: new deposits and sends are rejected while
+ * withdrawals (to exit funds) remain allowed.
+ */
+export class CHANNEL_DISABLED extends PlatformError<{
+  channelContractId: string;
+}> {
+  constructor(channelContractId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.CHANNEL_DISABLED,
+      message: "Channel is disabled (withdraw-only)",
+      details:
+        `Channel '${channelContractId}' has been disabled by its council. Only withdrawals are accepted; new deposits and sends are rejected until it is re-enabled.`,
+      api: {
+        status: 403,
+        message: "Channel is disabled (withdraw-only)",
+        details:
+          "This channel has been disabled by its council. You can still withdraw existing funds, but new deposits and sends are not accepted until the council re-enables it.",
+      },
+      meta: { channelContractId },
     });
   }
 }
