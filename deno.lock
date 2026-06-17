@@ -4,13 +4,13 @@
     "jsr:@colibri/core@0.22": "0.22.0",
     "jsr:@fifo/convee@0.10": "0.10.0",
     "jsr:@fifo/convee@1.0.0": "1.0.0",
-    "jsr:@moonlight/moonlight-sdk@~0.9.1": "0.9.1",
+    "jsr:@moonlight/moonlight-sdk@0.10": "0.10.0",
     "jsr:@noble/curves@^1.8.0": "1.9.0",
     "jsr:@noble/hashes@1.8.0": "1.8.0",
     "jsr:@noble/hashes@^1.6.1": "1.8.0",
     "jsr:@oak/commons@1": "1.0.1",
     "jsr:@oak/oak@^17.1.4": "17.2.0",
-    "jsr:@olli/kvdex@^3.1.4": "3.6.7",
+    "jsr:@olli/kvdex@^3.1.4": "3.6.5",
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/bytes@1": "1.0.6",
     "jsr:@std/bytes@^1.0.4": "1.0.6",
@@ -39,6 +39,7 @@
     "npm:buffer@6.0.3": "6.0.3",
     "npm:buffer@^6.0.3": "6.0.3",
     "npm:chalk@^5.3.0": "5.6.2",
+    "npm:drizzle-kit@*": "0.31.10",
     "npm:drizzle-kit@~0.31.6": "0.31.10",
     "npm:drizzle-orm@~0.44.7": "0.44.7_@electric-sql+pglite@0.2.17_@opentelemetry+api@1.9.1_postgres@3.4.9",
     "npm:path-to-regexp@^6.3.0": "6.3.0",
@@ -62,8 +63,8 @@
     "@fifo/convee@1.0.0": {
       "integrity": "b61bfa222b9b8a53f0f2af1f35148fd54d86afc2fc3d6b5d073d56aaa369d9a3"
     },
-    "@moonlight/moonlight-sdk@0.9.1": {
-      "integrity": "fc2b58567117030be971bb66a7154c8a1d6e077af5ef7015ae2b24331352aca1",
+    "@moonlight/moonlight-sdk@0.10.0": {
+      "integrity": "2e53005b3c38085fb4d508fc18c6ffdc1f3e7eb44ca2c941b520236594034f69",
       "dependencies": [
         "jsr:@colibri/core",
         "jsr:@noble/curves",
@@ -105,8 +106,8 @@
         "npm:path-to-regexp"
       ]
     },
-    "@olli/kvdex@3.6.7": {
-      "integrity": "0f747297437ef30b106f174e6cca91ed4805bab26996781e9f556b5eaae15d86",
+    "@olli/kvdex@3.6.5": {
+      "integrity": "86e072d62ed5224047a0c67c7f4d0c14588886917cbaa55b275adaca6593a0d8",
       "dependencies": [
         "jsr:@std/bytes@^1.0.4",
         "jsr:@std/cli",
@@ -1089,7 +1090,7 @@
     "dependencies": [
       "jsr:@colibri/core@0.22",
       "jsr:@fifo/convee@0.10",
-      "jsr:@moonlight/moonlight-sdk@~0.9.1",
+      "jsr:@moonlight/moonlight-sdk@0.10",
       "jsr:@noble/curves@^1.8.0",
       "jsr:@noble/hashes@^1.6.1",
       "jsr:@oak/oak@^17.1.4",
