@@ -121,3 +121,20 @@ export const TRANSACTION_EXPIRATION_OFFSET = _rawTxExpirationOffset;
 export const EVENT_WATCHER_INTERVAL_MS = Number(
   Deno.env.get("EVENT_WATCHER_INTERVAL_MS") ?? "30000",
 );
+
+// Where a fresh watcher (no stored position) begins polling. Unset → SYNC ALL
+// AVAILABLE: start from the oldest ledger the RPC still retains, so no in-window
+// event is skipped on a cold boot. Set → start at exactly that ledger (e.g. to
+// skip ancient history on a known-fresh deploy). Never defaults to "latest".
+const _rawBootSyncStart = loadOptionalEnv("BOOT_SYNC_START_LEDGER_BLOCK");
+let _bootSyncStart: number | null = null;
+if (_rawBootSyncStart !== undefined && _rawBootSyncStart !== "") {
+  const n = Number(_rawBootSyncStart);
+  if (!Number.isInteger(n) || n < 0) {
+    throw new Error(
+      `BOOT_SYNC_START_LEDGER_BLOCK must be a non-negative integer, got: "${_rawBootSyncStart}"`,
+    );
+  }
+  _bootSyncStart = n;
+}
+export const BOOT_SYNC_START_LEDGER_BLOCK = _bootSyncStart;

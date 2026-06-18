@@ -1,5 +1,5 @@
 import type { Logger } from "@/utils/logger/index.ts";
-import { NETWORK_RPC_SERVER } from "@/config/env.ts";
+import type { Server } from "stellar-sdk/rpc";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
 import type {
   ChannelAuthEvent,
@@ -7,10 +7,7 @@ import type {
 } from "./event-watcher.types.ts";
 import { withSpan } from "@/core/tracing.ts";
 import { recoverFromOutOfRetention } from "./retention.ts";
-
-function cursorKvKey(contractId: string): Deno.KvKey {
-  return ["event-watcher", contractId, "lastLedger"];
-}
+import { resolveBootStartLedger } from "./start-ledger.ts";
 
 export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
 export type ResyncHandler = () => void | Promise<void>;
@@ -22,8 +19,11 @@ export type ResyncHandler = () => void | Promise<void>;
  * Uses a self-scheduling pattern (setTimeout after each poll completes)
  * to prevent concurrent polls when RPC is slow.
  *
- * Persists the last processed ledger to Deno KV so restarts don't
- * lose event history.
+ * The watcher holds NO durable cursor: provider-platform reconstructs all
+ * derived state by querying the council on boot (converge-by-query), so a fresh
+ * watcher simply syncs all available history forward from the resolved boot
+ * ledger (see `resolveBootStartLedger`). Events are a live delta on top of that
+ * baseline.
  *
  * Consumers register handlers via `onEvent()` and the watcher
  * dispatches parsed events as they arrive.
@@ -35,17 +35,20 @@ export class EventWatcher {
   private config: EventWatcherConfig;
   private handlers: EventHandler[] = [];
   private resyncHandlers: ResyncHandler[] = [];
-  private kv: Deno.Kv | null = null;
+  private rpc: Server;
+  private startLedgerBlock: number | null;
   private log: Logger;
 
   constructor(
     config: { contractId: string; intervalMs?: number },
-    deps: { log: Logger },
+    deps: { log: Logger; rpc: Server; startLedgerBlock: number | null },
   ) {
     this.config = {
       contractId: config.contractId,
       intervalMs: config.intervalMs ?? 30_000,
     };
+    this.rpc = deps.rpc;
+    this.startLedgerBlock = deps.startLedgerBlock;
     this.log = deps.log.scope("EventWatcher");
   }
 
@@ -75,26 +78,15 @@ export class EventWatcher {
 
     this.isRunning = true;
 
-    // Open KV for cursor persistence
-    await Deno.mkdir(".data", { recursive: true });
-    this.kv = await Deno.openKv("./.data/memory-kvdb.db");
-
-    // Restore cursor from KV, or fall back to current network ledger
-    const stored = await this.kv.get<number>(
-      cursorKvKey(this.config.contractId),
+    // No persisted cursor: resolve the boot start ledger (oldest available, or
+    // the configured override) and sync forward.
+    this.lastLedger = await resolveBootStartLedger(
+      this.rpc,
+      this.startLedgerBlock,
     );
-    if (stored.value !== null) {
-      this.lastLedger = stored.value;
-      this.log.debug("contractId", this.config.contractId);
-      this.log.debug("startLedger", this.lastLedger);
-      this.log.event("EventWatcher restored cursor from KV");
-    } else {
-      const latestLedger = await NETWORK_RPC_SERVER.getLatestLedger();
-      this.lastLedger = latestLedger.sequence;
-      this.log.debug("contractId", this.config.contractId);
-      this.log.debug("startLedger", this.lastLedger);
-      this.log.event("EventWatcher initialized from network (no saved cursor)");
-    }
+    this.log.debug("contractId", this.config.contractId);
+    this.log.debug("startLedger", this.lastLedger);
+    this.log.event("EventWatcher initialized boot start ledger");
 
     // Start the self-scheduling loop
     this.scheduleNext();
@@ -110,10 +102,6 @@ export class EventWatcher {
     if (this.timeoutId !== null) {
       clearTimeout(this.timeoutId);
       this.timeoutId = null;
-    }
-    if (this.kv) {
-      this.kv.close();
-      this.kv = null;
     }
     this.log.event("EventWatcher stopped");
   }
@@ -150,7 +138,7 @@ export class EventWatcher {
         if (this.lastLedger === null) return;
 
         const { events, latestLedger } = await fetchChannelAuthEvents(
-          NETWORK_RPC_SERVER,
+          this.rpc,
           this.config.contractId,
           this.lastLedger,
           { log: this.log },
@@ -169,16 +157,9 @@ export class EventWatcher {
           }
         }
 
-        // Advance cursor past the latest ledger we've seen
+        // Advance cursor past the latest ledger we've seen (in memory only —
+        // there is no durable cursor; converge-by-query is the recovery path).
         this.lastLedger = latestLedger + 1;
-
-        // Persist cursor to KV
-        if (this.kv) {
-          await this.kv.set(
-            cursorKvKey(this.config.contractId),
-            this.lastLedger,
-          );
-        }
       } catch (error) {
         span.addEvent("poll_error", {
           "error.message": error instanceof Error
@@ -189,19 +170,13 @@ export class EventWatcher {
         try {
           const recoveredCursor = await recoverFromOutOfRetention(
             error,
-            () => NETWORK_RPC_SERVER.getLatestLedger(),
+            () => this.rpc.getLatestLedger(),
             () => this.fireResync(),
             this.log,
           );
           if (recoveredCursor !== null) {
             span.addEvent("out_of_retention_recovery");
             this.lastLedger = recoveredCursor;
-            if (this.kv) {
-              await this.kv.set(
-                cursorKvKey(this.config.contractId),
-                this.lastLedger,
-              );
-            }
             return;
           }
         } catch (recoveryError) {

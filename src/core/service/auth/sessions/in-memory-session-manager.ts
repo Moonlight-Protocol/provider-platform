@@ -1,15 +1,24 @@
 import { SESSION_TTL } from "@/config/env.ts";
-import { memDb } from "@/persistence/kv/config.ts";
 import type { Session } from "@/models/auth/session/session.model.ts";
 import type { Logger } from "@/utils/logger/index.ts";
 
+/**
+ * Live store of in-flight handshake sessions, keyed by challenge tx hash.
+ *
+ * Truly in-memory (a plain Map) — these are short-TTL auth handshakes, not
+ * derived state, so there is no benefit to persisting them. A machine
+ * stop/redeploy clears them and the client simply re-authenticates. Nothing
+ * here touches disk or Deno.KV.
+ */
 export class InMemorySessionManager {
+  private sessions: Map<string, Session> = new Map();
   private log: Logger;
 
   constructor(deps: { log: Logger }) {
     this.log = deps.log.scope("InMemorySessionManager");
   }
 
+  // deno-lint-ignore require-await -- async to preserve the manager's contract
   public async addSession(
     txHash: string,
     clientAccount: string,
@@ -19,7 +28,7 @@ export class InMemorySessionManager {
     this.log.info("addSession");
     this.log.debug("txHash", txHash);
 
-    const cr = await memDb.sessions.add({
+    this.sessions.set(txHash, {
       txHash,
       clientAccount,
       requestId,
@@ -27,23 +36,22 @@ export class InMemorySessionManager {
       status: "PENDING",
     });
 
-    if (cr.ok) {
-      this.log.event("session added to store");
-    }
+    this.log.event("session added to store");
   }
 
+  // deno-lint-ignore require-await -- async to preserve the manager's contract
   public async getSession(txHash: string): Promise<Session | undefined> {
     this.log.info("getSession");
     this.log.debug("txHash", txHash);
 
     this.log.event("looking up session by txHash");
-    const session = await memDb.sessions.findByPrimaryIndex("txHash", txHash);
-    if (session && Date.now() < session.value.expiresAt.getTime()) {
+    const session = this.sessions.get(txHash);
+    if (session && Date.now() < session.expiresAt.getTime()) {
       this.log.event("session found and valid");
-      return session.value;
+      return session;
     }
     this.log.event("session missing or expired, deleting");
-    await memDb.sessions.delete(txHash);
+    this.sessions.delete(txHash);
     return undefined;
   }
 
@@ -60,17 +68,20 @@ export class InMemorySessionManager {
     }
 
     this.log.event("persisting session update");
-    await memDb.sessions.update(session.txHash, session);
+    this.sessions.set(session.txHash, session);
   }
 
+  // deno-lint-ignore require-await -- async to preserve the manager's contract
   public async cleanupExpired(): Promise<void> {
     const now = Date.now();
 
     this.log.info("cleanupExpired");
 
-    await memDb.sessions.deleteMany({
-      filter: (doc) => doc.value.expiresAt.getTime() < now,
-    });
+    for (const [txHash, session] of this.sessions) {
+      if (session.expiresAt.getTime() < now) {
+        this.sessions.delete(txHash);
+      }
+    }
 
     this.log.event("expired sessions cleaned");
   }
