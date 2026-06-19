@@ -1,6 +1,7 @@
 import { selectNetwork } from "@/config/network.ts";
 import { loadOptionalEnv, requireEnv } from "@/utils/env/loadEnv.ts";
 import { requireBaseFee } from "@/utils/env/requireBaseFee.ts";
+import { parseBootSyncStartLedger } from "@/utils/env/parseBootSyncStartLedger.ts";
 import { Server } from "stellar-sdk/rpc";
 
 export const DATABASE_URL = requireEnv("DATABASE_URL");
@@ -122,19 +123,16 @@ export const EVENT_WATCHER_INTERVAL_MS = Number(
   Deno.env.get("EVENT_WATCHER_INTERVAL_MS") ?? "30000",
 );
 
-// Where a fresh watcher (no stored position) begins polling. Unset → SYNC ALL
-// AVAILABLE: start from the oldest ledger the RPC still retains, so no in-window
-// event is skipped on a cold boot. Set → start at exactly that ledger (e.g. to
-// skip ancient history on a known-fresh deploy). Never defaults to "latest".
-const _rawBootSyncStart = loadOptionalEnv("BOOT_SYNC_START_LEDGER_BLOCK");
-let _bootSyncStart: number | null = null;
-if (_rawBootSyncStart !== undefined && _rawBootSyncStart !== "") {
-  const n = Number(_rawBootSyncStart);
-  if (!Number.isInteger(n) || n < 0) {
-    throw new Error(
-      `BOOT_SYNC_START_LEDGER_BLOCK must be a non-negative integer, got: "${_rawBootSyncStart}"`,
-    );
-  }
-  _bootSyncStart = n;
-}
-export const BOOT_SYNC_START_LEDGER_BLOCK = _bootSyncStart;
+// Where a fresh watcher (no stored position) begins polling.
+//   "all" (case-insensitive) → SYNC ALL AVAILABLE: start from the oldest ledger
+//     the RPC still retains, so no in-window event is skipped on a cold boot.
+//   empty / unset → SYNC ALL AVAILABLE (same as "all"; the explicit synonym is
+//     kept so iac can carry a real placeholder and flip it to a ledger at reset
+//     time without an empty value changing behavior).
+//   non-negative integer → start at exactly that ledger (e.g. to skip ancient
+//     history on a known-fresh deploy).
+//   anything else ("latest", negative, other junk) → throws at boot.
+// Never defaults to "latest". See parseBootSyncStartLedger for the parse rules.
+export const BOOT_SYNC_START_LEDGER_BLOCK = parseBootSyncStartLedger(
+  loadOptionalEnv("BOOT_SYNC_START_LEDGER_BLOCK"),
+);
