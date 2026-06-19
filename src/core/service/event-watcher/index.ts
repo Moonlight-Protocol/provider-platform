@@ -1,4 +1,9 @@
-import { CHALLENGE_TTL, EVENT_WATCHER_INTERVAL_MS } from "@/config/env.ts";
+import {
+  BOOT_SYNC_START_LEDGER_BLOCK,
+  CHALLENGE_TTL,
+  EVENT_WATCHER_INTERVAL_MS,
+  NETWORK_RPC_SERVER,
+} from "@/config/env.ts";
 import { EventWatcher } from "./event-watcher.process.ts";
 import { ChannelRegistry } from "./channel-registry.ts";
 import {
@@ -63,7 +68,11 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
   const watcher = new EventWatcher({
     contractId: channelAuthId,
     intervalMs: EVENT_WATCHER_INTERVAL_MS,
-  }, { log: watcherLog! });
+  }, {
+    log: watcherLog!,
+    rpc: NETWORK_RPC_SERVER,
+    startLedgerBlock: BOOT_SYNC_START_LEDGER_BLOCK,
+  });
 
   // Re-query the council and reconcile asset-channel statuses when the event
   // cursor falls out of Stellar RPC retention (events may have been missed; the

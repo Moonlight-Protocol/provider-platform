@@ -1,10 +1,10 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {
-    "serve": "deno run --allow-all --unstable-kv src/main.ts",
+    "serve": "deno run --allow-all src/main.ts",
     "test": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests,src/http/v1/entities/tests src/ && deno test --allow-all --no-check --config src/http/v1/pay/tests/deno.json src/http/v1/pay/tests/ && deno test --allow-all --no-check --config src/http/v1/entities/tests/deno.json src/http/v1/entities/tests/",
     "test:integration": "deno test --allow-all --no-check --config tests/deno.json tests/",
     "test:unit": "deno test --allow-all --no-check --ignore=src/http/v1/pay/tests,src/http/v1/entities/tests src/",

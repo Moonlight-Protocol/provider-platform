@@ -24,10 +24,6 @@ export interface ChannelRecord {
   removedAtLedger?: number;
 }
 
-const REGISTRY_KV_KEY = ["channel-registry", "channels"];
-const KV_DIR = new URL("../../../../.data", import.meta.url).pathname;
-const KV_PATH = `${KV_DIR}/memory-kvdb.db`;
-
 /**
  * In-memory registry of channels this PP is registered in.
  *
@@ -35,53 +31,19 @@ const KV_PATH = `${KV_DIR}/memory-kvdb.db`;
  * The `configuredChannels` set represents which channels the operator
  * has chosen to actively serve (from instance config).
  *
- * State is persisted to Deno KV so restarts don't lose channel info.
- * On startup, the registry restores from KV first, then seeds any
- * configured channels that aren't already tracked.
+ * State is NOT persisted: every record it holds is authoritatively
+ * re-queryable (channel membership from this PP's own DB, asset-channel status
+ * from the council via converge-by-query on boot), so the registry is rebuilt
+ * from scratch on each start rather than restored from a durable store.
  */
 export class ChannelRegistry {
   private channels: Map<string, ChannelRecord> = new Map();
   private configuredChannels: Set<string>;
-  private kv: Deno.Kv | null = null;
   private log: Logger;
 
   constructor(configuredChannelIds: string[], deps: { log: Logger }) {
     this.configuredChannels = new Set(configuredChannelIds);
     this.log = deps.log.scope("ChannelRegistry");
-  }
-
-  /**
-   * Initialize the registry: restore from KV, then seed any configured
-   * channels not already present. Must be called before use.
-   */
-  async initialize(): Promise<void> {
-    await Deno.mkdir(KV_DIR, { recursive: true });
-    this.kv = await Deno.openKv(KV_PATH);
-
-    // Restore persisted state
-    const stored = await this.kv.get<ChannelRecord[]>(REGISTRY_KV_KEY);
-    if (stored.value && stored.value.length > 0) {
-      for (const record of stored.value) {
-        this.channels.set(record.contractId, record);
-      }
-      this.log.debug("count", stored.value.length);
-      this.log.event("ChannelRegistry restored from KV");
-    }
-
-    // Seed configured channels that aren't already tracked
-    for (const contractId of this.configuredChannels) {
-      if (!this.channels.has(contractId)) {
-        this.channels.set(contractId, {
-          contractId,
-          state: "active",
-          registeredAtLedger: 0,
-        });
-        this.log.debug("contractId", contractId);
-        this.log.event("seeded configured channel as active");
-      }
-    }
-
-    await this.persist();
   }
 
   /** Dynamically add a channel to track (e.g., when a PP joins a new council). */
@@ -137,6 +99,7 @@ export class ChannelRegistry {
    * `enabled=true` → `active` (full service resumes). Idempotent: re-applying
    * the same state is a no-op.
    */
+  // deno-lint-ignore require-await -- async to preserve the awaited mutation contract
   async applyChannelState(
     channelContractId: string,
     enabled: boolean,
@@ -160,7 +123,6 @@ export class ChannelRegistry {
     this.log.event(
       enabled ? "asset channel enabled" : "asset channel disabled",
     );
-    await this.persist();
   }
 
   /**
@@ -172,6 +134,7 @@ export class ChannelRegistry {
     return this.channels.get(channelContractId)?.state === "disabled";
   }
 
+  // deno-lint-ignore require-await -- async to preserve the awaited mutation contract
   private async onProviderAdded(event: ChannelAuthEvent): Promise<void> {
     const isConfigured = this.configuredChannels.has(event.contractId);
     const state: ChannelState = isConfigured ? "active" : "pending";
@@ -186,10 +149,9 @@ export class ChannelRegistry {
     this.log.debug("state", state);
     this.log.debug("ledger", event.ledger);
     this.log.event("provider registered in channel");
-
-    await this.persist();
   }
 
+  // deno-lint-ignore require-await -- async to preserve the awaited mutation contract
   private async onProviderRemoved(event: ChannelAuthEvent): Promise<void> {
     const existing = this.channels.get(event.contractId);
     if (existing) {
@@ -207,20 +169,6 @@ export class ChannelRegistry {
     this.log.debug("contractId", event.contractId);
     this.log.debug("ledger", event.ledger);
     this.log.event("provider removed from channel");
-
-    await this.persist();
-  }
-
-  /**
-   * Persist current registry state to KV.
-   */
-  private async persist(): Promise<void> {
-    if (!this.kv) return;
-    try {
-      await this.kv.set(REGISTRY_KV_KEY, this.getAll());
-    } catch (error) {
-      this.log.error(error, "failed to persist channel registry");
-    }
   }
 
   /**
@@ -247,6 +195,7 @@ export class ChannelRegistry {
   /**
    * Mark a channel as configured (operator activated it).
    */
+  // deno-lint-ignore require-await -- async to preserve the awaited mutation contract
   async activateChannel(contractId: string): Promise<void> {
     this.log.info("activateChannel");
     this.log.debug("contractId", contractId);
@@ -255,13 +204,13 @@ export class ChannelRegistry {
     if (channel && channel.state === "pending") {
       channel.state = "active";
       this.log.event("channel transitioned to active");
-      await this.persist();
     }
   }
 
   /**
    * Mark a channel as no longer configured by the operator.
    */
+  // deno-lint-ignore require-await -- async to preserve the awaited mutation contract
   async deactivateChannel(contractId: string): Promise<void> {
     this.log.info("deactivateChannel");
     this.log.debug("contractId", contractId);
@@ -270,19 +219,6 @@ export class ChannelRegistry {
     if (channel && channel.state === "active") {
       channel.state = "pending";
       this.log.event("channel transitioned to pending");
-      await this.persist();
-    }
-  }
-
-  /**
-   * Close the KV handle. Call on shutdown.
-   */
-  close(): void {
-    this.log.info("close");
-    if (this.kv) {
-      this.kv.close();
-      this.kv = null;
-      this.log.event("KV handle closed");
     }
   }
 }
