@@ -22,7 +22,11 @@ import { emitForPp } from "@/core/service/events/emit-helpers.ts";
 setChallengeTtlMs(CHALLENGE_TTL * 1000);
 
 const registeredProviders = new Set<string>();
-const activeWatchers = new Map<string, EventWatcher>();
+
+// Exactly one watcher for the whole process, regardless of how many councils are
+// active. It polls every active council's channel-auth contract in one batched
+// getEvents call and dispatches each event by the contract it came from.
+let watcher: EventWatcher | null = null;
 
 export let channelRegistry: ChannelRegistry;
 let watcherLog: Logger | null = null;
@@ -30,43 +34,14 @@ let watcherLog: Logger | null = null;
 const ppRepo = new PpRepository(drizzleClient);
 const membershipRepo = new CouncilMembershipRepository(drizzleClient);
 
-async function initFromDb(): Promise<void> {
+/**
+ * Build the single watcher and wire its event/resync handlers. Created with an
+ * empty contract set; `initFromDb`/`addCouncilWatcher` populate it.
+ */
+function createWatcher(): EventWatcher {
   const log = watcherLog!.scope("eventWatcher");
-  try {
-    const pps = await ppRepo.listAll();
-    for (const pp of pps) {
-      registeredProviders.add(pp.publicKey);
-    }
-
-    for (const pp of pps) {
-      const membership = await membershipRepo.getCurrentForPp(pp.publicKey);
-      if (
-        membership?.status === CouncilMembershipStatus.ACTIVE &&
-        membership.channelAuthId
-      ) {
-        await ensureWatcher(membership.channelAuthId);
-      }
-    }
-
-    log.debug("providers", registeredProviders.size);
-    log.debug("watchers", activeWatchers.size);
-    log.event("event watchers initialized from DB");
-  } catch (err) {
-    log.error(err, "failed to initialize event watchers from DB");
-  }
-}
-
-async function ensureWatcher(channelAuthId: string): Promise<void> {
-  const log = watcherLog!.scope("ensureWatcher");
-  log.info("ensureWatcher");
-  log.debug("channelAuthId", channelAuthId);
-  if (activeWatchers.has(channelAuthId)) {
-    log.event("watcher already active");
-    return;
-  }
-
-  const watcher = new EventWatcher({
-    contractId: channelAuthId,
+  const w = new EventWatcher({
+    contractIds: [],
     intervalMs: EVENT_WATCHER_INTERVAL_MS,
   }, {
     log: watcherLog!,
@@ -74,14 +49,20 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
     startLedgerBlock: BOOT_SYNC_START_LEDGER_BLOCK,
   });
 
-  // Re-query the council and reconcile asset-channel statuses when the event
-  // cursor falls out of Stellar RPC retention (events may have been missed; the
-  // query can't be). This is the can't-miss convergence path.
-  watcher.onResync(async () => {
-    await convergeChannelStatusesForCouncil(channelAuthId);
+  // Re-query each watched council and reconcile asset-channel statuses when the
+  // single poll falls out of Stellar RPC retention (events may have been missed
+  // across all contracts; the queries can't be). This is the can't-miss path.
+  w.onResync(async () => {
+    for (const channelAuthId of w.getContractIds()) {
+      await convergeChannelStatusesForCouncil(channelAuthId);
+    }
   });
 
-  watcher.onEvent(async (event) => {
+  w.onEvent(async (event) => {
+    // Each event is tagged with the council (channel-auth contract) that emitted
+    // it, so one watcher routes correctly across all contracts.
+    const channelAuthId = event.contractId;
+
     // Asset-channel lifecycle events are council-scoped, not provider-scoped —
     // handle them regardless of which provider address appears, so a disable
     // immediately drives the withdraw-only gate.
@@ -129,18 +110,50 @@ async function ensureWatcher(channelAuthId: string): Promise<void> {
     }
   });
 
+  return w;
+}
+
+async function initFromDb(): Promise<void> {
+  const log = watcherLog!.scope("eventWatcher");
   try {
-    await watcher.start();
+    const pps = await ppRepo.listAll();
+    for (const pp of pps) {
+      registeredProviders.add(pp.publicKey);
+    }
+
+    for (const pp of pps) {
+      const membership = await membershipRepo.getCurrentForPp(pp.publicKey);
+      if (
+        membership?.status === CouncilMembershipStatus.ACTIVE &&
+        membership.channelAuthId
+      ) {
+        watchCouncilContract(membership.channelAuthId);
+      }
+    }
+
+    log.debug("providers", registeredProviders.size);
+    log.debug("contracts", watcher?.getContractIds().length ?? 0);
+    log.event("event watcher initialized from DB");
   } catch (err) {
+    log.error(err, "failed to initialize event watcher from DB");
+  }
+}
+
+/**
+ * Add a council's channel-auth contract to the single watcher's set and start
+ * tracking it in the registry. Replaces the old per-council watcher creation.
+ */
+function watchCouncilContract(channelAuthId: string): void {
+  const log = watcherLog!.scope("watchCouncilContract");
+  if (!watcher) {
     log.debug("channelAuthId", channelAuthId);
-    log.error(err, "failed to start event watcher");
+    log.event("watcher not started; cannot watch council contract");
     return;
   }
-
-  activeWatchers.set(channelAuthId, watcher);
+  watcher.addContract(channelAuthId);
   channelRegistry.addChannel(channelAuthId);
   log.debug("channelAuthId", channelAuthId);
-  log.event("started event watcher for council");
+  log.event("watching council channel-auth contract");
 }
 
 /**
@@ -263,11 +276,41 @@ async function deactivateMembership(
     log.debug("ppPublicKey", ppPublicKey);
     log.debug("channelAuthId", channelAuthId);
     log.event("PP membership deactivated via on-chain event");
+
+    // Drop the contract from the single watcher's set once no active membership
+    // references it. Multiple PPs can share a council, so only stop polling it
+    // when the last active membership is gone (the status update above already
+    // excluded this PP).
+    await unwatchCouncilContractIfUnused(channelAuthId);
   } catch (err) {
     log.debug("ppPublicKey", ppPublicKey);
     log.debug("channelAuthId", channelAuthId);
     log.error(err, "failed to deactivate membership from event");
   }
+}
+
+/**
+ * Remove a council's channel-auth contract from the single watcher when no PP
+ * still has an active membership in it. Reference-counts across all PPs so one
+ * provider leaving doesn't blind the watcher for others still in that council.
+ */
+async function unwatchCouncilContractIfUnused(
+  channelAuthId: string,
+): Promise<void> {
+  const log = watcherLog!.scope("unwatchCouncilContract");
+  if (!watcher) return;
+  const pps = await ppRepo.listAll();
+  for (const pp of pps) {
+    const membership = await membershipRepo.getActiveForPp(pp.publicKey);
+    if (membership?.channelAuthId === channelAuthId) {
+      log.debug("channelAuthId", channelAuthId);
+      log.event("council still has active members; keeping contract watched");
+      return;
+    }
+  }
+  watcher.removeContract(channelAuthId);
+  log.debug("channelAuthId", channelAuthId);
+  log.event("unwatched council channel-auth contract");
 }
 
 export function addProviderAddress(publicKey: string): void {
@@ -294,14 +337,9 @@ export function addCouncilWatcher(channelAuthId: string): void {
     const log = watcherLog.scope("addCouncilWatcher");
     log.info("addCouncilWatcher");
     log.debug("channelAuthId", channelAuthId);
-    log.event("scheduling watcher for council");
+    log.event("adding council contract to watcher set");
   }
-  ensureWatcher(channelAuthId).catch((err) => {
-    if (watcherLog) {
-      const log = watcherLog.scope("addCouncilWatcher");
-      log.error(err, "failed to add council watcher");
-    }
-  });
+  watchCouncilContract(channelAuthId);
 }
 
 export async function startEventWatcher(deps: { log: Logger }): Promise<void> {
@@ -311,20 +349,30 @@ export async function startEventWatcher(deps: { log: Logger }): Promise<void> {
   }
   const log = watcherLog.scope("startEventWatcher");
   log.info("startEventWatcher");
+
+  // One watcher for the whole process. Build it (empty), let initFromDb fill its
+  // contract set, then start the single poll loop.
+  watcher = createWatcher();
   await initFromDb();
+  try {
+    await watcher.start();
+  } catch (err) {
+    log.error(err, "failed to start event watcher");
+  }
+
   // Converge asset-channel statuses by querying the council(s) — applies any
   // disable/enable that happened while this provider was down.
   await convergeChannelStatusesOnBoot();
-  if (activeWatchers.size === 0) {
-    log.event("no active council memberships — no event watchers started");
+  if (watcher.getContractIds().length === 0) {
+    log.event("no active council memberships — watcher idle until a join");
   }
 }
 
-export async function stopEventWatcher(): Promise<void> {
-  for (const [, watcher] of activeWatchers) {
+export function stopEventWatcher(): void {
+  if (watcher) {
     try {
-      await watcher.stop();
+      watcher.stop();
     } catch { /* best effort */ }
+    watcher = null;
   }
-  activeWatchers.clear();
 }
