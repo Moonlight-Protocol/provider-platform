@@ -31,8 +31,9 @@ export interface ChannelAuthEvent {
 }
 
 export interface EventWatcherConfig {
-  /** Channel Auth contract ID to watch */
-  contractId: string;
+  /** Channel Auth contract IDs to watch (one watcher covers every active
+   * council's contract via a single batched poll). */
+  contractIds: string[];
   /** RPC polling interval in milliseconds */
   intervalMs: number;
 }
