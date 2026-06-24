@@ -1,10 +1,18 @@
 import { assertEquals } from "@std/assert";
+import { Address, Keypair, xdr } from "stellar-sdk";
 import type { Server } from "stellar-sdk/rpc";
 import { EventWatcher } from "./event-watcher.process.ts";
+import type { ChannelAuthEvent } from "./event-watcher.types.ts";
 import { newNoop } from "@/utils/logger/index.ts";
 
 const CONTRACT = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4";
 const CONTRACT_B = "CBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBV6";
+
+// The boot start ledger now resolves inside the first poll (so a transient
+// failure retries instead of killing the watcher in start()), so every
+// assertion about where the watcher began polling must let that fire-and-forget
+// first poll run to completion.
+const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 /**
  * Records the `startLedger` of each getEvents call so a test can assert exactly
@@ -60,6 +68,7 @@ Deno.test("EventWatcher - override set → first getEvents at exactly that ledge
   );
 
   await watcher.start();
+  await tick(); // let the first poll resolve the boot ledger and fetch
   watcher.stop();
 
   assertEquals(startLedgers[0], 12345);
@@ -76,13 +85,11 @@ Deno.test("EventWatcher - override unset → first getEvents at oldest available
   );
 
   await watcher.start();
+  await tick(); // let the first poll resolve the boot ledger and fetch
   watcher.stop();
 
   assertEquals(startLedgers[0], 5000);
 });
-
-// Let the fire-and-forget first poll (scheduled by start()) run to completion.
-const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 Deno.test("EventWatcher - holds no durable cursor: a restart re-syncs from oldest", async () => {
   // First watcher polls once and advances its in-memory cursor past 5100.
@@ -104,6 +111,7 @@ Deno.test("EventWatcher - holds no durable cursor: a restart re-syncs from oldes
     { log: newNoop(), rpc: second.rpc, startLedgerBlock: null },
   );
   await w2.start();
+  await tick(); // let the fresh watcher's first poll resolve + fetch
   w2.stop();
 
   assertEquals(second.startLedgers[0], 5000);
@@ -184,4 +192,107 @@ Deno.test("EventWatcher - empty contract set holds the cursor and skips the RPC"
   // ledger so a later join resumes from there.
   assertEquals(polledContractIds.length, 0);
   assertEquals(watcher.getLastLedger(), 7000);
+});
+
+// --- Boot resilience ---
+
+/** A raw provider_added RPC event the real parser accepts, for CONTRACT. */
+function rawProviderAddedEvent(address: string, ledger: number) {
+  return {
+    type: "contract" as const,
+    ledger,
+    topic: [
+      xdr.ScVal.scvSymbol("provider_added"),
+      new Address(address).toScVal(),
+    ],
+    value: xdr.ScVal.scvVoid(),
+    id: `${ledger}-0`,
+    pagingToken: `${ledger}-0`,
+    inSuccessfulContractCall: true,
+    contractId: CONTRACT,
+  };
+}
+
+/**
+ * RPC mock whose boot-ledger resolution (getHealth) THROWS on its first call
+ * and recovers afterwards. Once recovered, getEvents serves a single
+ * provider_added event so a test can prove the watcher actually resumes polling
+ * and processing — not merely that it survived.
+ */
+function flakyBootRpc(
+  opts: { oldestLedger: number; latestLedger: number; address: string },
+) {
+  let healthCalls = 0;
+  let eventsServed = false;
+  const rpc = {
+    // deno-lint-ignore require-await -- mock satisfies async getHealth contract
+    getHealth: async () => {
+      healthCalls++;
+      if (healthCalls === 1) {
+        throw new Error("transient RPC failure resolving boot ledger");
+      }
+      return { oldestLedger: opts.oldestLedger };
+    },
+    // deno-lint-ignore require-await -- mock satisfies async getEvents contract
+    getEvents: async () => {
+      // Serve the event exactly once so the watcher processes it after recovery.
+      const events = eventsServed
+        ? []
+        : [rawProviderAddedEvent(opts.address, opts.latestLedger)];
+      eventsServed = true;
+      return { events, latestLedger: opts.latestLedger };
+    },
+    // deno-lint-ignore require-await -- mock satisfies async getLatestLedger contract
+    getLatestLedger: async () => ({ sequence: opts.latestLedger }),
+  } as unknown as Server;
+  return { rpc, healthCalls: () => healthCalls };
+}
+
+/** Poll `predicate` on the macrotask queue until true or `timeoutMs` elapses. */
+async function waitUntil(
+  predicate: () => boolean,
+  timeoutMs = 2000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+  }
+  return predicate();
+}
+
+Deno.test("EventWatcher - transient boot-ledger failure retries instead of killing the watcher", async () => {
+  const ADDRESS = Keypair.random().publicKey();
+  const { rpc, healthCalls } = flakyBootRpc({
+    oldestLedger: 5000,
+    latestLedger: 5100,
+    address: ADDRESS,
+  });
+
+  const received: ChannelAuthEvent[] = [];
+  const watcher = new EventWatcher(
+    { contractIds: [CONTRACT], intervalMs: 20 },
+    { log: newNoop(), rpc, startLedgerBlock: null },
+  );
+  watcher.onEvent((event) => {
+    received.push(event);
+  });
+
+  // The first poll's getHealth throws. Pre-fix this rejected start() and the
+  // poll loop never ran; the watcher stayed dead forever. It must instead retry.
+  await watcher.start();
+
+  const recovered = await waitUntil(() => received.length > 0);
+  watcher.stop();
+
+  // The first boot resolution failed (proving the failure path was exercised)…
+  // …yet the watcher recovered: it resolved the boot ledger on a later tick,
+  // polled, and processed the on-chain event.
+  assertEquals(recovered, true);
+  assertEquals(healthCalls() >= 2, true);
+  assertEquals(received.length, 1);
+  assertEquals(received[0].type, "provider_added");
+  assertEquals(received[0].address, ADDRESS);
+  // Cursor advanced past the latest ledger — the loop is live, not stuck at boot.
+  assertEquals(watcher.getLastLedger(), 5101);
 });
