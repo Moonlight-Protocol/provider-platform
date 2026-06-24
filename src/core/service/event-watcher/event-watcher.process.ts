@@ -101,26 +101,28 @@ export class EventWatcher {
   /**
    * Starts the event watcher polling loop.
    */
-  async start(): Promise<void> {
+  start(): Promise<void> {
     if (this.isRunning) {
       this.log.event("EventWatcher is already running");
-      return;
+      return Promise.resolve();
     }
 
     this.isRunning = true;
 
-    // No persisted cursor: resolve the boot start ledger (oldest available, or
-    // the configured override) and sync forward.
-    this.lastLedger = await resolveBootStartLedger(
-      this.rpc,
-      this.startLedgerBlock,
-    );
+    // No persisted cursor: the boot start ledger (oldest available, or the
+    // configured override) is resolved by the FIRST poll, not here. Resolving
+    // it inside the poll loop means a transient RPC failure while resolving it
+    // is caught and retried on the next tick — exactly like any poll error —
+    // instead of rejecting start() and leaving the watcher permanently dead
+    // for the life of the process. The cursor stays null until resolved.
     this.log.debug("contractCount", this.contractIds.size);
-    this.log.debug("startLedger", this.lastLedger);
-    this.log.event("EventWatcher initialized boot start ledger");
+    this.log.event(
+      "EventWatcher started; boot start ledger resolves on first poll",
+    );
 
     // Start the self-scheduling loop
     this.scheduleNext();
+    return Promise.resolve();
   }
 
   /**
@@ -166,7 +168,20 @@ export class EventWatcher {
   private poll(): Promise<void> {
     return withSpan("EventWatcher.poll", async (span) => {
       try {
-        if (this.lastLedger === null) return;
+        // First poll with no resolved boot position: resolve it now, INSIDE
+        // this try/catch + retry machinery. A transient failure here (e.g. the
+        // getHealth RPC blipping) is caught below and retried on the next tick
+        // rather than terminally killing the watcher. Boot-sync semantics are
+        // unchanged: oldest available, or the pinned override — never "latest".
+        if (this.lastLedger === null) {
+          this.lastLedger = await resolveBootStartLedger(
+            this.rpc,
+            this.startLedgerBlock,
+          );
+          this.log.debug("contractCount", this.contractIds.size);
+          this.log.debug("startLedger", this.lastLedger);
+          this.log.event("EventWatcher resolved boot start ledger");
+        }
 
         const { events, latestLedger } = await fetchChannelAuthEvents(
           this.rpc,
