@@ -10,6 +10,10 @@ import {
   fetchCouncilConfig,
   reconcileChannelStatuses,
 } from "./channel-convergence.ts";
+import {
+  convergeMembershipStatusesOnBoot,
+  fetchMembershipStatus,
+} from "./membership-convergence.ts";
 import { setChallengeTtlMs } from "@/core/service/auth/dashboard-auth.ts";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { PpRepository } from "@/persistence/drizzle/repository/pp.repository.ts";
@@ -363,6 +367,24 @@ export async function startEventWatcher(deps: { log: Logger }): Promise<void> {
   // Converge asset-channel statuses by querying the council(s) — applies any
   // disable/enable that happened while this provider was down.
   await convergeChannelStatusesOnBoot();
+
+  // Converge MEMBERSHIP by querying the council(s) — demotes a membership whose
+  // provider_removed landed while we were down (and may have fallen out of RPC
+  // retention, so event replay alone would miss it). This is the can't-miss
+  // pull-path baseline; there is no inbound removal notice.
+  await convergeMembershipStatusesOnBoot({
+    listPps: () => ppRepo.listAll(),
+    getActiveMembership: async (ppPublicKey) => {
+      const m = await membershipRepo.getActiveForPp(ppPublicKey);
+      return m
+        ? { channelAuthId: m.channelAuthId, councilUrl: m.councilUrl }
+        : undefined;
+    },
+    fetchStatus: fetchMembershipStatus,
+    deactivate: deactivateMembership,
+    log: watcherLog!,
+  });
+
   if (watcher.getContractIds().length === 0) {
     log.event("no active council memberships — watcher idle until a join");
   }
