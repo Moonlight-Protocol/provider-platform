@@ -44,5 +44,14 @@ export function withSpan<T>(
   });
 }
 
+/**
+ * The active span's trace id, or undefined outside a span. Used to stamp
+ * correlation on log lines so a log can be joined to its trace.
+ */
+export function currentTraceId(): string | undefined {
+  const id = trace.getActiveSpan()?.spanContext().traceId;
+  return id && id !== "00000000000000000000000000000000" ? id : undefined;
+}
+
 export { SpanStatusCode, tracer };
 export type { Span };
