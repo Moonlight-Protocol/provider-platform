@@ -2,6 +2,7 @@ import { Router, Status } from "@oak/oak";
 import { sql } from "drizzle-orm";
 import { drizzleClient } from "@/persistence/drizzle/config.ts";
 import { checkDbHealth } from "@/http/v1/health/db-check.ts";
+import { getEventWatcherHealth } from "@/core/service/event-watcher/index.ts";
 
 const denoJson = JSON.parse(
   await Deno.readTextFile(new URL("../../../../deno.json", import.meta.url)),
@@ -22,6 +23,11 @@ healthRouter.get("/health", async (ctx) => {
   const db = await checkDbHealth(() => drizzleClient.execute(sql`select 1`));
   const healthy = db === "ok";
 
+  // Event-watcher health is reported but does NOT gate the deploy status — a
+  // transient RPC blip must not flap the Fly health-gate (same rationale as
+  // checkDbHealth). Ops/alerting consume the `watcher` field (#10).
+  const watcher = getEventWatcherHealth();
+
   ctx.response.status = healthy ? Status.OK : Status.ServiceUnavailable;
   ctx.response.body = {
     status: healthy ? "ok" : "error",
@@ -31,6 +37,7 @@ healthRouter.get("/health", async (ctx) => {
       "moonlight-sdk": sdkVersion,
       db,
     },
+    watcher: watcher ?? "idle",
   };
 });
 

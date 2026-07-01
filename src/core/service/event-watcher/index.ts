@@ -179,6 +179,7 @@ async function convergeChannelStatusesOnBoot(): Promise<void> {
       const data = await fetchCouncilConfig(
         membership.councilUrl,
         membership.channelAuthId,
+        { log },
       );
       if (data) await reconcileChannelStatuses(channelRegistry, data);
     }
@@ -205,6 +206,7 @@ async function convergeChannelStatusesForCouncil(
       const data = await fetchCouncilConfig(
         membership.councilUrl,
         channelAuthId,
+        { log },
       );
       if (data) {
         await reconcileChannelStatuses(channelRegistry, data);
@@ -235,7 +237,13 @@ async function activateMembership(
 
     let configJson: string | null = null;
     let councilName = membership.councilName;
-    const data = await fetchCouncilConfig(membership.councilUrl, channelAuthId);
+    const data = await fetchCouncilConfig(
+      membership.councilUrl,
+      channelAuthId,
+      {
+        log,
+      },
+    );
     if (data) {
       configJson = JSON.stringify(data);
       councilName = data.council?.name ?? councilName;
@@ -397,4 +405,16 @@ export function stopEventWatcher(): void {
     } catch { /* best effort */ }
     watcher = null;
   }
+}
+
+/**
+ * Background-poll health of the event watcher for the /health endpoint (#10).
+ * Returns null when no watcher is running (e.g. no active councils yet).
+ */
+export function getEventWatcherHealth():
+  | ReturnType<
+    EventWatcher["getHealth"]
+  >
+  | null {
+  return watcher?.getHealth() ?? null;
 }

@@ -2,7 +2,7 @@ import type { Logger } from "@/utils/logger/index.ts";
 import type { Server } from "stellar-sdk/rpc";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
 import type { ChannelAuthEvent } from "./event-watcher.types.ts";
-import { withSpan } from "@/core/tracing.ts";
+import { currentTraceId, SpanStatusCode, withSpan } from "@/core/tracing.ts";
 import { recoverFromOutOfRetention } from "./retention.ts";
 import { resolveBootStartLedger } from "./start-ledger.ts";
 
@@ -43,6 +43,11 @@ export class EventWatcher {
   private rpc: Server;
   private startLedgerBlock: number | null;
   private log: Logger;
+  // Health signal (#10): the watcher runs in the background with no request to
+  // surface failures on, so its last-success / last-error is tracked here and
+  // exposed via getHealth() for the /health endpoint.
+  private lastPollOkAt: number | null = null;
+  private lastPollError: { at: number; message: string } | null = null;
 
   constructor(
     config: { contractIds: string[]; intervalMs?: number },
@@ -53,6 +58,28 @@ export class EventWatcher {
     this.rpc = deps.rpc;
     this.startLedgerBlock = deps.startLedgerBlock;
     this.log = deps.log.scope("EventWatcher");
+  }
+
+  /**
+   * Background-poll health for the /health endpoint. `healthy` is false once a
+   * poll has errored more recently than the last success (or never succeeded
+   * after an error).
+   */
+  getHealth(): {
+    running: boolean;
+    lastPollOkAt: number | null;
+    lastPollError: { at: number; message: string } | null;
+    healthy: boolean;
+  } {
+    const healthy = this.lastPollError === null ||
+      (this.lastPollOkAt !== null &&
+        this.lastPollOkAt >= this.lastPollError.at);
+    return {
+      running: this.isRunning,
+      lastPollOkAt: this.lastPollOkAt,
+      lastPollError: this.lastPollError,
+      healthy,
+    };
   }
 
   /**
@@ -206,6 +233,7 @@ export class EventWatcher {
         // Advance cursor past the latest ledger we've seen (in memory only —
         // there is no durable cursor; converge-by-query is the recovery path).
         this.lastLedger = latestLedger + 1;
+        this.lastPollOkAt = Date.now();
       } catch (error) {
         span.addEvent("poll_error", {
           "error.message": error instanceof Error
@@ -233,7 +261,23 @@ export class EventWatcher {
           return;
         }
 
-        this.log.error(error, "EventWatcher poll error");
+        // Surface the failure (#10): the swallowing catch previously left the
+        // span un-errored and no health signal. Mark it ERROR, record the
+        // exception, and update the health state so /health can report it.
+        this.lastPollError = {
+          at: Date.now(),
+          message: error instanceof Error ? error.message : String(error),
+        };
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: this.lastPollError.message,
+        });
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+        this.log.error(error, "EventWatcher poll error", {
+          traceId: currentTraceId(),
+        });
       }
     });
   }
