@@ -2,7 +2,8 @@ import type { Logger } from "@/utils/logger/index.ts";
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import type { OperationsBundleRepository } from "@/persistence/drizzle/repository/operations-bundle.repository.ts";
 import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
-import { withSpan } from "@/core/tracing.ts";
+import { currentTraceId, withSpan } from "@/core/tracing.ts";
+import type { StructuredFailureDetail } from "@/core/service/executor/failure-detail.ts";
 
 export type ExecutionFailureResult = {
   bundleId: string;
@@ -22,6 +23,10 @@ export function handleExecutionFailure(
   deps: {
     operationsBundleRepository: OperationsBundleRepository;
     maxRetryAttempts: number;
+    /** True for an on-chain revert that will fail identically on retry. */
+    deterministic: boolean;
+    /** Structured identity persisted to `failureDetail` on terminal failure. */
+    failureDetail: StructuredFailureDetail;
     log: Logger;
   },
 ): Promise<ExecutionFailureResult[]> {
@@ -35,9 +40,17 @@ export function handleExecutionFailure(
     span.addEvent("handling_failure", {
       "error.message": errorMessage,
       "bundles.count": bundleIds.length,
+      deterministic: deps.deterministic,
+      "failure.code": deps.failureDetail.code,
     });
-    log.error(error, "execution failed");
+    log.error(error, "execution failed", {
+      bundleId: bundleIds,
+      failureCode: deps.failureDetail.code,
+      deterministic: deps.deterministic,
+      traceId: currentTraceId(),
+    });
 
+    const failureDetail = { ...deps.failureDetail };
     const bundlesToRetry: ExecutionFailureResult[] = [];
 
     for (const bundleId of bundleIds) {
@@ -50,18 +63,30 @@ export function handleExecutionFailure(
         }
 
         const nextRetryCount = (bundle.retryCount ?? 0) + 1;
+        // A deterministic revert is terminal immediately — retrying it only
+        // wastes submits and produces duplicate FAILED traces (#12).
         const hasReachedMaxAttempts = nextRetryCount >= deps.maxRetryAttempts;
+        const isTerminal = deps.deterministic || hasReachedMaxAttempts;
 
-        if (hasReachedMaxAttempts) {
+        if (isTerminal) {
           await deps.operationsBundleRepository.update(bundleId, {
             status: BundleStatus.FAILED,
             retryCount: nextRetryCount,
             lastFailureReason,
+            failureDetail,
             updatedAt: new Date(),
           });
           log.debug("bundleId", bundleId);
           log.debug("retryCount", nextRetryCount);
-          log.event("bundle moved to dead-letter after max retry attempts");
+          span.addEvent("bundle_failed_terminal", {
+            "bundle.id": bundleId,
+            reason: deps.deterministic ? "deterministic" : "max_retries",
+          });
+          log.event(
+            deps.deterministic
+              ? "bundle FAILED — deterministic revert, no retry"
+              : "bundle moved to dead-letter after max retry attempts",
+          );
         } else {
           await deps.operationsBundleRepository.update(bundleId, {
             status: BundleStatus.PENDING,
