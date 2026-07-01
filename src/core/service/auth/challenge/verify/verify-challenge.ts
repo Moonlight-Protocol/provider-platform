@@ -4,6 +4,7 @@ import { getProviderAccount } from "@/core/service/auth/service/service-account.
 import { NETWORK_CONFIG, SERVICE_DOMAIN } from "@/config/env.ts";
 import type { PostChallengeInput } from "@/core/service/auth/challenge/types.ts";
 import * as E from "@/core/service/auth/challenge/verify/error.ts";
+import { PlatformError } from "@/error/index.ts";
 import { assertOrThrow } from "@/utils/error/assert-or-throw.ts";
 import { isDefined } from "@/utils/type-guards/is-defined.ts";
 import { StrKey } from "@colibri/core";
@@ -128,6 +129,10 @@ export const P_VerifyChallenge = (deps: { log: Logger }) =>
               : String(error),
           });
           log.error(error, "challenge verification failed");
+          // Preserve a precise auth failure (e.g. MISSING_CLIENT_SIGNATURE
+          // 4xx) instead of masking every cause as a generic 500 (#4). Only
+          // genuinely unexpected errors become CHALLENGE_VERIFICATION_FAILED.
+          if (error instanceof PlatformError) throw error;
           throw new E.CHALLENGE_VERIFICATION_FAILED(error);
         }
       });
