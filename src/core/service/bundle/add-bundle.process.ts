@@ -447,11 +447,18 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
 
         span.addEvent("calculating_fee");
         log.event("calculating fee");
-        const amounts = await calculateOperationAmounts(
-          classified,
-          channelClient,
-          deps,
-        );
+        // First on-chain read of admission — fast-fail if the chain is
+        // unreachable rather than hanging the request (#2).
+        const amounts = await withTimeout(
+          calculateOperationAmounts(classified, channelClient, deps),
+          ADMISSION_RPC_TIMEOUT_MS,
+          "calculateOperationAmounts",
+        ).catch((error) => {
+          if (error instanceof TimeoutError) {
+            throw new E.CHANNEL_RPC_UNAVAILABLE(channelContractId);
+          }
+          throw error;
+        });
         const feeCalculation = calculateFee(amounts);
 
         span.addEvent("fee_calculated", {

@@ -89,7 +89,10 @@ class ExecutionError extends Error {
   readonly failureContext: ExecutionFailureContext;
 
   constructor(cause: Error, failureContext: ExecutionFailureContext) {
-    super(cause.message);
+    // Preserve the original error as `cause` so its structured payload (e.g.
+    // the colibri contract-error-matcher's meta.data.match with the soroban
+    // code) survives up to the decoder and the logs, per the bubbling model.
+    super(cause.message, { cause });
     this.name = "ExecutionError";
     this.stack = cause.stack;
     this.failureContext = failureContext;
