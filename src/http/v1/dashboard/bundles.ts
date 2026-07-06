@@ -156,6 +156,10 @@ export function handleGetBundleDetail(
           entityName,
           jurisdictions,
           amount: aggregateAmountFromMLXDR(bundle.operationsMLXDR),
+          // On-chain / in-flight failure reason for the operator (null unless
+          // the bundle FAILED). Operator's own bundles — no privacy reason to
+          // withhold it.
+          failureDetail: bundle.failureDetail ?? null,
         },
       };
       log.event("bundle detail response assembled");
@@ -205,6 +209,7 @@ export function handleListRecentBundles(
           operationsMLXDR: operationsBundle.operationsMLXDR,
           createdAt: operationsBundle.createdAt,
           updatedAt: operationsBundle.updatedAt,
+          failureDetail: operationsBundle.failureDetail,
           entityName: entity.name,
           entityJurisdictions: entity.jurisdictions,
         })
@@ -233,6 +238,7 @@ export function handleListRecentBundles(
             entityName: r.entityName,
             jurisdictions: r.entityJurisdictions ?? [],
             amount: aggregateAmountFromMLXDR(r.operationsMLXDR),
+            failureDetail: r.failureDetail ?? null,
             createdAt: r.createdAt instanceof Date
               ? r.createdAt.toISOString()
               : r.createdAt,
