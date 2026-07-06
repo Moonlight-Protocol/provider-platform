@@ -4,6 +4,7 @@ import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.ent
 import type { OperationsBundle } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import {
   AccountRepository,
+  BundleTransactionRepository,
   EntityRepository,
   OperationsBundleRepository,
 } from "@/persistence/drizzle/repository/index.ts";
@@ -48,6 +49,7 @@ const operationsBundleRepository = new OperationsBundleRepository(
 );
 const accountRepository = new AccountRepository(drizzleClient);
 const entityRepository = new EntityRepository(drizzleClient);
+const bundleTransactionRepository = new BundleTransactionRepository();
 
 /**
  * Parses MLXDR operations from a bundle entity
@@ -166,9 +168,31 @@ async function loadPendingBundlesFromDB(
   log.event("querying pending/processing bundles");
   const bundles = await operationsBundleRepository.findPendingOrProcessing();
   log.debug("count", bundles.length);
+
+  // Reconciliation guard (#11): a PROCESSING bundle that already has a linked
+  // transaction was submitted AND recorded before the crash. Re-executing it
+  // would double-submit; instead leave it PROCESSING for the verifier to
+  // reconcile against the chain (the verifier confirms it, or fails it once
+  // past its confirmation timeout — see #3). Only truly un-submitted bundles
+  // (PENDING, or PROCESSING with no transaction row) are re-hydrated.
+  const resubmittable: OperationsBundle[] = [];
+  for (const bundle of bundles) {
+    if (bundle.status === BundleStatus.PROCESSING) {
+      const links = await bundleTransactionRepository.findByBundleId(bundle.id);
+      if (links.length > 0) {
+        log.debug("bundleId", bundle.id);
+        log.event(
+          "skipping resubmit — bundle already has a transaction; left for verifier reconciliation",
+        );
+        continue;
+      }
+    }
+    resubmittable.push(bundle);
+  }
+
   log.event("hydrating SlotBundles");
   const slotBundles = await Promise.all(
-    bundles.map((bundle: OperationsBundle) =>
+    resubmittable.map((bundle: OperationsBundle) =>
       createSlotBundleFromEntity(bundle, deps)
     ),
   );

@@ -8,6 +8,7 @@ import type { PostEndpointInput } from "@/http/pipelines/types.ts";
 import type { OperationTypes } from "@moonlight/moonlight-sdk";
 import { MoonlightOperation } from "@moonlight/moonlight-sdk";
 import { resolveChannelContext } from "@/core/service/executor/channel-resolver.ts";
+import { TimeoutError, withTimeout } from "@/utils/async/with-timeout.ts";
 import {
   calculateBundleTtl,
   calculateBundleWeight,
@@ -53,6 +54,10 @@ const utxoRepository = new UtxoRepository(drizzleClient);
 const operationsBundleRepository = new OperationsBundleRepository(
   drizzleClient,
 );
+
+// Bounded so an unreachable Soroban RPC fast-fails admission (#2) instead of
+// hanging the request for minutes.
+const ADMISSION_RPC_TIMEOUT_MS = 10_000;
 
 const MEMPOOL_WEIGHT_CONFIG: WeightConfig = {
   expensiveOpWeight: MEMPOOL_EXPENSIVE_OP_WEIGHT,
@@ -137,15 +142,12 @@ function parseOperations(
       "operations.count": operationsMLXDR.length,
     });
     log.event("parsing MLXDR operations");
+    // `operationsMLXDR` is a 1:1 source for `operations` and the request
+    // schema already enforces `.min(1)` (returning a structured 400 before
+    // this runs), so an empty-operations case is unreachable here (#13).
     const operations = await Promise.all(
       operationsMLXDR.map((xdr) => MoonlightOperation.fromMLXDR(xdr)),
     );
-
-    if (operations.length === 0) {
-      span.addEvent("no_operations");
-      log.event("no operations parsed");
-      throw new E.NO_OPERATIONS_PROVIDED();
-    }
 
     span.addEvent("operations_parsed", {
       "operations.count": operations.length,
@@ -210,6 +212,7 @@ function persistSpendOperations(
   bundleId: string,
   accountId: string,
   channelClient: import("@moonlight/moonlight-sdk").PrivacyChannel,
+  channelContractId: string,
   deps: { log: Logger },
 ): Promise<void> {
   if (operations.length === 0) {
@@ -223,11 +226,16 @@ function persistSpendOperations(
     });
 
     const utxoPublicKeys = operations.map((op) => op.getUtxo());
-    const balances = await fetchUtxoBalances(
-      utxoPublicKeys,
-      channelClient,
-      deps,
-    );
+    const balances = await withTimeout(
+      fetchUtxoBalances(utxoPublicKeys, channelClient, deps),
+      ADMISSION_RPC_TIMEOUT_MS,
+      "fetchUtxoBalances",
+    ).catch((error) => {
+      if (error instanceof TimeoutError) {
+        throw new E.CHANNEL_RPC_UNAVAILABLE(channelContractId);
+      }
+      throw error;
+    });
 
     for (let i = 0; i < operations.length; i++) {
       const operation = operations[i];
@@ -350,11 +358,18 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
         log.debug("ppPublicKey", ppPublicKey);
 
         log.event("resolving channel context for PP");
-        const channelCtx = await resolveChannelContext(
-          channelContractId,
-          ppPublicKey,
-          deps,
-        );
+        const channelCtx = await withTimeout(
+          resolveChannelContext(channelContractId, ppPublicKey, deps),
+          ADMISSION_RPC_TIMEOUT_MS,
+          "resolveChannelContext",
+        ).catch((error) => {
+          // Fast-fail an unreachable chain during admission instead of
+          // hanging the request indefinitely (#2).
+          if (error instanceof TimeoutError) {
+            throw new E.CHANNEL_RPC_UNAVAILABLE(channelContractId);
+          }
+          throw error;
+        });
         const channelClient = channelCtx.channelClient;
 
         span.addEvent("validating_session");
@@ -432,11 +447,18 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
 
         span.addEvent("calculating_fee");
         log.event("calculating fee");
-        const amounts = await calculateOperationAmounts(
-          classified,
-          channelClient,
-          deps,
-        );
+        // First on-chain read of admission — fast-fail if the chain is
+        // unreachable rather than hanging the request (#2).
+        const amounts = await withTimeout(
+          calculateOperationAmounts(classified, channelClient, deps),
+          ADMISSION_RPC_TIMEOUT_MS,
+          "calculateOperationAmounts",
+        ).catch((error) => {
+          if (error instanceof TimeoutError) {
+            throw new E.CHANNEL_RPC_UNAVAILABLE(channelContractId);
+          }
+          throw error;
+        });
         const feeCalculation = calculateFee(amounts);
 
         span.addEvent("fee_calculated", {
@@ -494,6 +516,7 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
           bundleEntity.id,
           userSession.accountId,
           channelClient,
+          channelContractId,
           deps,
         );
 

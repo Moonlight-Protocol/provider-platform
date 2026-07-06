@@ -12,6 +12,13 @@ import { newNoop } from "@/utils/logger/index.ts";
 
 const MAX_RETRY = 3;
 
+// Transient (retryable) failure identity used by the existing retry cases.
+const PROVIDER_DETAIL = {
+  code: "PROVIDER_EXECUTION_FAILED",
+  source: "provider" as const,
+  message: "The bundle could not be submitted to the network.",
+};
+
 async function setup() {
   await ensureInitialized();
   await resetDb();
@@ -55,6 +62,8 @@ Deno.test(
     const retryMeta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      deterministic: false,
+      failureDetail: PROVIDER_DETAIL,
       log: newNoop(),
     });
 
@@ -73,6 +82,42 @@ Deno.test(
 );
 
 Deno.test(
+  "executor – deterministic revert: FAILED immediately with failureDetail, NOT retried",
+  async () => {
+    const repo = await setup();
+    const id = testBundleId();
+    // Well below max retries — a deterministic revert must not be retried.
+    await seedBundle({ id, retryCount: 0, status: BundleStatus.PROCESSING });
+
+    const error = makeError("Contract error: SignatureExpired");
+    const reason = makeLastFailureReason(error, id);
+    const sorobanDetail = {
+      code: "SOROBAN_1010",
+      source: "onchain" as const,
+      name: "SignatureExpired",
+      message: "A signature expired before the current ledger.",
+    };
+
+    const retryMeta = await handleExecutionFailure(error, [id], reason, {
+      operationsBundleRepository: repo,
+      maxRetryAttempts: MAX_RETRY,
+      deterministic: true,
+      failureDetail: sorobanDetail,
+      log: newNoop(),
+    });
+
+    // Not returned for retry.
+    assertEquals(retryMeta.length, 0);
+
+    const found = await repo.findById(id);
+    assertExists(found);
+    assertEquals(found.status, BundleStatus.FAILED);
+    assertEquals(found.failureDetail?.code, "SOROBAN_1010");
+    assertEquals(found.failureDetail?.source, "onchain");
+  },
+);
+
+Deno.test(
   "executor – at max retries (dead-letter): status→FAILED, retryCount=MAX, NOT returned for retry",
   async () => {
     const repo = await setup();
@@ -85,6 +130,8 @@ Deno.test(
     const retryMeta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      deterministic: false,
+      failureDetail: PROVIDER_DETAIL,
       log: newNoop(),
     });
 
@@ -134,6 +181,8 @@ Deno.test(
       {
         operationsBundleRepository: repo,
         maxRetryAttempts: MAX_RETRY,
+        deterministic: false,
+        failureDetail: PROVIDER_DETAIL,
         log: newNoop(),
       },
     );
@@ -169,6 +218,8 @@ Deno.test(
     await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      deterministic: false,
+      failureDetail: PROVIDER_DETAIL,
       log: newNoop(),
     });
 
@@ -199,6 +250,8 @@ Deno.test(
     const meta = await handleExecutionFailure(error, [id], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      deterministic: false,
+      failureDetail: PROVIDER_DETAIL,
       log: newNoop(),
     });
 
@@ -224,6 +277,8 @@ Deno.test(
     const meta = await handleExecutionFailure(error, [missingId], reason, {
       operationsBundleRepository: repo,
       maxRetryAttempts: MAX_RETRY,
+      deterministic: false,
+      failureDetail: PROVIDER_DETAIL,
       log: newNoop(),
     });
 

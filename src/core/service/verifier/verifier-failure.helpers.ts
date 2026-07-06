@@ -12,6 +12,14 @@ export type VerifierFailureDeps = {
   createSlotBundleFn: (bundle: OperationsBundle) => Promise<SlotBundle>;
   reAddBundlesFn: (bundles: SlotBundle[]) => Promise<void>;
   maxRetryAttempts: number;
+  /**
+   * Force terminal FAILED with no retry — set for deterministic outcomes
+   * (an on-chain result-code failure, or a confirmation timeout) that would
+   * fail identically on resubmit (#3, #12). Defaults to retryable.
+   */
+  terminal?: boolean;
+  /** Structured identity persisted to `failureDetail` on terminal failure. */
+  failureDetail?: Record<string, unknown>;
   log: Logger;
 };
 
@@ -52,6 +60,7 @@ export async function handleVerificationFailure(
 
       const nextRetryCount = (bundle.retryCount ?? 0) + 1;
       const hasReachedMaxAttempts = nextRetryCount >= deps.maxRetryAttempts;
+      const isTerminal = deps.terminal || hasReachedMaxAttempts;
 
       const lastFailureReason = safeJsonStringify({
         occurredAt: new Date().toISOString(),
@@ -62,15 +71,16 @@ export async function handleVerificationFailure(
       }) ?? reason;
 
       await deps.operationsBundleRepository.update(bundleId, {
-        status: hasReachedMaxAttempts
-          ? BundleStatus.FAILED
-          : BundleStatus.PENDING,
+        status: isTerminal ? BundleStatus.FAILED : BundleStatus.PENDING,
         retryCount: nextRetryCount,
         lastFailureReason,
+        ...(isTerminal && deps.failureDetail
+          ? { failureDetail: deps.failureDetail }
+          : {}),
         updatedAt: new Date(),
       });
 
-      if (!hasReachedMaxAttempts) {
+      if (!isTerminal) {
         retryableBundleIds.push(bundleId);
       } else {
         log.debug("bundleId", bundleId);

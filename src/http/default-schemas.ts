@@ -22,6 +22,9 @@ export const errorStatusSchema = z.union([
   z.literal(Status.InternalServerError),
   z.literal(Status.TooManyRequests),
   z.literal(Status.Conflict),
+  // 503 — a dependency (e.g. Soroban RPC) is temporarily unreachable and the
+  // client should retry; used by the admission fast-fail (#2).
+  z.literal(Status.ServiceUnavailable),
 ]);
 
 export const errorResponseSchema = z.object({

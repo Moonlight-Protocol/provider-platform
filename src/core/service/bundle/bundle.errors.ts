@@ -7,7 +7,8 @@ export enum BUNDLE_ERROR_CODES {
   INSUFFICIENT_UTXOS = "BND_004",
   UTXO_NOT_FOUND = "BND_005",
   SPEND_OPERATION_NOT_SIGNED = "BND_006",
-  NO_OPERATIONS_PROVIDED = "BND_007",
+  // BND_007 (NO_OPERATIONS_PROVIDED) removed — unreachable behind the request
+  // schema's operationsMLXDR.min(1) validation (#13).
   BUNDLE_NOT_FOUND = "BND_008",
   BUNDLE_ACCESS_FORBIDDEN = "BND_009",
   TOO_MANY_OPERATIONS = "BND_010",
@@ -16,6 +17,7 @@ export enum BUNDLE_ERROR_CODES {
   PP_NOT_FOUND = "BND_013",
   PP_NOT_MEMBER_OF_CHANNEL = "BND_014",
   CHANNEL_DISABLED = "BND_015",
+  CHANNEL_RPC_UNAVAILABLE = "BND_016",
 }
 
 const source = "@service/bundle";
@@ -110,6 +112,32 @@ export class CHANNEL_DISABLED extends PlatformError<{
         message: "Channel is disabled (withdraw-only)",
         details:
           "This channel has been disabled by its council. You can still withdraw existing funds, but new deposits and sends are not accepted until the council re-enables it.",
+      },
+      meta: { channelContractId },
+    });
+  }
+}
+
+/**
+ * Error thrown when an on-chain read needed to admit a bundle (channel
+ * context resolution or UTXO balance lookup) does not respond within the
+ * admission timeout. Fast-fails the request instead of hanging (#2).
+ */
+export class CHANNEL_RPC_UNAVAILABLE extends PlatformError<{
+  channelContractId: string;
+}> {
+  constructor(channelContractId: string) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.CHANNEL_RPC_UNAVAILABLE,
+      message: "Channel network is temporarily unavailable",
+      details:
+        `An on-chain read for channel '${channelContractId}' did not respond in time.`,
+      api: {
+        status: 503,
+        message: "Channel network is temporarily unavailable",
+        details:
+          "The network could not be reached to process your bundle right now. Please try again shortly.",
       },
       meta: { channelContractId },
     });
@@ -224,26 +252,6 @@ export class BUNDLE_ALREADY_EXISTS extends PlatformError<{ bundleId: string }> {
       },
       meta: {
         bundleId,
-      },
-    });
-  }
-}
-
-/**
- * Error thrown when no operations are provided in the bundle
- */
-export class NO_OPERATIONS_PROVIDED extends PlatformError {
-  constructor() {
-    super({
-      source,
-      code: BUNDLE_ERROR_CODES.NO_OPERATIONS_PROVIDED,
-      message: "No operations provided",
-      details: "The operations bundle must contain at least one operation.",
-      api: {
-        status: 400,
-        message: "No operations provided",
-        details:
-          "The request must include at least one operation in the operations bundle.",
       },
     });
   }

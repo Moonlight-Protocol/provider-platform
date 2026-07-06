@@ -15,7 +15,7 @@ import {
 import { BundleStatus } from "@/persistence/drizzle/entity/operations-bundle.entity.ts";
 import { getMempool } from "@/core/mempool/index.ts";
 import { createSlotBundleFromEntity } from "@/core/service/mempool/mempool.process.ts";
-import { withSpan } from "@/core/tracing.ts";
+import { currentTraceId, withSpan } from "@/core/tracing.ts";
 import {
   handleVerificationFailure as _handleVerificationFailure,
 } from "@/core/service/verifier/verifier-failure.helpers.ts";
@@ -78,6 +78,7 @@ function handleVerificationFailure(
   reason: string,
   bundleIds: string[],
   log: Logger,
+  opts?: { terminal?: boolean; failureDetail?: Record<string, unknown> },
 ): Promise<void> {
   return _handleVerificationFailure(txId, reason, bundleIds, {
     operationsBundleRepository,
@@ -86,6 +87,8 @@ function handleVerificationFailure(
     createSlotBundleFn: (bundle) => createSlotBundleFromEntity(bundle, { log }),
     reAddBundlesFn: (bundles) => getMempool().reAddBundles(bundles),
     maxRetryAttempts: VERIFIER_MAX_RETRY_ATTEMPTS,
+    terminal: opts?.terminal,
+    failureDetail: opts?.failureDetail,
     log,
   });
 }
@@ -262,7 +265,7 @@ export class Verifier {
         );
 
         for (const transaction of unverifiedTransactions) {
-          await this.verifyTransaction(transaction.id);
+          await this.verifyTransaction(transaction);
         }
 
         span.addEvent("verification_cycle_complete");
@@ -272,10 +275,9 @@ export class Verifier {
             ? error.message
             : String(error),
         });
-        this.log.error(
-          new Error(String("Error during transaction verification")),
-          "Error during transaction verification",
-        );
+        this.log.error(error, "Error during transaction verification", {
+          traceId: currentTraceId(),
+        });
       }
     });
   }
@@ -283,7 +285,10 @@ export class Verifier {
   /**
    * Verifies a single transaction
    */
-  private verifyTransaction(txId: string): Promise<void> {
+  private verifyTransaction(
+    transaction: { id: string; timeout: Date },
+  ): Promise<void> {
+    const txId = transaction.id;
     return withSpan("Verifier.verifyTransaction", async (span) => {
       try {
         span.setAttribute("tx.id", txId);
@@ -316,11 +321,21 @@ export class Verifier {
           const channelContractId = await findFirstBundleChannel(bundleIds, {
             log: this.log,
           });
+          // An applied-but-failed tx is deterministic — mark terminal with a
+          // structured on-chain identity, no retry (#1, #12).
           await handleVerificationFailure(
             txId,
             result.reason,
             bundleIds,
             this.log,
+            {
+              terminal: true,
+              failureDetail: {
+                code: "ONCHAIN_TX_FAILED",
+                source: "onchain",
+                message: "The transaction failed on-chain.",
+              },
+            },
           );
           if (channelContractId) {
             await emitForBundles(bundleIds, (scope) => ({
@@ -335,6 +350,27 @@ export class Verifier {
               },
             }), { log: this.log });
           }
+        } else if (Date.now() > transaction.timeout.getTime()) {
+          // Dropped / never-closed tx past its confirmation window: fail it
+          // instead of leaving the bundle PROCESSING forever (#3).
+          span.addEvent("transaction_confirmation_timeout", {
+            "tx.timeout": transaction.timeout.toISOString(),
+          });
+          this.log.event(`Transaction ${txId} timed out awaiting confirmation`);
+          await handleVerificationFailure(
+            txId,
+            `Confirmation timeout: not observed on-network by ${transaction.timeout.toISOString()}`,
+            bundleIds,
+            this.log,
+            {
+              terminal: true,
+              failureDetail: {
+                code: "PROVIDER_TX_TIMEOUT",
+                source: "provider",
+                message: "The transaction was not confirmed in time.",
+              },
+            },
+          );
         } else {
           this.log.event(`Transaction ${txId} still pending verification`);
         }
@@ -344,10 +380,10 @@ export class Verifier {
             ? error.message
             : String(error),
         });
-        this.log.error(
-          new Error(String(`Failed to verify transaction ${txId}`)),
-          `Failed to verify transaction ${txId}`,
-        );
+        this.log.error(error, `Failed to verify transaction ${txId}`, {
+          bundleId: txId,
+          traceId: currentTraceId(),
+        });
       }
     });
   }

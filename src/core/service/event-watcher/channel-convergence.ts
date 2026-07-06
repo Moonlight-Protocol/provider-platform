@@ -1,4 +1,5 @@
 import type { ChannelRegistry } from "./channel-registry.ts";
+import type { Logger } from "@/utils/logger/index.ts";
 
 /**
  * Subset of a council's public state (`GET /api/v1/public/council`) the provider
@@ -17,6 +18,7 @@ export interface CouncilConfigData {
 export async function fetchCouncilConfig(
   councilUrl: string,
   channelAuthId: string,
+  deps?: { log?: Logger },
 ): Promise<CouncilConfigData | null> {
   try {
     const res = await fetch(
@@ -24,10 +26,23 @@ export async function fetchCouncilConfig(
         encodeURIComponent(channelAuthId)
       }`,
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Best-effort still, but no longer silent (#10): a persistently failing
+      // council query degrades convergence and must be visible.
+      deps?.log?.error(
+        new Error(`council config query returned ${res.status}`),
+        "fetchCouncilConfig non-OK response",
+        { councilUrl, channelAuthId, status: res.status },
+      );
+      return null;
+    }
     const { data } = await res.json();
     return data as CouncilConfigData;
-  } catch {
+  } catch (error) {
+    deps?.log?.error(error, "fetchCouncilConfig failed", {
+      councilUrl,
+      channelAuthId,
+    });
     return null;
   }
 }

@@ -27,7 +27,12 @@ import {
   TransactionRepository,
 } from "@/persistence/drizzle/repository/index.ts";
 import { safeJsonStringify } from "@/utils/parse/safeStringify.ts";
-import { withSpan } from "@/core/tracing.ts";
+import { currentTraceId, withSpan } from "@/core/tracing.ts";
+import {
+  buildFailureDetail,
+  isDeterministic,
+  type StructuredFailureDetail,
+} from "@/core/service/executor/failure-detail.ts";
 import {
   buildRetryBundles,
   handleExecutionFailure as _handleExecutionFailure,
@@ -84,7 +89,10 @@ class ExecutionError extends Error {
   readonly failureContext: ExecutionFailureContext;
 
   constructor(cause: Error, failureContext: ExecutionFailureContext) {
-    super(cause.message);
+    // Preserve the original error as `cause` so its structured payload (e.g.
+    // the colibri contract-error-matcher's meta.data.match with the soroban
+    // code) survives up to the decoder and the logs, per the bubbling model.
+    super(cause.message, { cause });
     this.name = "ExecutionError";
     this.stack = cause.stack;
     this.failureContext = failureContext;
@@ -268,11 +276,14 @@ function handleExecutionFailure(
   error: Error,
   bundleIds: string[],
   lastFailureReason: string,
+  outcome: { deterministic: boolean; failureDetail: StructuredFailureDetail },
   log: Logger,
 ) {
   return _handleExecutionFailure(error, bundleIds, lastFailureReason, {
     operationsBundleRepository,
     maxRetryAttempts: EXECUTOR_CONFIG.MAX_RETRY_ATTEMPTS,
+    deterministic: outcome.deterministic,
+    failureDetail: outcome.failureDetail,
     log,
   });
 }
@@ -521,13 +532,24 @@ export class Executor {
         const lastFailureReason = safeJsonStringify(lastFailureReasonPayload) ??
           truncate(errorMessage, 2000);
 
-        this.log.error(
-          new Error(String("Slot execution failed")),
-          "Slot execution failed",
-        );
+        // Translate the failure into a stable identity ONCE, and decide
+        // whether it is deterministic (an on-chain revert that will fail
+        // identically on retry) or transient (retryable).
+        const failureDetail = buildFailureDetail(errorInstance, networkCtx);
+        const deterministic = isDeterministic(errorInstance);
 
         const failedChannelContractId = slot?.getBundles()[0]
           ?.channelContractId ?? null;
+
+        // Preserve the real cause (its full chain is flattened by the logger)
+        // instead of discarding it behind a generic "Slot execution failed".
+        this.log.error(errorInstance, "Slot execution failed", {
+          bundleId: bundleIds,
+          channelContractId: failedChannelContractId,
+          failureCode: failureDetail.code,
+          deterministic,
+          traceId: currentTraceId(),
+        });
         if (failedChannelContractId) {
           await emitForBundles(bundleIds, (scope) => ({
             kind: "executor.execution_failed",
@@ -548,6 +570,7 @@ export class Executor {
             errorInstance,
             bundleIds,
             lastFailureReason,
+            { deterministic, failureDetail },
             this.log,
           );
 
@@ -563,10 +586,9 @@ export class Executor {
           }
         } else {
           this.log.error(
-            new Error(
-              String("Execution error with no slot or bundles to re-add"),
-            ),
+            errorInstance,
             "Execution error with no slot or bundles to re-add",
+            { bundleId: bundleIds, traceId: currentTraceId() },
           );
         }
       } finally {
