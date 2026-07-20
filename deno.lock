@@ -4,7 +4,7 @@
     "jsr:@colibri/core@0.22": "0.22.0",
     "jsr:@fifo/convee@0.10": "0.10.0",
     "jsr:@fifo/convee@1.0.0": "1.0.0",
-    "jsr:@moonlight/moonlight-sdk@0.12": "0.12.0",
+    "jsr:@moonlight/moonlight-sdk@~0.12.1": "0.12.1",
     "jsr:@noble/curves@^1.8.0": "1.9.0",
     "jsr:@noble/hashes@1.8.0": "1.8.0",
     "jsr:@noble/hashes@^1.6.1": "1.8.0",
@@ -63,8 +63,8 @@
     "@fifo/convee@1.0.0": {
       "integrity": "b61bfa222b9b8a53f0f2af1f35148fd54d86afc2fc3d6b5d073d56aaa369d9a3"
     },
-    "@moonlight/moonlight-sdk@0.12.0": {
-      "integrity": "2522d7a5bd1e03b69d48caaa3f9742e4d663bd00bc9ebb45854d5b41133ad369",
+    "@moonlight/moonlight-sdk@0.12.1": {
+      "integrity": "2294af5bcebb8c547fc74660fb315887954b3153abbf687fbc46a45886ec8c09",
       "dependencies": [
         "jsr:@colibri/core",
         "jsr:@noble/curves",
@@ -1091,7 +1091,7 @@
     "dependencies": [
       "jsr:@colibri/core@0.22",
       "jsr:@fifo/convee@0.10",
-      "jsr:@moonlight/moonlight-sdk@0.12",
+      "jsr:@moonlight/moonlight-sdk@~0.12.1",
       "jsr:@noble/curves@^1.8.0",
       "jsr:@noble/hashes@^1.6.1",
       "jsr:@oak/oak@^17.1.4",
