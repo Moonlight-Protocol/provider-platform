@@ -4,7 +4,7 @@
     "jsr:@colibri/core@0.22": "0.22.0",
     "jsr:@fifo/convee@0.10": "0.10.0",
     "jsr:@fifo/convee@1.0.0": "1.0.0",
-    "jsr:@moonlight/moonlight-sdk@0.11": "0.11.0",
+    "jsr:@moonlight/moonlight-sdk@~0.12.1": "0.12.1",
     "jsr:@noble/curves@^1.8.0": "1.9.0",
     "jsr:@noble/hashes@1.8.0": "1.8.0",
     "jsr:@noble/hashes@^1.6.1": "1.8.0",
@@ -15,18 +15,18 @@
     "jsr:@std/bytes@1": "1.0.6",
     "jsr:@std/bytes@^1.0.4": "1.0.6",
     "jsr:@std/cli@1.0.12": "1.0.12",
-    "jsr:@std/collections@^1.0.9": "1.2.0",
-    "jsr:@std/collections@^1.1.3": "1.2.0",
+    "jsr:@std/collections@^1.0.9": "1.3.0",
+    "jsr:@std/collections@^1.1.3": "1.3.0",
     "jsr:@std/crypto@1": "1.1.0",
     "jsr:@std/dotenv@~0.225.6": "0.225.7",
     "jsr:@std/encoding@0.224.0": "0.224.0",
-    "jsr:@std/encoding@1": "1.0.10",
-    "jsr:@std/encoding@^1.0.10": "1.0.10",
-    "jsr:@std/http@1": "1.1.1",
+    "jsr:@std/encoding@1": "1.0.11",
+    "jsr:@std/encoding@^1.0.11": "1.0.11",
+    "jsr:@std/http@1": "1.1.2",
     "jsr:@std/internal@^1.0.12": "1.0.14",
     "jsr:@std/internal@^1.0.14": "1.0.14",
     "jsr:@std/media-types@1": "1.1.0",
-    "jsr:@std/path@1": "1.1.5",
+    "jsr:@std/path@1": "1.1.6",
     "jsr:@std/toml@^1.0.11": "1.0.11",
     "jsr:@std/ulid@1": "1.0.0",
     "jsr:@zaubrik/djwt@^3.0.2": "3.0.2",
@@ -63,8 +63,8 @@
     "@fifo/convee@1.0.0": {
       "integrity": "b61bfa222b9b8a53f0f2af1f35148fd54d86afc2fc3d6b5d073d56aaa369d9a3"
     },
-    "@moonlight/moonlight-sdk@0.11.0": {
-      "integrity": "2c5595abc19e8b35e4faf56c573bb127b59b2a9e7d86dda49a180ff2263ffb11",
+    "@moonlight/moonlight-sdk@0.12.1": {
+      "integrity": "2294af5bcebb8c547fc74660fb315887954b3153abbf687fbc46a45886ec8c09",
       "dependencies": [
         "jsr:@colibri/core",
         "jsr:@noble/curves",
@@ -128,8 +128,8 @@
     "@std/cli@1.0.12": {
       "integrity": "e5cfb7814d189da174ecd7a34fbbd63f3513e24a1b307feb2fcd5da47a070d90"
     },
-    "@std/collections@1.2.0": {
-      "integrity": "47627a21d3a13138b77fd0e4d790ba9d2e603c3510b686cde6b132fe9aa98a88"
+    "@std/collections@1.3.0": {
+      "integrity": "eb36b43d784477ea0b476483ac034a14bdd182aff921c812ecf662a1fcef9498"
     },
     "@std/crypto@1.1.0": {
       "integrity": "b8d6d0a6377a32b213af2661ed7bf1062d94feac0c57def5526a8e74a95c3ec8"
@@ -140,13 +140,13 @@
     "@std/encoding@0.224.0": {
       "integrity": "efb6dca97d3e9c31392bd5c8cfd9f9fc9decf5a1f4d1f78af7900a493bcf89b5"
     },
-    "@std/encoding@1.0.10": {
-      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
     },
-    "@std/http@1.1.1": {
-      "integrity": "e343a9a80aea07c716b91be5c79df764144430ad2dd7c9121ed7443f08dc74f7",
+    "@std/http@1.1.2": {
+      "integrity": "1c0473590d5e5b75b30b2be4833c08047dd799aeea35624fd34ec58d67fc9240",
       "dependencies": [
-        "jsr:@std/encoding@^1.0.10"
+        "jsr:@std/encoding@^1.0.11"
       ]
     },
     "@std/internal@1.0.14": {
@@ -155,8 +155,8 @@
     "@std/media-types@1.1.0": {
       "integrity": "c9d093f0c05c3512932b330e3cc1fe1d627b301db33a4c2c2185c02471d6eaa4"
     },
-    "@std/path@1.1.5": {
-      "integrity": "ccea00982ea28c36becaf6e62f855406c76a8c32d462f66f415bbb7d83a271bc",
+    "@std/path@1.1.6": {
+      "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
       "dependencies": [
         "jsr:@std/internal@^1.0.14"
       ]
@@ -597,7 +597,8 @@
         "bignumber.js",
         "buffer",
         "sha.js"
-      ]
+      ],
+      "deprecated": true
     },
     "@stellar/stellar-sdk@15.1.0": {
       "integrity": "sha512-GsJUcWx2yboVzYdhTe/LHS3V1wVLSHkUkglC5bBoYWGJt31vzIhbSGno60NP9CdCTNkLJdnrsLJ63oA58Zvh5A==",
@@ -869,8 +870,8 @@
         "is-callable"
       ]
     },
-    "form-data@4.0.5": {
-      "integrity": "sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==",
+    "form-data@4.0.6": {
+      "integrity": "sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==",
       "dependencies": [
         "asynckit",
         "combined-stream",
@@ -1090,7 +1091,7 @@
     "dependencies": [
       "jsr:@colibri/core@0.22",
       "jsr:@fifo/convee@0.10",
-      "jsr:@moonlight/moonlight-sdk@0.11",
+      "jsr:@moonlight/moonlight-sdk@~0.12.1",
       "jsr:@noble/curves@^1.8.0",
       "jsr:@noble/hashes@^1.6.1",
       "jsr:@oak/oak@^17.1.4",
