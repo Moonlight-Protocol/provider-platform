@@ -109,7 +109,10 @@ function flattenCauses(err: unknown): string {
   for (let depth = 0; depth < 16 && current != null; depth++) {
     if (seen.has(current)) break;
     seen.add(current);
-    parts.push(current instanceof Error ? current.message : String(current));
+    // Non-Error throws (e.g. the Stellar RPC's plain-object error responses)
+    // must not go through String(), which renders them as "[object Object]".
+    // stringify() JSON-encodes objects so the actual error content survives.
+    parts.push(current instanceof Error ? current.message : stringify(current));
     current = current instanceof Error
       ? (current as { cause?: unknown }).cause
       : undefined;
