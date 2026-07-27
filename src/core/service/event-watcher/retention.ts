@@ -1,13 +1,32 @@
 import type { Logger } from "@/utils/logger/index.ts";
 
 /**
+ * Extract searchable text from a thrown value. The Stellar RPC rejects with a
+ * plain `{ code, message }` object, not an Error, so `String(error)` yields
+ * "[object Object]" and loses the message. Read `.message` when present, else
+ * JSON-encode, so retention detection sees the real text.
+ */
+function retentionErrorText(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error !== null && typeof error === "object") {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
+/**
  * Detect the Stellar RPC "startLedger out of retention" condition. When the
  * persisted cursor predates the RPC's retention window, getEvents fails and we
  * must reset the cursor and reconcile state via a council query instead.
  */
 export function isOutOfRetentionError(error: unknown): boolean {
-  const msg = (error instanceof Error ? error.message : String(error))
-    .toLowerCase();
+  const msg = retentionErrorText(error).toLowerCase();
   return (
     msg.includes("startledger") ||
     (msg.includes("ledger") &&
