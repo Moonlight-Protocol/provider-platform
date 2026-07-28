@@ -3,11 +3,10 @@ import type { Server } from "stellar-sdk/rpc";
 import { fetchChannelAuthEvents } from "./event-watcher.service.ts";
 import type { ChannelAuthEvent } from "./event-watcher.types.ts";
 import { currentTraceId, SpanStatusCode, withSpan } from "@/core/tracing.ts";
-import { recoverFromOutOfRetention } from "./retention.ts";
+import { isOutOfRetentionError } from "./retention.ts";
 import { resolveBootStartLedger } from "./start-ledger.ts";
 
 export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
-export type ResyncHandler = () => void | Promise<void>;
 
 /**
  * EventWatcher polls Stellar RPC for Channel Auth contract events
@@ -39,7 +38,6 @@ export class EventWatcher {
   private contractIds: Set<string>;
   private intervalMs: number;
   private handlers: EventHandler[] = [];
-  private resyncHandlers: ResyncHandler[] = [];
   private rpc: Server;
   private startLedgerBlock: number | null;
   private log: Logger;
@@ -115,14 +113,6 @@ export class EventWatcher {
    */
   onEvent(handler: EventHandler): void {
     this.handlers.push(handler);
-  }
-
-  /**
-   * Register a handler invoked when the watcher recovers from an out-of-retention
-   * cursor — the cue to reconcile state via a council query.
-   */
-  onResync(handler: ResyncHandler): void {
-    this.resyncHandlers.push(handler);
   }
 
   /**
@@ -241,23 +231,19 @@ export class EventWatcher {
             : String(error),
         });
 
-        try {
-          const recoveredCursor = await recoverFromOutOfRetention(
-            error,
-            () => this.rpc.getLatestLedger(),
-            () => this.fireResync(),
-            this.log,
+        // Out of retention: the cursor fell below the RPC's retained window
+        // (e.g. it was held at a stale position while no contract was watched,
+        // and the window slid past it). Reset it so the next poll re-resolves
+        // to the oldest retained ledger and reads FORWARD from there. Never
+        // jump to "latest" — that skips the gap, and the skipped gap can hold
+        // the very events we exist to process (e.g. provider_added, which
+        // activates a membership).
+        if (isOutOfRetentionError(error)) {
+          span.addEvent("out_of_retention_reset");
+          this.log.event(
+            "EventWatcher cursor out of retention; resetting to oldest retained",
           );
-          if (recoveredCursor !== null) {
-            span.addEvent("out_of_retention_recovery");
-            this.lastLedger = recoveredCursor;
-            return;
-          }
-        } catch (recoveryError) {
-          this.log.error(
-            recoveryError,
-            "EventWatcher out-of-retention recovery failed",
-          );
+          this.lastLedger = null;
           return;
         }
 
@@ -280,19 +266,6 @@ export class EventWatcher {
         });
       }
     });
-  }
-
-  /**
-   * Invoke all registered resync handlers (best-effort, isolated failures).
-   */
-  private async fireResync(): Promise<void> {
-    for (const handler of this.resyncHandlers) {
-      try {
-        await handler();
-      } catch (error) {
-        this.log.error(error, "EventWatcher resync handler error");
-      }
-    }
   }
 
   /**

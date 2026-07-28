@@ -248,6 +248,43 @@ function flakyBootRpc(
   return { rpc, healthCalls: () => healthCalls };
 }
 
+/**
+ * RPC mock that rejects the first getEvents with a plain-object out-of-retention
+ * error (the real Stellar RPC shape), then — after the watcher resets and
+ * re-resolves — serves a provider_added event at the oldest retained ledger.
+ * Proves the watcher reads the event FORWARD after reset instead of skipping it.
+ */
+function outOfRetentionThenServes(
+  opts: { oldestLedger: number; latestLedger: number; address: string },
+) {
+  let eventsCalls = 0;
+  const rpc = {
+    // deno-lint-ignore require-await -- mock satisfies async getHealth contract
+    getHealth: async () => ({ oldestLedger: opts.oldestLedger }),
+    // deno-lint-ignore require-await -- mock satisfies async getEvents contract
+    getEvents: async () => {
+      eventsCalls++;
+      if (eventsCalls === 1) {
+        // Stale cursor: the RPC rejects with a plain object, not an Error.
+        throw {
+          code: -32600,
+          message:
+            `startLedger must be within the ledger range: ${opts.oldestLedger} - ${opts.latestLedger}`,
+        };
+      }
+      // After reset the watcher re-resolves to oldest and reads forward, landing
+      // on the event that must NOT be skipped.
+      return {
+        events: [rawProviderAddedEvent(opts.address, opts.oldestLedger)],
+        latestLedger: opts.latestLedger,
+      };
+    },
+    // deno-lint-ignore require-await -- mock satisfies async getLatestLedger contract
+    getLatestLedger: async () => ({ sequence: opts.latestLedger }),
+  } as unknown as Server;
+  return { rpc, eventsCalls: () => eventsCalls };
+}
+
 /** Poll `predicate` on the macrotask queue until true or `timeoutMs` elapses. */
 async function waitUntil(
   predicate: () => boolean,
@@ -295,4 +332,34 @@ Deno.test("EventWatcher - transient boot-ledger failure retries instead of killi
   assertEquals(received[0].address, ADDRESS);
   // Cursor advanced past the latest ledger — the loop is live, not stuck at boot.
   assertEquals(watcher.getLastLedger(), 5101);
+});
+
+Deno.test("EventWatcher - out-of-retention poll resets to oldest and reads the event forward (never skips it)", async () => {
+  const ADDRESS = Keypair.random().publicKey();
+  const { rpc } = outOfRetentionThenServes({
+    oldestLedger: 5000,
+    latestLedger: 5100,
+    address: ADDRESS,
+  });
+
+  const received: ChannelAuthEvent[] = [];
+  const watcher = new EventWatcher(
+    { contractIds: [CONTRACT], intervalMs: 20 },
+    { log: newNoop(), rpc, startLedgerBlock: null },
+  );
+  watcher.onEvent((event) => {
+    received.push(event);
+  });
+
+  await watcher.start();
+
+  // The first poll hits out-of-retention. The watcher must reset and re-resolve
+  // to oldest, then read forward and process the event — not jump past it.
+  const got = await waitUntil(() => received.length > 0);
+  watcher.stop();
+
+  assertEquals(got, true);
+  assertEquals(received.length, 1);
+  assertEquals(received[0].type, "provider_added");
+  assertEquals(received[0].address, ADDRESS);
 });
