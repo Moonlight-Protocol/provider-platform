@@ -57,24 +57,27 @@ function capturingRpc(opts: { oldestLedger: number; latestLedger: number }) {
   return { rpc, polledContractIds };
 }
 
-Deno.test("EventWatcher - override set → first getEvents at exactly that ledger", async () => {
+Deno.test("EventWatcher - live reads from the tip; backfill reads from the override", async () => {
   const { rpc, startLedgers } = mockRpc({
     oldestLedger: 5000,
     latestLedger: 5100,
   });
   const watcher = new EventWatcher(
     { contractIds: [CONTRACT], intervalMs: 60_000 },
-    { log: newNoop(), rpc, startLedgerBlock: 12345 },
+    { log: newNoop(), rpc, startLedgerBlock: 5050 },
   );
 
   await watcher.start();
-  await tick(); // let the first poll resolve the boot ledger and fetch
+  await tick(); // let the first poll init cursors + do live and backfill reads
   watcher.stop();
 
-  assertEquals(startLedgers[0], 12345);
+  // Live follows the tip so new events are caught within one interval; backfill
+  // walks history forward from the override.
+  assertEquals(startLedgers[0], 5100); // live: the tip
+  assertEquals(startLedgers.includes(5050), true); // backfill: the override
 });
 
-Deno.test("EventWatcher - override unset → first getEvents at oldest available", async () => {
+Deno.test("EventWatcher - live reads from the tip; backfill reads from oldest when unset", async () => {
   const { rpc, startLedgers } = mockRpc({
     oldestLedger: 5000,
     latestLedger: 5100,
@@ -85,36 +88,36 @@ Deno.test("EventWatcher - override unset → first getEvents at oldest available
   );
 
   await watcher.start();
-  await tick(); // let the first poll resolve the boot ledger and fetch
+  await tick();
   watcher.stop();
 
-  assertEquals(startLedgers[0], 5000);
+  assertEquals(startLedgers[0], 5100); // live: the tip
+  assertEquals(startLedgers.includes(5000), true); // backfill: oldest available
 });
 
-Deno.test("EventWatcher - holds no durable cursor: a restart re-syncs from oldest", async () => {
-  // First watcher polls once and advances its in-memory cursor past 5100.
+Deno.test("EventWatcher - holds no durable cursor: a restart re-walks history from oldest", async () => {
   const first = mockRpc({ oldestLedger: 5000, latestLedger: 5100 });
   const w1 = new EventWatcher(
     { contractIds: [CONTRACT], intervalMs: 60_000 },
     { log: newNoop(), rpc: first.rpc, startLedgerBlock: null },
   );
   await w1.start();
-  await tick(); // wait for the first poll to advance the in-memory cursor
+  await tick();
   w1.stop();
-  assertEquals(w1.getLastLedger(), 5101); // advanced in memory
+  assertEquals(w1.getLastLedger(), 5101); // live advanced past the tip
 
-  // A fresh watcher (simulating a process restart) must start from oldest
-  // again — nothing was persisted, so it does not resume at 5101.
+  // A fresh watcher (simulating a process restart) re-walks history from oldest
+  // — nothing was persisted.
   const second = mockRpc({ oldestLedger: 5000, latestLedger: 5100 });
   const w2 = new EventWatcher(
     { contractIds: [CONTRACT], intervalMs: 60_000 },
     { log: newNoop(), rpc: second.rpc, startLedgerBlock: null },
   );
   await w2.start();
-  await tick(); // let the fresh watcher's first poll resolve + fetch
+  await tick();
   w2.stop();
 
-  assertEquals(second.startLedgers[0], 5000);
+  assertEquals(second.startLedgers.includes(5000), true); // backfill from oldest
 });
 
 Deno.test("EventWatcher - getContractIds reflects in-place add/remove", () => {
@@ -136,7 +139,7 @@ Deno.test("EventWatcher - getContractIds reflects in-place add/remove", () => {
   assertEquals(watcher.getContractIds(), [CONTRACT_B]);
 });
 
-Deno.test("EventWatcher - one watcher polls every contract added before start", async () => {
+Deno.test("EventWatcher - one watcher covers every contract added before start", async () => {
   const { rpc, polledContractIds } = capturingRpc({
     oldestLedger: 5000,
     latestLedger: 5100,
@@ -148,12 +151,15 @@ Deno.test("EventWatcher - one watcher polls every contract added before start", 
   watcher.addContract(CONTRACT_B); // a second council joins before boot completes
 
   await watcher.start();
-  await tick(); // let the first poll run
+  await tick(); // let the first poll run (live + backfill reads)
   watcher.stop();
 
-  // A single poll covered BOTH councils' contracts (not one poll per council).
-  assertEquals(polledContractIds.length, 1);
-  assertEquals(polledContractIds[0].sort(), [CONTRACT, CONTRACT_B].sort());
+  // Every getEvents call (live and backfill alike) batches BOTH councils'
+  // contracts — one watcher, not one per council.
+  assertEquals(polledContractIds.length >= 1, true);
+  for (const polled of polledContractIds) {
+    assertEquals(polled.sort(), [CONTRACT, CONTRACT_B].sort());
+  }
 });
 
 Deno.test("EventWatcher - removed contract is no longer polled", async () => {
@@ -171,10 +177,14 @@ Deno.test("EventWatcher - removed contract is no longer polled", async () => {
   await tick();
   watcher.stop();
 
-  assertEquals(polledContractIds[0], [CONTRACT_B]); // CONTRACT dropped from poll
+  // Neither the live nor the backfill read includes the dropped contract.
+  assertEquals(polledContractIds.length >= 1, true);
+  for (const polled of polledContractIds) {
+    assertEquals(polled, [CONTRACT_B]);
+  }
 });
 
-Deno.test("EventWatcher - empty contract set holds the cursor and skips the RPC", async () => {
+Deno.test("EventWatcher - empty contract set skips the RPC and holds the live cursor at the tip", async () => {
   const { rpc, polledContractIds } = capturingRpc({
     oldestLedger: 5000,
     latestLedger: 5100,
@@ -188,10 +198,10 @@ Deno.test("EventWatcher - empty contract set holds the cursor and skips the RPC"
   await tick();
   watcher.stop();
 
-  // No contracts → never query getEvents, and the cursor stays at the boot
-  // ledger so a later join resumes from there.
+  // No contracts → never query getEvents. The live cursor holds at the tip so a
+  // later join resumes from there.
   assertEquals(polledContractIds.length, 0);
-  assertEquals(watcher.getLastLedger(), 7000);
+  assertEquals(watcher.getLastLedger(), 5100);
 });
 
 // --- Boot resilience ---
@@ -249,40 +259,34 @@ function flakyBootRpc(
 }
 
 /**
- * RPC mock that rejects the first getEvents with a plain-object out-of-retention
- * error (the real Stellar RPC shape), then — after the watcher resets and
- * re-resolves — serves a provider_added event at the oldest retained ledger.
- * Proves the watcher reads the event FORWARD after reset instead of skipping it.
+ * RPC mock with a huge gap between oldest and the tip: a live read (startLedger
+ * at/after the tip) serves a provider_added event immediately, while a backfill
+ * read (startLedger far below the tip) returns nothing and advances only a
+ * bounded slice. Proves the live path catches a tip event on the first poll
+ * even though backfill has an enormous range still to walk.
  */
-function outOfRetentionThenServes(
-  opts: { oldestLedger: number; latestLedger: number; address: string },
+function tipEventDeepBackfill(
+  opts: { oldestLedger: number; tip: number; address: string },
 ) {
-  let eventsCalls = 0;
   const rpc = {
     // deno-lint-ignore require-await -- mock satisfies async getHealth contract
     getHealth: async () => ({ oldestLedger: opts.oldestLedger }),
+    // deno-lint-ignore require-await -- mock satisfies async getLatestLedger contract
+    getLatestLedger: async () => ({ sequence: opts.tip }),
     // deno-lint-ignore require-await -- mock satisfies async getEvents contract
-    getEvents: async () => {
-      eventsCalls++;
-      if (eventsCalls === 1) {
-        // Stale cursor: the RPC rejects with a plain object, not an Error.
-        throw {
-          code: -32600,
-          message:
-            `startLedger must be within the ledger range: ${opts.oldestLedger} - ${opts.latestLedger}`,
+    getEvents: async (req: { startLedger: number }) => {
+      if (req.startLedger >= opts.tip) {
+        // Live read at the tip — the new event is here.
+        return {
+          events: [rawProviderAddedEvent(opts.address, opts.tip)],
+          latestLedger: opts.tip,
         };
       }
-      // After reset the watcher re-resolves to oldest and reads forward, landing
-      // on the event that must NOT be skipped.
-      return {
-        events: [rawProviderAddedEvent(opts.address, opts.oldestLedger)],
-        latestLedger: opts.latestLedger,
-      };
+      // Backfill read far below the tip — a bounded, empty slice (crawls).
+      return { events: [], latestLedger: req.startLedger + 10 };
     },
-    // deno-lint-ignore require-await -- mock satisfies async getLatestLedger contract
-    getLatestLedger: async () => ({ sequence: opts.latestLedger }),
   } as unknown as Server;
-  return { rpc, eventsCalls: () => eventsCalls };
+  return { rpc };
 }
 
 /** Poll `predicate` on the macrotask queue until true or `timeoutMs` elapses. */
@@ -334,11 +338,14 @@ Deno.test("EventWatcher - transient boot-ledger failure retries instead of killi
   assertEquals(watcher.getLastLedger(), 5101);
 });
 
-Deno.test("EventWatcher - out-of-retention poll resets to oldest and reads the event forward (never skips it)", async () => {
+Deno.test("EventWatcher - live catches a tip event on the first poll despite a deep pending backfill", async () => {
   const ADDRESS = Keypair.random().publicKey();
-  const { rpc } = outOfRetentionThenServes({
-    oldestLedger: 5000,
-    latestLedger: 5100,
+  // Backfilling from oldest (1_000) to the tip (900_000) is ~90k bounded slices
+  // — but the live read at the tip must land the event on the very first poll,
+  // not wait for backfill to crawl there.
+  const { rpc } = tipEventDeepBackfill({
+    oldestLedger: 1_000,
+    tip: 900_000,
     address: ADDRESS,
   });
 
@@ -352,14 +359,12 @@ Deno.test("EventWatcher - out-of-retention poll resets to oldest and reads the e
   });
 
   await watcher.start();
-
-  // The first poll hits out-of-retention. The watcher must reset and re-resolve
-  // to oldest, then read forward and process the event — not jump past it.
   const got = await waitUntil(() => received.length > 0);
   watcher.stop();
 
   assertEquals(got, true);
-  assertEquals(received.length, 1);
   assertEquals(received[0].type, "provider_added");
   assertEquals(received[0].address, ADDRESS);
+  // The live cursor sits at the tip, not down where backfill is still crawling.
+  assertEquals(watcher.getLastLedger(), 900_001);
 });
