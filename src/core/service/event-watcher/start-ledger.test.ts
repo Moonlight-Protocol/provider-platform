@@ -15,14 +15,25 @@ function rpcWithOldest(oldestLedger: number): BootSyncRpc & {
   };
 }
 
-Deno.test("resolveBootStartLedger - override set → starts at exactly that ledger", async () => {
+Deno.test("resolveBootStartLedger - pin within the retention window → starts at the pin", async () => {
   const rpc = rpcWithOldest(5000);
 
   const start = await resolveBootStartLedger(rpc, 12345);
 
   assertEquals(start, 12345);
-  // The override wins without consulting the RPC at all.
-  assertEquals(rpc.healthCalls, 0);
+  // getHealth is consulted so the pin can be checked against the retention floor.
+  assertEquals(rpc.healthCalls, 1);
+});
+
+Deno.test("resolveBootStartLedger - pin older than oldest retained → clamps up to oldest", async () => {
+  const rpc = rpcWithOldest(3723170);
+
+  // The real failure: a stale reset pin (~a month back) that fell out of the
+  // retention window. Clamp to oldest instead of passing an out-of-range value.
+  const start = await resolveBootStartLedger(rpc, 3177789);
+
+  assertEquals(start, 3723170);
+  assertEquals(rpc.healthCalls, 1);
 });
 
 Deno.test("resolveBootStartLedger - override unset → starts at oldest available", async () => {
@@ -34,13 +45,13 @@ Deno.test("resolveBootStartLedger - override unset → starts at oldest availabl
   assertEquals(rpc.healthCalls, 1);
 });
 
-Deno.test("resolveBootStartLedger - override of 0 is honored (not treated as unset)", async () => {
+Deno.test("resolveBootStartLedger - pin of 0 clamps to oldest (everything still retained)", async () => {
   const rpc = rpcWithOldest(5000);
 
   const start = await resolveBootStartLedger(rpc, 0);
 
-  assertEquals(start, 0);
-  assertEquals(rpc.healthCalls, 0);
+  assertEquals(start, 5000);
+  assertEquals(rpc.healthCalls, 1);
 });
 
 // Integration: the parsed env value (from utils) flows through to the resolved
@@ -56,12 +67,11 @@ Deno.test("parse + resolve - 'all' / empty / unset → starts at oldest", async 
   }
 });
 
-Deno.test("parse + resolve - non-negative integer → pins that exact ledger", async () => {
+Deno.test("parse + resolve - in-window integer → pins that exact ledger", async () => {
   const rpc = rpcWithOldest(5000);
   assertEquals(
     await resolveBootStartLedger(rpc, parseBootSyncStartLedger("12345")),
     12345,
   );
-  // Pinned: resolution never consults the RPC.
-  assertEquals(rpc.healthCalls, 0);
+  assertEquals(rpc.healthCalls, 1);
 });
