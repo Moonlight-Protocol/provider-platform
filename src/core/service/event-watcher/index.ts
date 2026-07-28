@@ -53,15 +53,6 @@ function createWatcher(): EventWatcher {
     startLedgerBlock: BOOT_SYNC_START_LEDGER_BLOCK,
   });
 
-  // Re-query each watched council and reconcile asset-channel statuses when the
-  // single poll falls out of Stellar RPC retention (events may have been missed
-  // across all contracts; the queries can't be). This is the can't-miss path.
-  w.onResync(async () => {
-    for (const channelAuthId of w.getContractIds()) {
-      await convergeChannelStatusesForCouncil(channelAuthId);
-    }
-  });
-
   w.onEvent(async (event) => {
     // Each event is tagged with the council (channel-auth contract) that emitted
     // it, so one watcher routes correctly across all contracts.
@@ -187,36 +178,6 @@ async function convergeChannelStatusesOnBoot(): Promise<void> {
     log.event("asset-channel statuses converged from council queries");
   } catch (err) {
     log.error(err, "failed to converge channel statuses on boot");
-  }
-}
-
-/**
- * Re-query a single council and reconcile its asset-channel statuses. Used on
- * out-of-retention recovery for that council's watcher.
- */
-async function convergeChannelStatusesForCouncil(
-  channelAuthId: string,
-): Promise<void> {
-  const log = watcherLog!.scope("convergeChannelStatuses");
-  try {
-    const pps = await ppRepo.listAll();
-    for (const pp of pps) {
-      const membership = await membershipRepo.getActiveForPp(pp.publicKey);
-      if (membership?.channelAuthId !== channelAuthId) continue;
-      const data = await fetchCouncilConfig(
-        membership.councilUrl,
-        channelAuthId,
-        { log },
-      );
-      if (data) {
-        await reconcileChannelStatuses(channelRegistry, data);
-        log.debug("channelAuthId", channelAuthId);
-        log.event("asset-channel statuses re-queried after out-of-retention");
-      }
-      return;
-    }
-  } catch (err) {
-    log.error(err, "failed to converge channel statuses for council");
   }
 }
 

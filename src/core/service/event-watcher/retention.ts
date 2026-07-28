@@ -1,5 +1,3 @@
-import type { Logger } from "@/utils/logger/index.ts";
-
 /**
  * Extract searchable text from a thrown value. The Stellar RPC rejects with a
  * plain `{ code, message }` object, not an Error, so `String(error)` yields
@@ -22,8 +20,9 @@ function retentionErrorText(error: unknown): string {
 
 /**
  * Detect the Stellar RPC "startLedger out of retention" condition. When the
- * persisted cursor predates the RPC's retention window, getEvents fails and we
- * must reset the cursor and reconcile state via a council query instead.
+ * cursor predates the RPC's retention window, getEvents fails; the watcher
+ * resets its cursor to re-resolve to the oldest retained ledger and reads
+ * forward from there.
  */
 export function isOutOfRetentionError(error: unknown): boolean {
   const msg = retentionErrorText(error).toLowerCase();
@@ -36,24 +35,4 @@ export function isOutOfRetentionError(error: unknown): boolean {
         msg.includes("out of range") ||
         msg.includes("not within")))
   );
-}
-
-/**
- * Recover from an out-of-retention cursor: if `error` is the retention
- * condition, jump the cursor to the current latest ledger (events between the
- * stale cursor and now are unrecoverable from RPC) and fire the resync so state
- * is reconciled via a council query. Returns the new cursor, or null when the
- * error is unrelated (caller handles it as an ordinary poll error).
- */
-export async function recoverFromOutOfRetention(
-  error: unknown,
-  getLatestLedger: () => Promise<{ sequence: number }>,
-  onResync: () => Promise<void> | void,
-  log: Logger,
-): Promise<number | null> {
-  if (!isOutOfRetentionError(error)) return null;
-  log.event("EventWatcher cursor out of retention; recovering");
-  const latest = await getLatestLedger();
-  await onResync();
-  return latest.sequence + 1;
 }
