@@ -22,11 +22,15 @@ export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
  * Uses a self-scheduling pattern (setTimeout after each poll completes)
  * to prevent concurrent polls when RPC is slow.
  *
+ * Each poll runs two independent reads: a LIVE read from the tip (so new events
+ * are processed within one interval) and, until history is caught up, one
+ * bounded BACKFILL slice from the boot ledger forward. The live read is never
+ * gated by backfill progress — a provider that joins right now is seen on the
+ * next tick even if backfill has days of empty history still to walk.
+ *
  * The watcher holds NO durable cursor: provider-platform reconstructs all
- * derived state by querying the council on boot (converge-by-query), so a fresh
- * watcher simply syncs all available history forward from the resolved boot
- * ledger (see `resolveBootStartLedger`). Events are a live delta on top of that
- * baseline.
+ * derived state by querying the council on boot (converge-by-query). Events are
+ * a live delta on top of that baseline.
  *
  * Consumers register handlers via `onEvent()` and the watcher
  * dispatches parsed events as they arrive.
@@ -34,7 +38,18 @@ export type EventHandler = (event: ChannelAuthEvent) => void | Promise<void>;
 export class EventWatcher {
   private timeoutId: number | null = null;
   private isRunning = false;
-  private lastLedger: number | null = null;
+  // Two INDEPENDENT cursors, so "listen for new events" is never gated behind
+  // "finish backfilling history":
+  //   - liveLedger tracks the tip. Each poll reads from it forward, so a new
+  //     event (e.g. provider_added) is caught within one interval regardless of
+  //     how far back history goes. It starts at the current latest ledger.
+  //   - backfillLedger walks history from the resolved boot ledger (oldest
+  //     retained, or the clamped pin) up to backfillCeiling — the tip at boot —
+  //     one bounded slice per poll. It NEVER blocks the live path. null once
+  //     backfill is complete or unnecessary.
+  private liveLedger: number | null = null;
+  private backfillLedger: number | null = null;
+  private backfillCeiling: number | null = null;
   private contractIds: Set<string>;
   private intervalMs: number;
   private handlers: EventHandler[] = [];
@@ -157,10 +172,17 @@ export class EventWatcher {
   }
 
   /**
-   * Returns the last processed ledger sequence.
+   * Returns the live cursor — the ledger the tip-following read has advanced to.
    */
   getLastLedger(): number | null {
-    return this.lastLedger;
+    return this.liveLedger;
+  }
+
+  /**
+   * Returns the backfill cursor, or null once history is caught up. Test/debug.
+   */
+  getBackfillLedger(): number | null {
+    return this.backfillLedger;
   }
 
   /**
@@ -180,33 +202,41 @@ export class EventWatcher {
   }
 
   /**
-   * Single poll cycle: fetch events since lastLedger, dispatch to handlers.
+   * Single poll cycle: a LIVE read from the tip, then (until caught up) one
+   * bounded BACKFILL slice. The live read owns the health signal; backfill is
+   * isolated so its failures never mark the watcher unhealthy or block the tip.
    */
   private poll(): Promise<void> {
     return withSpan("EventWatcher.poll", async (span) => {
       try {
-        // First poll with no resolved boot position: resolve it now, INSIDE
-        // this try/catch + retry machinery. A transient failure here (e.g. the
-        // getHealth RPC blipping) is caught below and retried on the next tick
-        // rather than terminally killing the watcher. Boot-sync semantics are
-        // unchanged: oldest available, or the pinned override — never "latest".
-        if (this.lastLedger === null) {
-          this.lastLedger = await resolveBootStartLedger(
+        // First poll: resolve both cursors INSIDE the retry machinery so a
+        // transient RPC blip retries next tick instead of killing the watcher.
+        // Assign together — if either RPC call throws, neither is set.
+        if (this.liveLedger === null) {
+          const { sequence: tip } = await this.rpc.getLatestLedger();
+          const backfillStart = await resolveBootStartLedger(
             this.rpc,
             this.startLedgerBlock,
           );
+          // Live follows the tip; new events are caught within one interval.
+          this.liveLedger = tip;
+          // Backfill walks history up to where live took over. Nothing to walk
+          // if the boot ledger is already at/after the tip.
+          this.backfillCeiling = tip;
+          this.backfillLedger = backfillStart >= tip ? null : backfillStart;
           this.log.debug("contractCount", this.contractIds.size);
-          this.log.debug("startLedger", this.lastLedger);
-          this.log.event("EventWatcher resolved boot start ledger");
+          this.log.debug("liveLedger", this.liveLedger);
+          this.log.debug("backfillLedger", this.backfillLedger);
+          this.log.event("EventWatcher initialized live + backfill cursors");
         }
 
+        // LIVE read — always from the tip, first, never gated by backfill.
         const { events, latestLedger } = await fetchChannelAuthEvents(
           this.rpc,
           this.getContractIds(),
-          this.lastLedger,
+          this.liveLedger,
           { log: this.log },
         );
-
         if (events.length > 0) {
           span.addEvent("dispatching_events", {
             "events.count": events.length,
@@ -214,15 +244,11 @@ export class EventWatcher {
           this.log.debug("count", events.length);
           this.log.debug("types", events.map((e) => e.type).join(", "));
           this.log.event("EventWatcher found new events");
-
           for (const event of events) {
             await this.dispatch(event);
           }
         }
-
-        // Advance cursor past the latest ledger we've seen (in memory only —
-        // there is no durable cursor; converge-by-query is the recovery path).
-        this.lastLedger = latestLedger + 1;
+        this.liveLedger = latestLedger + 1;
         this.lastPollOkAt = Date.now();
       } catch (error) {
         span.addEvent("poll_error", {
@@ -231,25 +257,21 @@ export class EventWatcher {
             : String(error),
         });
 
-        // Out of retention: the cursor fell below the RPC's retained window
-        // (e.g. it was held at a stale position while no contract was watched,
-        // and the window slid past it). Reset it so the next poll re-resolves
-        // to the oldest retained ledger and reads FORWARD from there. Never
-        // jump to "latest" — that skips the gap, and the skipped gap can hold
-        // the very events we exist to process (e.g. provider_added, which
-        // activates a membership).
+        // The live cursor fell out of retention — the watcher was idle longer
+        // than the RPC retains. Resume at the current tip next poll; the idle
+        // gap is reconciled by boot convergence-by-query, and backfill still
+        // covers history up to boot. (This does NOT skip fresh events: a live
+        // event only ever lands at the tip we're about to re-resolve to.)
         if (isOutOfRetentionError(error)) {
-          span.addEvent("out_of_retention_reset");
+          span.addEvent("live_out_of_retention_reset");
           this.log.event(
-            "EventWatcher cursor out of retention; resetting to oldest retained",
+            "EventWatcher live cursor out of retention; resuming at tip",
           );
-          this.lastLedger = null;
+          this.liveLedger = null;
           return;
         }
 
-        // Surface the failure (#10): the swallowing catch previously left the
-        // span un-errored and no health signal. Mark it ERROR, record the
-        // exception, and update the health state so /health can report it.
+        // Surface the failure (#10) via the health signal.
         this.lastPollError = {
           at: Date.now(),
           message: error instanceof Error ? error.message : String(error),
@@ -264,8 +286,71 @@ export class EventWatcher {
         this.log.error(error, "EventWatcher poll error", {
           traceId: currentTraceId(),
         });
+        return;
       }
+
+      // BACKFILL — one bounded slice, only after a healthy live read. Isolated:
+      // its errors are logged but never touch the live cursor or health signal.
+      await this.pollBackfill();
     });
+  }
+
+  /**
+   * Walk history one bounded getEvents slice forward, dispatching events below
+   * the ceiling (the live path owns everything from the ceiling on). Completes
+   * when the cursor reaches the ceiling. Out-of-retention re-clamps to oldest.
+   */
+  private async pollBackfill(): Promise<void> {
+    if (this.backfillLedger === null || this.backfillCeiling === null) return;
+    if (this.backfillLedger >= this.backfillCeiling) {
+      this.backfillLedger = null;
+      return;
+    }
+    try {
+      const { events, latestLedger } = await fetchChannelAuthEvents(
+        this.rpc,
+        this.getContractIds(),
+        this.backfillLedger,
+        { log: this.log },
+      );
+      for (const event of events) {
+        // Strictly below the ceiling — no double-dispatch at the seam.
+        if (event.ledger < this.backfillCeiling) {
+          await this.dispatch(event);
+        }
+      }
+      this.backfillLedger = latestLedger + 1;
+      if (this.backfillLedger >= this.backfillCeiling) {
+        this.backfillLedger = null;
+        this.log.event("EventWatcher backfill complete");
+      }
+    } catch (error) {
+      if (isOutOfRetentionError(error)) {
+        // The backfill start fell below the retained window; re-clamp to oldest
+        // and keep walking forward. Never affects the live cursor.
+        this.log.event(
+          "EventWatcher backfill out of retention; re-clamping to oldest retained",
+        );
+        try {
+          this.backfillLedger = await resolveBootStartLedger(
+            this.rpc,
+            this.startLedgerBlock,
+          );
+          if (
+            this.backfillCeiling !== null &&
+            this.backfillLedger >= this.backfillCeiling
+          ) {
+            this.backfillLedger = null;
+          }
+        } catch (reclampError) {
+          this.log.error(reclampError, "EventWatcher backfill re-clamp failed");
+        }
+        return;
+      }
+      this.log.error(error, "EventWatcher backfill error", {
+        traceId: currentTraceId(),
+      });
+    }
   }
 
   /**
