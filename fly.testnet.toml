@@ -63,7 +63,7 @@ primary_region = 'ams'
     path = "/api/v1/health"
 
 [deploy]
-  strategy = "bluegreen"
+  strategy = "rolling"
   release_command = "deno run -A --node-modules-dir npm:drizzle-kit migrate"
 
 [[vm]]
