@@ -1,6 +1,6 @@
 {
   "name": "@moonlight-protocol/provider-platform",
-  "version": "0.9.16",
+  "version": "0.9.17",
   "license": "MIT",
   "exports": "./src/main.ts",
   "tasks": {

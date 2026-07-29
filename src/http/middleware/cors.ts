@@ -27,7 +27,7 @@ function setCorsHeaders(ctx: Context, origin: string) {
     "Access-Control-Allow-Headers",
     MODE === "development"
       ? "*"
-      : "Content-Type, Authorization, Traceparent, Tracestate",
+      : "Content-Type, Authorization, Traceparent, Tracestate, X-Client-Name, X-Client-Version",
   );
   ctx.response.headers.set("Access-Control-Max-Age", "86400");
 }
