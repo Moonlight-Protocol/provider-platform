@@ -65,18 +65,20 @@ export function verifyTransactionOnNetwork(
         ? error.message
         : String(error);
 
-      if (errorMessage.includes("not found") || errorMessage.includes("404")) {
-        span.addEvent("transaction_pending_not_found");
-        log.event("RPC reports not found, treating as pending");
-        return { status: "PENDING" };
-      }
-
-      span.addEvent("verification_error", { "error.message": errorMessage });
-      log.error(error, "verification RPC failure");
-      return {
-        status: "FAILED",
-        reason: errorMessage,
-      };
+      // A thrown RPC error means we could not determine the on-chain outcome;
+      // it is not evidence the transaction failed. Treat it as PENDING so the
+      // verifier retries. If the tx genuinely never lands, the confirmation
+      // timeout in verifier.process fails the bundle terminally. Previously any
+      // non-"not found" error was returned as FAILED, which terminally
+      // false-failed already-applied transactions on a transient RPC blip
+      // (timeout / 5xx / reset), surfacing "transaction failed on-chain" for a
+      // withdrawal that had in fact succeeded.
+      span.addEvent("verification_rpc_error_pending", {
+        "error.message": errorMessage,
+      });
+      log.event("RPC error during verification, treating as pending");
+      log.debug("error", errorMessage);
+      return { status: "PENDING" };
     }
   });
 }
