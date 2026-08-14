@@ -468,6 +468,22 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
         });
         log.debug("fee", feeCalculation.fee.toString());
 
+        // A bundle without a positive fee can never execute: the on-chain
+        // channel enforces that spends cover creates, and the executor's fee
+        // operation requires an amount > 0. Reject it here, before it is
+        // persisted or enters a slot, so it can never drag the other bundles
+        // batched with it into a failing transaction.
+        if (feeCalculation.fee < BigInt(1)) {
+          span.addEvent("insufficient_balance_rejected", {
+            "fee.amount": feeCalculation.fee.toString(),
+          });
+          log.event("rejecting bundle: outflows not covered by inflows");
+          throw new E.INSUFFICIENT_BALANCE(
+            feeCalculation.fee + feeCalculation.totalOutflows,
+            feeCalculation.totalOutflows,
+          );
+        }
+
         let bundleEntity: OperationsBundle;
         if (isBundleExpired) {
           span.addEvent("updating_expired_bundle");
@@ -496,11 +512,6 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
             createdBy: userSession.accountId,
             createdAt: new Date(),
           });
-        }
-
-        if (feeCalculation.fee < BigInt(1)) {
-          span.addEvent("zero_fee_warning");
-          log.event("bundle has no fee");
         }
 
         span.addEvent("persisting_utxos");

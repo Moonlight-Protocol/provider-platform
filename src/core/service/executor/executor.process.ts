@@ -35,14 +35,20 @@ import {
 } from "@/core/service/executor/failure-detail.ts";
 import {
   buildRetryBundles,
+  expireSlotBundlesPastTtl,
   handleExecutionFailure as _handleExecutionFailure,
 } from "@/core/service/executor/executor-failure.helpers.ts";
+import { isBundleExpired } from "@/core/service/mempool/mempool.service.ts";
+import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
 import {
   extractNetworkErrorContext,
   type NetworkErrorContext,
   recordNetworkErrorOnSpan,
 } from "@/core/service/executor/error-extraction.ts";
-import { emitForBundles } from "@/core/service/events/emit-helpers.ts";
+import {
+  emitForBundles,
+  emitForPp,
+} from "@/core/service/events/emit-helpers.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -357,6 +363,36 @@ export class Executor {
 
         if (!slot || slot.isEmpty()) {
           span.addEvent("no_slots_to_process");
+          return;
+        }
+
+        // TTL gate: a bundle past its TTL must never execute. The periodic
+        // sweep only reaches bundles still queued in the mempool, so a slot
+        // pulled for execution is checked here — its expired bundles are
+        // evicted and end EXPIRED, never submitted.
+        const evicted = await expireSlotBundlesPastTtl(slot, {
+          operationsBundleRepository,
+          isExpired: isBundleExpired,
+          emitExpired: (bundle: SlotBundle) =>
+            emitForPp(bundle.ppPublicKey, (scope) => ({
+              kind: "mempool.bundle_expired",
+              ts: Date.now(),
+              scope,
+              payload: {
+                bundleId: bundle.bundleId,
+                channelContractId: bundle.channelContractId,
+              },
+            }), { log: this.log }),
+          log: this.log,
+        });
+        if (evicted.length > 0) {
+          span.addEvent("expired_bundles_evicted", {
+            "expired.count": evicted.length,
+            expiredBundleIds: evicted.map((b) => b.bundleId),
+          });
+        }
+        if (slot.isEmpty()) {
+          span.addEvent("slot_empty_after_ttl_eviction");
           return;
         }
 
