@@ -3,6 +3,7 @@ import {
   MoonlightTransactionBuilder,
 } from "@moonlight/moonlight-sdk";
 import type { Slot } from "@/core/service/mempool/mempool.process.ts";
+import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
 import type { TransactionBuildResult } from "@/core/service/executor/executor.types.ts";
 import { UtxoBasedStellarAccount, UTXOStatus } from "@moonlight/moonlight-sdk";
 import { withSpan } from "@/core/tracing.ts";
@@ -23,10 +24,22 @@ export function buildTransactionFromSlot(
   ctx: ChannelContext,
   deps: { log: Logger },
 ): Promise<TransactionBuildResult> {
+  return buildTransactionFromBundles(slot.getBundles(), ctx, deps);
+}
+
+/**
+ * Builds a transaction from an explicit bundle list. Split out from
+ * `buildTransactionFromSlot` so the failure-isolation probe can build a
+ * single-bundle transaction without fabricating a Slot.
+ */
+export function buildTransactionFromBundles(
+  bundles: SlotBundle[],
+  ctx: ChannelContext,
+  deps: { log: Logger },
+): Promise<TransactionBuildResult> {
   return withSpan("Executor.buildTransactionFromSlot", async (span) => {
     const log = deps.log.scope("buildTransactionFromSlot");
     log.info("buildTransactionFromSlot");
-    const bundles = slot.getBundles();
     log.debug("bundleCount", bundles.length);
 
     if (bundles.length === 0) {

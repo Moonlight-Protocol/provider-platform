@@ -35,14 +35,25 @@ import {
 } from "@/core/service/executor/failure-detail.ts";
 import {
   buildRetryBundles,
+  expireSlotBundlesPastTtl,
   handleExecutionFailure as _handleExecutionFailure,
 } from "@/core/service/executor/executor-failure.helpers.ts";
+import {
+  handleSlotFailureWithIsolation,
+  probeBundle,
+} from "@/core/service/executor/bundle-isolation.ts";
+import { isBundleExpired } from "@/core/service/mempool/mempool.service.ts";
+import type { ChannelContext } from "@/core/service/executor/channel-resolver.ts";
+import type { SlotBundle } from "@/core/service/bundle/bundle.types.ts";
 import {
   extractNetworkErrorContext,
   type NetworkErrorContext,
   recordNetworkErrorOnSpan,
 } from "@/core/service/executor/error-extraction.ts";
-import { emitForBundles } from "@/core/service/events/emit-helpers.ts";
+import {
+  emitForBundles,
+  emitForPp,
+} from "@/core/service/events/emit-helpers.ts";
 
 /** Approximate Stellar ledger close time in milliseconds. Used to convert a
  *  ledger-sequence offset into a wall-clock duration for the DB timeout.
@@ -349,6 +360,8 @@ export class Executor {
       const mempool = getMempool();
       let slot: ReturnType<typeof mempool.removeFirstSlot> = null;
       let bundleIds: string[] = [];
+      let channelCtx: ChannelContext | null = null;
+      let ppPublicKey: string | undefined;
 
       try {
         this.isProcessing = true;
@@ -357,6 +370,36 @@ export class Executor {
 
         if (!slot || slot.isEmpty()) {
           span.addEvent("no_slots_to_process");
+          return;
+        }
+
+        // TTL gate: a bundle past its TTL must never execute. The periodic
+        // sweep only reaches bundles still queued in the mempool, so a slot
+        // pulled for execution is checked here — its expired bundles are
+        // evicted and end EXPIRED, never submitted.
+        const evicted = await expireSlotBundlesPastTtl(slot, {
+          operationsBundleRepository,
+          isExpired: isBundleExpired,
+          emitExpired: (bundle: SlotBundle) =>
+            emitForPp(bundle.ppPublicKey, (scope) => ({
+              kind: "mempool.bundle_expired",
+              ts: Date.now(),
+              scope,
+              payload: {
+                bundleId: bundle.bundleId,
+                channelContractId: bundle.channelContractId,
+              },
+            }), { log: this.log }),
+          log: this.log,
+        });
+        if (evicted.length > 0) {
+          span.addEvent("expired_bundles_evicted", {
+            "expired.count": evicted.length,
+            expiredBundleIds: evicted.map((b) => b.bundleId),
+          });
+        }
+        if (slot.isEmpty()) {
+          span.addEvent("slot_empty_after_ttl_eviction");
           return;
         }
 
@@ -374,7 +417,7 @@ export class Executor {
         // its own ppPublicKey from the URL-scoped submission.
         const slotBundles = slot.getBundles();
         const channelContractId = slotBundles[0]?.channelContractId;
-        const ppPublicKey = slotBundles[0]?.ppPublicKey;
+        ppPublicKey = slotBundles[0]?.ppPublicKey;
         if (!channelContractId) {
           throw new Error("Bundle missing channelContractId");
         }
@@ -382,7 +425,7 @@ export class Executor {
           throw new Error("Bundle missing ppPublicKey");
         }
 
-        const channelCtx = await resolveChannelContext(
+        channelCtx = await resolveChannelContext(
           channelContractId,
           ppPublicKey,
           { log: this.log },
@@ -561,6 +604,51 @@ export class Executor {
               reason: errorMessage,
             },
           }), { log: this.log });
+        }
+
+        // Multi-bundle slot: before terminal-failing (or retrying) the whole
+        // batch, probe each bundle on its own to isolate the offender(s) —
+        // one unexecutable bundle must not destroy the innocents batched
+        // with it. Falls through to the group path when the probe cannot
+        // attribute the failure to specific bundles.
+        if (
+          slot && bundleIds.length > 1 && channelCtx !== null &&
+          ppPublicKey !== undefined
+        ) {
+          const ctx = channelCtx;
+          const feePayerPubkey = ppPublicKey;
+          try {
+            const isolated = await handleSlotFailureWithIsolation(
+              slot.getBundles(),
+              {
+                probe: (bundle) =>
+                  probeBundle(bundle, ctx, {
+                    rpcServer: NETWORK_RPC_SERVER,
+                    networkPassphrase: NETWORK_CONFIG
+                      .networkPassphrase as string,
+                    baseInclusionFeeStroops: BigInt(NETWORK_FEE),
+                    feePayerPubkey,
+                    log: this.log,
+                  }),
+                operationsBundleRepository,
+                reAddBundles: (bundles) => mempool.reAddBundles(bundles),
+                log: this.log,
+              },
+            );
+            if (isolated) {
+              span.addEvent("slot_failure_isolated");
+              this.log.event(
+                "slot failure isolated to offending bundle(s), innocents re-queued",
+              );
+              return;
+            }
+          } catch (isolationError) {
+            span.addEvent("isolation_errored");
+            this.log.error(
+              isolationError,
+              "bundle isolation errored, falling back to group retry",
+            );
+          }
         }
 
         // Handle failure: re-add bundles to mempool (only those still elegible) and update status

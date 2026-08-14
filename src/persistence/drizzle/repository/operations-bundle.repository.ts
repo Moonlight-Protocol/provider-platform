@@ -243,6 +243,32 @@ export class OperationsBundleRepository extends BaseRepository<
   }
 
   /**
+   * Like {@link updateStatusIfActive} but updates arbitrary columns alongside
+   * the status gate. Used by failure handlers so a bundle that was concurrently
+   * moved to a terminal state (EXPIRED / FAILED / COMPLETED) is never
+   * overwritten with a new failure status.
+   * Returns `true` if the row was updated, `false` if skipped.
+   */
+  async updateIfStatusIn(
+    id: string,
+    data: Partial<NewOperationsBundle>,
+    activeStatuses: BundleStatus[],
+  ): Promise<boolean> {
+    const result = await this.db
+      .update(operationsBundle)
+      .set({ ...data, updatedAt: new Date() })
+      .where(
+        and(
+          eq(operationsBundle.id, id),
+          isNull(operationsBundle.deletedAt),
+          inArray(operationsBundle.status, activeStatuses),
+        ),
+      )
+      .returning({ id: operationsBundle.id });
+    return result.length > 0;
+  }
+
+  /**
    * Finds bundles by creator account ID, optionally filtered by status.
    * Results are ordered by createdAt descending (most recent first).
    */

@@ -70,15 +70,25 @@ export async function handleVerificationFailure(
         bundleId,
       }) ?? reason;
 
-      await deps.operationsBundleRepository.update(bundleId, {
-        status: isTerminal ? BundleStatus.FAILED : BundleStatus.PENDING,
-        retryCount: nextRetryCount,
-        lastFailureReason,
-        ...(isTerminal && deps.failureDetail
-          ? { failureDetail: deps.failureDetail }
-          : {}),
-        updatedAt: new Date(),
-      });
+      // Status-gated: a bundle concurrently moved to a terminal state (e.g.
+      // EXPIRED by the TTL sweep) keeps that state — never overwrite it.
+      const updated = await deps.operationsBundleRepository.updateIfStatusIn(
+        bundleId,
+        {
+          status: isTerminal ? BundleStatus.FAILED : BundleStatus.PENDING,
+          retryCount: nextRetryCount,
+          lastFailureReason,
+          ...(isTerminal && deps.failureDetail
+            ? { failureDetail: deps.failureDetail }
+            : {}),
+        },
+        [BundleStatus.PENDING, BundleStatus.PROCESSING],
+      );
+      if (!updated) {
+        log.debug("bundleId", bundleId);
+        log.event("bundle already in a terminal status, leaving it untouched");
+        continue;
+      }
 
       if (!isTerminal) {
         retryableBundleIds.push(bundleId);

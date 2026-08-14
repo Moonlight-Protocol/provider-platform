@@ -69,13 +69,24 @@ export function handleExecutionFailure(
         const isTerminal = deps.deterministic || hasReachedMaxAttempts;
 
         if (isTerminal) {
-          await deps.operationsBundleRepository.update(bundleId, {
-            status: BundleStatus.FAILED,
-            retryCount: nextRetryCount,
-            lastFailureReason,
-            failureDetail,
-            updatedAt: new Date(),
-          });
+          // Status-gated: a bundle concurrently moved to a terminal state
+          // (e.g. EXPIRED by the TTL sweep while the slot was in flight)
+          // must keep that state — never overwrite it with FAILED.
+          const updated = await deps.operationsBundleRepository
+            .updateIfStatusIn(bundleId, {
+              status: BundleStatus.FAILED,
+              retryCount: nextRetryCount,
+              lastFailureReason,
+              failureDetail,
+            }, [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+          if (!updated) {
+            span.addEvent("bundle_already_terminal", { "bundle.id": bundleId });
+            log.debug("bundleId", bundleId);
+            log.event(
+              "bundle already in a terminal status, leaving it untouched",
+            );
+            continue;
+          }
           log.debug("bundleId", bundleId);
           log.debug("retryCount", nextRetryCount);
           span.addEvent("bundle_failed_terminal", {
@@ -88,12 +99,20 @@ export function handleExecutionFailure(
               : "bundle moved to dead-letter after max retry attempts",
           );
         } else {
-          await deps.operationsBundleRepository.update(bundleId, {
-            status: BundleStatus.PENDING,
-            retryCount: nextRetryCount,
-            lastFailureReason,
-            updatedAt: new Date(),
-          });
+          const updated = await deps.operationsBundleRepository
+            .updateIfStatusIn(bundleId, {
+              status: BundleStatus.PENDING,
+              retryCount: nextRetryCount,
+              lastFailureReason,
+            }, [BundleStatus.PENDING, BundleStatus.PROCESSING]);
+          if (!updated) {
+            span.addEvent("bundle_already_terminal", { "bundle.id": bundleId });
+            log.debug("bundleId", bundleId);
+            log.event(
+              "bundle already in a terminal status, not eligible for retry",
+            );
+            continue;
+          }
           span.addEvent("bundle_reset_to_pending", { "bundle.id": bundleId });
 
           bundlesToRetry.push({ bundleId, nextRetryCount, lastFailureReason });
@@ -137,4 +156,45 @@ export function buildRetryBundles(
 
   log.debug("eligibleCount", eligible.length);
   return eligible;
+}
+
+/**
+ * TTL enforcement at the execution gate: removes every expired bundle from a
+ * slot the executor just pulled, marking each EXPIRED (status-gated, so a
+ * bundle already terminal keeps its state). The periodic `expireBundles`
+ * sweep only covers bundles still queued in the mempool — a slot that has
+ * been pulled is outside its reach, so without this check a bundle could
+ * execute arbitrarily long past its TTL.
+ */
+export async function expireSlotBundlesPastTtl(
+  slot: { getBundles(): SlotBundle[]; removeBundle(bundleId: string): boolean },
+  deps: {
+    operationsBundleRepository: OperationsBundleRepository;
+    isExpired: (bundle: SlotBundle) => boolean;
+    /** Emits the mempool.bundle_expired event; errors must not propagate. */
+    emitExpired: (bundle: SlotBundle) => Promise<void>;
+    log: Logger;
+  },
+): Promise<SlotBundle[]> {
+  const log = deps.log.scope("expireSlotBundlesPastTtl");
+  const expired = slot.getBundles().filter(deps.isExpired);
+
+  for (const bundle of expired) {
+    slot.removeBundle(bundle.bundleId);
+    try {
+      await deps.operationsBundleRepository.updateStatusIfActive(
+        bundle.bundleId,
+        BundleStatus.EXPIRED,
+        [BundleStatus.PENDING, BundleStatus.PROCESSING],
+      );
+      log.debug("bundleId", bundle.bundleId);
+      log.event("expired bundle evicted from slot before execution");
+      await deps.emitExpired(bundle);
+    } catch (error) {
+      log.debug("bundleId", bundle.bundleId);
+      log.error(error, "failed to persist EXPIRED for evicted bundle");
+    }
+  }
+
+  return expired;
 }
