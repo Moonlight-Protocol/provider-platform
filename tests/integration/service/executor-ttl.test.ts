@@ -93,28 +93,58 @@ Deno.test(
 );
 
 Deno.test(
-  "ttl gate – bundle already EXPIRED in DB is still evicted without a status change",
+  "ttl gate – bundle force-expired in DB only (fresh in-memory TTL) is still evicted",
   async () => {
     const repo = await setup();
     const id = testBundleId();
-    // send-loop's force-expire writes EXPIRED directly while the bundle is
-    // still in an in-memory slot; the gate must evict it and leave EXPIRED.
+    // send-loop's force-expire writes EXPIRED directly to the row; the
+    // in-memory SlotBundle keeps its original future TTL, so only the DB
+    // status betrays the expiry. The gate must evict it and leave EXPIRED.
     await seedBundle({ id, status: BundleStatus.EXPIRED });
 
     const slot = makeFakeSlot([
-      makeSlotBundle(id, { ttl: new Date(Date.now() - 1000) }),
+      makeSlotBundle(id, { ttl: new Date(Date.now() + 60_000) }),
     ]);
+    const emitted: string[] = [];
 
     const evicted = await expireSlotBundlesPastTtl(slot, {
       operationsBundleRepository: repo,
-      isExpired: () => true,
-      emitExpired: () => Promise.resolve(),
+      isExpired: (b) => b.ttl.getTime() <= Date.now(),
+      emitExpired: (b) => {
+        emitted.push(b.bundleId);
+        return Promise.resolve();
+      },
       log: newNoop(),
     });
 
     assertEquals(evicted.length, 1);
     assertEquals(slot.isEmpty(), true);
+    // Already terminal: no event, no status change.
+    assertEquals(emitted, []);
     const found = await repo.findById(id);
     assertEquals(found?.status, BundleStatus.EXPIRED);
+  },
+);
+
+Deno.test(
+  "ttl gate – active bundle with fresh TTL stays in the slot",
+  async () => {
+    const repo = await setup();
+    const id = testBundleId();
+    await seedBundle({ id, status: BundleStatus.PROCESSING });
+
+    const slot = makeFakeSlot([makeSlotBundle(id)]);
+
+    const evicted = await expireSlotBundlesPastTtl(slot, {
+      operationsBundleRepository: repo,
+      isExpired: (b) => b.ttl.getTime() <= Date.now(),
+      emitExpired: () => Promise.resolve(),
+      log: newNoop(),
+    });
+
+    assertEquals(evicted.length, 0);
+    assertEquals(slot.getBundles().length, 1);
+    const found = await repo.findById(id);
+    assertEquals(found?.status, BundleStatus.PROCESSING);
   },
 );
