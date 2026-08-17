@@ -344,11 +344,10 @@ export class Executor {
   }
 
   /**
-   * Evicts from the slot every bundle that must not execute (TTL passed, or
-   * its database row left PENDING/PROCESSING), marking TTL-expired ones
-   * EXPIRED and emitting the mempool.bundle_expired event.
+   * Evicts every TTL-expired bundle from the slot, marking each EXPIRED and
+   * emitting the mempool.bundle_expired event.
    */
-  private evictIneligibleBundles(
+  private evictExpiredBundles(
     slot: { getBundles(): SlotBundle[]; removeBundle(id: string): boolean },
   ): Promise<SlotBundle[]> {
     return expireSlotBundlesPastTtl(slot, {
@@ -391,12 +390,11 @@ export class Executor {
           return;
         }
 
-        // TTL gate: a bundle past its TTL (or force-expired in the database)
-        // must never execute. The periodic sweep only reaches bundles still
-        // queued in the mempool, so a slot pulled for execution is checked
-        // here — its expired bundles are evicted and end EXPIRED, never
-        // submitted.
-        const evicted = await this.evictIneligibleBundles(slot);
+        // TTL gate: a bundle past its TTL must never execute. The periodic
+        // sweep only reaches bundles still queued in the mempool, so a slot
+        // pulled for execution is checked here — its expired bundles are
+        // evicted and end EXPIRED, never submitted.
+        const evicted = await this.evictExpiredBundles(slot);
         if (evicted.length > 0) {
           span.addEvent("expired_bundles_evicted", {
             "expired.count": evicted.length,
@@ -461,23 +459,6 @@ export class Executor {
             log: this.log,
           },
         );
-
-        // Re-check the slot right before submission: a bundle can be expired
-        // in the window between the pull-time gate and now, while the
-        // transaction was being built. The built transaction embeds every
-        // bundle's operations, so if any bundle dropped out, discard the
-        // build and re-queue the rest for the next tick.
-        const lateEvicted = await this.evictIneligibleBundles(slot);
-        if (lateEvicted.length > 0) {
-          span.addEvent("expired_bundles_evicted_pre_submit", {
-            expiredBundleIds: lateEvicted.map((b) => b.bundleId),
-          });
-          const remaining = slot.getBundles();
-          if (remaining.length > 0) {
-            await mempool.reAddBundles(remaining);
-          }
-          return;
-        }
 
         // Submit transaction to network
         const transactionHash = await submitTransactionToNetwork(

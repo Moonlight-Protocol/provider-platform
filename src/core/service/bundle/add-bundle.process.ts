@@ -25,6 +25,7 @@ import {
   BUNDLE_MAX_OPERATIONS,
   MEMPOOL_CHEAP_OP_WEIGHT,
   MEMPOOL_EXPENSIVE_OP_WEIGHT,
+  NETWORK_RPC_SERVER,
 } from "@/config/env.ts";
 import type {
   SlotBundle,
@@ -484,6 +485,21 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
           );
         }
 
+        // TTL derives from the earliest spend-signature expiration (capped at
+        // 24h), so a bundle whose signatures can no longer settle is expired
+        // through the mempool's ordinary in-memory TTL checks.
+        const latestLedger = await withTimeout(
+          NETWORK_RPC_SERVER.getLatestLedger(),
+          ADMISSION_RPC_TIMEOUT_MS,
+          "getLatestLedger",
+        ).catch((error) => {
+          if (error instanceof TimeoutError) {
+            throw new E.CHANNEL_RPC_UNAVAILABLE(channelContractId);
+          }
+          throw error;
+        });
+        const ttl = calculateBundleTtl(classified, latestLedger.sequence);
+
         let bundleEntity: OperationsBundle;
         if (isBundleExpired) {
           span.addEvent("updating_expired_bundle");
@@ -493,6 +509,7 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
             channelContractId,
             operationsMLXDR: operationsMLXDR,
             fee: feeCalculation.fee,
+            ttl,
             retryCount: 0,
             ppPublicKey,
             updatedAt: new Date(),
@@ -505,7 +522,7 @@ export const P_AddOperationsBundle = (deps: { log: Logger }) =>
             id: bundleId,
             status: BundleStatus.PENDING,
             channelContractId,
-            ttl: calculateBundleTtl(),
+            ttl,
             operationsMLXDR: operationsMLXDR,
             fee: feeCalculation.fee,
             ppPublicKey,

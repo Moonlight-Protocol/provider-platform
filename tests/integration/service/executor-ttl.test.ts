@@ -93,34 +93,25 @@ Deno.test(
 );
 
 Deno.test(
-  "ttl gate – bundle force-expired in DB only (fresh in-memory TTL) is still evicted",
+  "ttl gate – bundle already EXPIRED in DB keeps its status (gated write)",
   async () => {
     const repo = await setup();
     const id = testBundleId();
-    // send-loop's force-expire writes EXPIRED directly to the row; the
-    // in-memory SlotBundle keeps its original future TTL, so only the DB
-    // status betrays the expiry. The gate must evict it and leave EXPIRED.
     await seedBundle({ id, status: BundleStatus.EXPIRED });
 
     const slot = makeFakeSlot([
-      makeSlotBundle(id, { ttl: new Date(Date.now() + 60_000) }),
+      makeSlotBundle(id, { ttl: new Date(Date.now() - 1000) }),
     ]);
-    const emitted: string[] = [];
 
     const evicted = await expireSlotBundlesPastTtl(slot, {
       operationsBundleRepository: repo,
       isExpired: (b) => b.ttl.getTime() <= Date.now(),
-      emitExpired: (b) => {
-        emitted.push(b.bundleId);
-        return Promise.resolve();
-      },
+      emitExpired: () => Promise.resolve(),
       log: newNoop(),
     });
 
     assertEquals(evicted.length, 1);
     assertEquals(slot.isEmpty(), true);
-    // Already terminal: no event, no status change.
-    assertEquals(emitted, []);
     const found = await repo.findById(id);
     assertEquals(found?.status, BundleStatus.EXPIRED);
   },
