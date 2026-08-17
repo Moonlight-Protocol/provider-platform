@@ -18,6 +18,7 @@ export enum BUNDLE_ERROR_CODES {
   PP_NOT_MEMBER_OF_CHANNEL = "BND_014",
   CHANNEL_DISABLED = "BND_015",
   CHANNEL_RPC_UNAVAILABLE = "BND_016",
+  INSUFFICIENT_BALANCE = "BND_017",
 }
 
 const source = "@service/bundle";
@@ -348,6 +349,38 @@ export class TOO_MANY_OPERATIONS
           `A bundle can contain at most ${max} operations, but ${received} were provided.`,
       },
       meta: { received, max },
+    });
+  }
+}
+
+/**
+ * Error thrown when a bundle's outflows (creates + withdraws) are not covered
+ * by its inflows (deposits, or spent UTXO balances), leaving no positive fee.
+ * Such a bundle can never execute — the on-chain channel enforces the balance
+ * and the executor's fee operation requires a positive amount — so it is
+ * rejected at admission instead of ever entering a slot.
+ */
+export class INSUFFICIENT_BALANCE extends PlatformError<{
+  availableStroops: string;
+  requiredStroops: string;
+}> {
+  constructor(availableStroops: bigint, requiredStroops: bigint) {
+    super({
+      source,
+      code: BUNDLE_ERROR_CODES.INSUFFICIENT_BALANCE,
+      message: "Insufficient balance",
+      details:
+        `The bundle's outflows (${requiredStroops} stroops) are not covered by its inflows (${availableStroops} stroops) plus a positive fee, so it can never execute.`,
+      api: {
+        status: 400,
+        message: "Insufficient balance",
+        details:
+          `The bundle spends or deposits ${availableStroops} stroops but its creates and withdraws require ${requiredStroops} stroops. Inflows must exceed outflows so the bundle carries a positive fee.`,
+      },
+      meta: {
+        availableStroops: availableStroops.toString(),
+        requiredStroops: requiredStroops.toString(),
+      },
     });
   }
 }

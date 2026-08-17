@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { isWithdrawOnlyBundle } from "./bundle.service.ts";
+import { calculateFee, isWithdrawOnlyBundle } from "./bundle.service.ts";
 import type { ClassifiedOperations } from "./bundle.types.ts";
 
 // isWithdrawOnlyBundle only inspects per-kind counts, so lightweight stand-ins
@@ -61,4 +61,35 @@ Deno.test("isWithdrawOnlyBundle - send/transfer (no withdraw) is rejected", () =
 
 Deno.test("isWithdrawOnlyBundle - empty bundle is not withdraw-only", () => {
   assertEquals(isWithdrawOnlyBundle(classified({})), false);
+});
+
+Deno.test("calculateFee - send: spends cover creates, fee is the remainder", () => {
+  const result = calculateFee({
+    totalDepositAmount: 0n,
+    totalSpendAmount: 11_000_000n,
+    totalCreateAmount: 10_000_000n,
+    totalWithdrawAmount: 0n,
+  });
+  assertEquals(result.fee, 1_000_000n);
+});
+
+Deno.test("calculateFee - overspend: creates exceed spends, fee is negative", () => {
+  // The send-loop fail-injection shape: SPEND a UTXO, CREATE 2x its balance.
+  const result = calculateFee({
+    totalDepositAmount: 0n,
+    totalSpendAmount: 5_000_000n,
+    totalCreateAmount: 10_000_000n,
+    totalWithdrawAmount: 0n,
+  });
+  assertEquals(result.fee, -5_000_000n);
+});
+
+Deno.test("calculateFee - exact cover leaves zero fee (still not admissible)", () => {
+  const result = calculateFee({
+    totalDepositAmount: 0n,
+    totalSpendAmount: 10_000_000n,
+    totalCreateAmount: 10_000_000n,
+    totalWithdrawAmount: 0n,
+  });
+  assertEquals(result.fee, 0n);
 });

@@ -266,6 +266,53 @@ Deno.test(
 );
 
 Deno.test(
+  "executor – concurrently EXPIRED bundle keeps EXPIRED, never overwritten with FAILED",
+  async () => {
+    const repo = await setup();
+    const expiredId = testBundleId();
+    const processingId = testBundleId();
+    // Force-expired (e.g. by the TTL sweep) while its slot was in flight.
+    await seedBundle({
+      id: expiredId,
+      retryCount: 2,
+      status: BundleStatus.EXPIRED,
+    });
+    await seedBundle({
+      id: processingId,
+      retryCount: 2,
+      status: BundleStatus.PROCESSING,
+    });
+
+    const error = makeError();
+    const reason = makeLastFailureReason(error, expiredId);
+
+    const retryMeta = await handleExecutionFailure(
+      error,
+      [expiredId, processingId],
+      reason,
+      {
+        operationsBundleRepository: repo,
+        maxRetryAttempts: MAX_RETRY,
+        deterministic: false,
+        failureDetail: PROVIDER_DETAIL,
+        log: newNoop(),
+      },
+    );
+
+    assertEquals(retryMeta.length, 0);
+
+    const expired = await repo.findById(expiredId);
+    assertExists(expired);
+    assertEquals(expired.status, BundleStatus.EXPIRED);
+    assertEquals(expired.retryCount, 2);
+
+    const processing = await repo.findById(processingId);
+    assertExists(processing);
+    assertEquals(processing.status, BundleStatus.FAILED);
+  },
+);
+
+Deno.test(
   "executor – missing bundle is skipped gracefully (no error thrown)",
   async () => {
     const repo = await setup();
