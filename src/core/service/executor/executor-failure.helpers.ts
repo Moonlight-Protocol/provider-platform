@@ -159,19 +159,13 @@ export function buildRetryBundles(
 }
 
 /**
- * TTL enforcement at the execution gate: removes from a just-pulled slot
- * every bundle that must not execute, and returns the evicted bundles.
- *
- * Two checks, because expiry can be visible in two places:
- * - The in-memory TTL has passed while the bundle sat queued — the bundle is
- *   evicted and marked EXPIRED (status-gated, so an already-terminal bundle
- *   keeps its state).
- * - The database row is no longer active (e.g. it was set EXPIRED directly,
- *   which does not touch the in-memory copy) — the bundle is evicted as-is.
- *
- * The periodic `expireBundles` sweep only covers bundles still queued in the
- * mempool and only sees the in-memory TTL; without this gate a bundle could
- * execute arbitrarily long past its expiry.
+ * TTL enforcement at the execution gate: removes every expired bundle from a
+ * slot the executor just pulled, marking each EXPIRED (status-gated, so a
+ * bundle already terminal keeps its state). Purely in-memory — the TTL is
+ * derived from the bundle's own signatures at admission, so no chain or
+ * database read is needed to know it. The periodic `expireBundles` sweep
+ * only covers bundles still queued in the mempool; a pulled slot is outside
+ * its reach, so without this check a bundle could execute past its TTL.
  */
 export async function expireSlotBundlesPastTtl(
   slot: { getBundles(): SlotBundle[]; removeBundle(bundleId: string): boolean },
@@ -184,51 +178,24 @@ export async function expireSlotBundlesPastTtl(
   },
 ): Promise<SlotBundle[]> {
   const log = deps.log.scope("expireSlotBundlesPastTtl");
-  const evicted: SlotBundle[] = [];
+  const expired = slot.getBundles().filter(deps.isExpired);
 
-  for (const bundle of slot.getBundles()) {
-    if (deps.isExpired(bundle)) {
-      slot.removeBundle(bundle.bundleId);
-      evicted.push(bundle);
-      try {
-        await deps.operationsBundleRepository.updateStatusIfActive(
-          bundle.bundleId,
-          BundleStatus.EXPIRED,
-          [BundleStatus.PENDING, BundleStatus.PROCESSING],
-        );
-        log.debug("bundleId", bundle.bundleId);
-        log.event("expired bundle evicted from slot before execution");
-        await deps.emitExpired(bundle);
-      } catch (error) {
-        log.debug("bundleId", bundle.bundleId);
-        log.error(error, "failed to persist EXPIRED for evicted bundle");
-      }
-      continue;
-    }
-
+  for (const bundle of expired) {
+    slot.removeBundle(bundle.bundleId);
     try {
-      const row = await deps.operationsBundleRepository.findById(
+      await deps.operationsBundleRepository.updateStatusIfActive(
         bundle.bundleId,
+        BundleStatus.EXPIRED,
+        [BundleStatus.PENDING, BundleStatus.PROCESSING],
       );
-      if (
-        row && row.status !== BundleStatus.PENDING &&
-        row.status !== BundleStatus.PROCESSING
-      ) {
-        slot.removeBundle(bundle.bundleId);
-        evicted.push(bundle);
-        log.debug("bundleId", bundle.bundleId);
-        log.event(
-          "bundle no longer active in database, evicted from slot before execution",
-        );
-      }
-    } catch (error) {
-      // On a read failure keep the bundle in the slot — the gate is a guard,
-      // not a hard dependency, and the status-gated failure writes still
-      // protect a terminal status if execution goes on to fail.
       log.debug("bundleId", bundle.bundleId);
-      log.error(error, "failed to read bundle status at execution gate");
+      log.event("expired bundle evicted from slot before execution");
+      await deps.emitExpired(bundle);
+    } catch (error) {
+      log.debug("bundleId", bundle.bundleId);
+      log.error(error, "failed to persist EXPIRED for evicted bundle");
     }
   }
 
-  return evicted;
+  return expired;
 }

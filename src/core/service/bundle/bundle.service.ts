@@ -211,13 +211,47 @@ export async function generateBundleId(
   return await sha256Hash(Buffer.from(JSON.stringify(operationsMLXDR)));
 }
 
+/** Default bundle TTL window. */
+const DEFAULT_BUNDLE_TTL_MS = 1000 * 60 * 60 * 24;
+
+/** Approximate Stellar ledger close time in milliseconds — the same
+ *  approximation the executor uses for its transaction timeout. */
+const STELLAR_LEDGER_CLOSE_TIME_MS = 5_000;
+
 /**
- * Calculates bundle TTL (24 hours from now)
+ * Calculates bundle TTL: 24 hours from now, capped by the earliest spend
+ * signature expiration. A spend signature is only valid until its expiration
+ * ledger, so a bundle kept past that point can never settle on-chain — it is
+ * expired in every sense that matters. Deriving the TTL from the signatures
+ * makes that expiry visible to the mempool's ordinary in-memory TTL checks,
+ * with no chain or database reads at expiry time.
  *
+ * @param classified - The bundle's classified operations
+ * @param latestLedgerSequence - Current ledger sequence, for converting a
+ *   signature's expiration ledger into wall-clock time
  * @returns TTL date
  */
-export function calculateBundleTtl(): Date {
-  return new Date(Date.now() + 1000 * 60 * 60 * 24);
+export function calculateBundleTtl(
+  classified?: ClassifiedOperations,
+  latestLedgerSequence?: number,
+): Date {
+  const defaultTtl = new Date(Date.now() + DEFAULT_BUNDLE_TTL_MS);
+  if (!classified || latestLedgerSequence === undefined) return defaultTtl;
+
+  let minExpirationLedger: number | null = null;
+  for (const op of classified.spend) {
+    const exp = Number(op.getUTXOSignature()?.exp);
+    if (!Number.isFinite(exp)) continue;
+    if (minExpirationLedger === null || exp < minExpirationLedger) {
+      minExpirationLedger = exp;
+    }
+  }
+  if (minExpirationLedger === null) return defaultTtl;
+
+  const msUntilExpiration = (minExpirationLedger - latestLedgerSequence) *
+    STELLAR_LEDGER_CLOSE_TIME_MS;
+  const signatureTtl = new Date(Date.now() + msUntilExpiration);
+  return signatureTtl < defaultTtl ? signatureTtl : defaultTtl;
 }
 
 /**

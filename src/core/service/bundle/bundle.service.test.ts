@@ -1,5 +1,9 @@
 import { assertEquals } from "@std/assert";
-import { calculateFee, isWithdrawOnlyBundle } from "./bundle.service.ts";
+import {
+  calculateBundleTtl,
+  calculateFee,
+  isWithdrawOnlyBundle,
+} from "./bundle.service.ts";
 import type { ClassifiedOperations } from "./bundle.types.ts";
 
 // isWithdrawOnlyBundle only inspects per-kind counts, so lightweight stand-ins
@@ -92,4 +96,42 @@ Deno.test("calculateFee - exact cover leaves zero fee (still not admissible)", (
     totalWithdrawAmount: 0n,
   });
   assertEquals(result.fee, 0n);
+});
+
+// calculateBundleTtl — spend ops are stand-ins exposing only getUTXOSignature.
+function spendWithSigExp(exps: number[]): ClassifiedOperations {
+  return {
+    create: [],
+    deposit: [],
+    withdraw: [],
+    spend: exps.map((exp) => ({
+      getUTXOSignature: () => ({ sig: new Uint8Array(), exp }),
+    })),
+  } as unknown as ClassifiedOperations;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+Deno.test("calculateBundleTtl - no operations: 24h default", () => {
+  const ttl = calculateBundleTtl().getTime() - Date.now();
+  assertEquals(Math.abs(ttl - DAY_MS) < 5_000, true);
+});
+
+Deno.test("calculateBundleTtl - unsigned/far-future signatures: capped at 24h", () => {
+  // Signature expires ~1M ledgers out — far beyond the 24h window.
+  const ttl = calculateBundleTtl(spendWithSigExp([1_000_000]), 100)
+    .getTime() - Date.now();
+  assertEquals(Math.abs(ttl - DAY_MS) < 5_000, true);
+});
+
+Deno.test("calculateBundleTtl - earliest signature expiration wins", () => {
+  // exp 110 at ledger 100 → 10 ledgers ≈ 50s (5s/ledger approximation).
+  const ttl = calculateBundleTtl(spendWithSigExp([500, 110]), 100)
+    .getTime() - Date.now();
+  assertEquals(Math.abs(ttl - 50_000) < 5_000, true);
+});
+
+Deno.test("calculateBundleTtl - already-expired signature yields a past TTL", () => {
+  const ttl = calculateBundleTtl(spendWithSigExp([99]), 100);
+  assertEquals(ttl.getTime() <= Date.now(), true);
 });
